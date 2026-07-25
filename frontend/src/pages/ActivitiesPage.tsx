@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isUnreachable, type ActivityRow } from "../api/client";
 import { ApiUnreachable } from "../components/ApiUnreachable";
+import { DataGridToolbar } from "../components/DataGridToolbar";
 import { DataViewFrame } from "../components/DataViewFrame";
 import { useToasts } from "../components/Toasts";
 import { formatDate } from "../lib/format";
@@ -23,6 +24,7 @@ export function ActivitiesPage() {
   const [search, setSearch] = useState("");
   const [type, setType] = useState("");
   const [status, setStatus] = useState("OPEN");
+  const [groupedView, setGroupedView] = useState(true);
   const [draft, setDraft] = useState({
     activityType: "TASK",
     subject: "",
@@ -115,7 +117,30 @@ export function ActivitiesPage() {
       <button className="btn btn-sm" onClick={resetFilters}>Reset</button>
     </section>
 
-    <DataViewFrame title="Activity timeline">
+    <DataViewFrame
+      title="Activity timeline"
+      actions={<DataGridToolbar
+        gridName="Activity timeline"
+        grouped={groupedView}
+        groupLabel="Related record"
+        onToggleGroup={() => setGroupedView((value) => !value)}
+        auditEntityType="ACTIVITY"
+        exportFilename="activity-timeline"
+        exportRows={rows.map((row) => ({
+          type: row.activityType,
+          subject: row.subject,
+          status: row.status,
+          priority: row.priority,
+          related: row.relatedLabel ?? row.relatedEntityType,
+          owner: row.ownerName,
+          dueAt: row.dueAt ?? "",
+          occurredAt: row.occurredAt,
+          completedAt: row.completedAt ?? "",
+          outcome: row.outcome ?? "",
+        }))}
+        note="Current filtered page"
+      />}
+    >
       <section className="activity-create-panel" aria-label="Create activity">
         <div className="activity-form-grid">
           <select value={draft.activityType} onChange={(event) => setDraft((value) => ({ ...value, activityType: event.target.value }))}>{TYPES.map((value) => <option key={value} value={value}>{value}</option>)}</select>
@@ -137,8 +162,8 @@ export function ActivitiesPage() {
 
       {activitiesQ.isLoading && <GridLoader label="Reading engagement timeline" rows={6} columns={5} />}
       {activitiesQ.isError && <p className="empty-note">Activities failed to load{activitiesQ.error instanceof Error ? `: ${activitiesQ.error.message}` : "."}</p>}
-      {activitiesQ.isSuccess && grouped.length === 0 && <p className="empty-note">No activities match the current query.</p>}
-      {grouped.map(([group, items]) => <section className="activity-group" key={group}>
+      {activitiesQ.isSuccess && rows.length === 0 && <p className="empty-note">No activities match the current query.</p>}
+      {groupedView && grouped.map(([group, items]) => <section className="activity-group" key={group}>
         <h2>{group}</h2>
         {items.map((activity) => <article className={`activity-row activity-${activity.activityType.toLowerCase()}`} key={activity.id}>
           <span className={`activity-stripe priority-${activity.priority.toLowerCase()}`} aria-hidden />
@@ -153,6 +178,18 @@ export function ActivitiesPage() {
           }}>Complete</button>}
         </article>)}
       </section>)}
+      {!groupedView && rows.map((activity) => <article className={`activity-row activity-${activity.activityType.toLowerCase()}`} key={activity.id}>
+        <span className={`activity-stripe priority-${activity.priority.toLowerCase()}`} aria-hidden />
+        <div className="activity-main">
+          <div className="activity-title"><strong>{activity.subject}</strong><span className={`chip chip-${activity.status.toLowerCase()}`}>{activity.status}</span></div>
+          <p>{activity.body || activity.outcome || "No notes captured."}</p>
+          <small>{activity.activityType} · {activity.priority} · {activity.relatedLabel ?? activity.relatedEntityType} · owner {activity.ownerName} · {activity.dueAt ? `due ${formatDate(activity.dueAt)}` : `occurred ${formatDate(activity.occurredAt)}`}</small>
+        </div>
+        {activity.status !== "COMPLETED" && <button className="btn btn-sm" disabled={completeMutation.isPending} onClick={() => {
+          const outcome = window.prompt("Outcome", "Completed");
+          if (outcome != null) completeMutation.mutate({ id: activity.id, outcome });
+        }}>Complete</button>}
+      </article>)}
       {activitiesQ.isSuccess && <footer className="page-controls" aria-label="Activity pagination">
         <span>Showing {rows.length} of {total} records - 100 rows per page</span>
         <div>

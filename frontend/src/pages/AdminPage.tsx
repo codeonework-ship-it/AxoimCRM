@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { api, isUnreachable, type ReportDefinition } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ApiUnreachable } from "../components/ApiUnreachable";
+import { DataGridToolbar } from "../components/DataGridToolbar";
 import { DataViewFrame } from "../components/DataViewFrame";
 import { useToasts } from "../components/Toasts";
 import { formatDate, formatMoney } from "../lib/format";
@@ -47,6 +48,7 @@ export function AdminPage() {
           : location.pathname.includes("/billing") ? "billing"
             : "users";
   const [tab, setTab] = useState(tabs.includes(initialTab) ? initialTab : tabs[0]);
+  const [groupedTabs, setGroupedTabs] = useState<Record<string, boolean>>({});
 
   const usersQ = useQuery({ queryKey: ["admin", "users"], queryFn: api.adminUsers, retry: 1 });
   const policiesQ = useQuery({ queryKey: ["rbac", "policies"], queryFn: () => api.rbacPolicies(), retry: 1 });
@@ -107,6 +109,19 @@ export function AdminPage() {
   });
 
   if (isUnreachable(usersQ.error)) return <ApiUnreachable onRetry={() => void usersQ.refetch()} retrying={usersQ.isFetching} />;
+  const activeGrouped = groupedTabs[tab] ?? false;
+  const users = activeGrouped ? sortedBy(usersQ.data ?? [], (row) => row.role, (row) => row.displayName) : usersQ.data ?? [];
+  const policies = activeGrouped ? sortedBy(policiesQ.data ?? [], (row) => row.moduleCode, (row) => row.displayName) : policiesQ.data ?? [];
+  const companies = activeGrouped ? sortedBy(companiesQ.data ?? [], (row) => row.accountStatus, (row) => row.tenantName) : companiesQ.data ?? [];
+  const billing = activeGrouped ? sortedBy(billingQ.data ?? [], (row) => row.paymentStatus, (row) => row.tenantName) : billingQ.data ?? [];
+  const alertRows = [
+    ...(emailAlertsQ.data ?? []).map((row) => ({ type: "Email", name: row.name, subject: row.subject, recipientsOrReport: row.to.join(", "), active: row.active ? "Active" : "Inactive" })),
+    ...(reportAlertsQ.data ?? []).map((row) => ({ type: "Report", name: row.name, subject: row.subject, recipientsOrReport: `${row.reportLabel} · ${row.formats.join(", ")}`, active: row.active ? "Active" : "Inactive" })),
+  ];
+
+  function toggleGroup(key = tab) {
+    setGroupedTabs((value) => ({ ...value, [key]: !value[key] }));
+  }
 
   return <>
     <div className="page-head">
@@ -117,7 +132,25 @@ export function AdminPage() {
       {tabs.map((item) => <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item.replace(/-/g, " ")}</button>)}
     </div>
 
-    {tab === "users" && <DataViewFrame title="User management">
+    {tab === "users" && <DataViewFrame
+      title="User management"
+      actions={<DataGridToolbar
+        gridName="User management"
+        grouped={activeGrouped}
+        groupLabel="Role"
+        onToggleGroup={() => toggleGroup("users")}
+        auditEntityType="APP_USER"
+        exportFilename="admin-users"
+        exportRows={users.map((row) => ({
+          name: row.displayName,
+          email: row.email,
+          tenant: row.tenantName,
+          role: row.role,
+          status: row.active ? "Active" : "Inactive",
+          platformUser: row.platformUser ? "Yes" : "No",
+        }))}
+      />}
+    >
       {!readOnly && <div className="admin-form">
         <input value={userDraft.displayName} onChange={(event) => setUserDraft((v) => ({ ...v, displayName: event.target.value }))} placeholder="Display name" />
         <input value={userDraft.email} onChange={(event) => setUserDraft((v) => ({ ...v, email: event.target.value }))} placeholder="Email" />
@@ -126,18 +159,57 @@ export function AdminPage() {
         <button className="btn btn-primary btn-sm" disabled={createUser.isPending} onClick={() => createUser.mutate()}>Create user</button>
       </div>}
       <div className="table-wrap"><table className="data-table"><thead><tr><th>Name</th><th>Email</th><th>Tenant</th><th>Role</th><th>Status</th>{!readOnly && <th className="table-action">Action</th>}</tr></thead>
-        <tbody>{usersQ.data?.map((row) => <tr key={row.id}><td>{row.displayName}</td><td>{row.email}</td><td>{row.tenantName}</td><td>{row.role}</td><td>{row.active ? "Active" : "Inactive"}</td>{!readOnly && <td className="table-action">{!row.platformUser && <button className="link-btn" onClick={() => activeUser.mutate({ id: row.id, active: !row.active })}>{row.active ? "Inactivate" : "Activate"}</button>}</td>}</tr>)}</tbody>
+        <tbody>{users.map((row, index, all) => <Fragment key={row.id}>
+          {activeGrouped && groupChanged(index, all, (item) => item.role) && <tr className="group-row"><th colSpan={readOnly ? 5 : 6}>{row.role}</th></tr>}
+          <tr><td>{row.displayName}</td><td>{row.email}</td><td>{row.tenantName}</td><td>{row.role}</td><td>{row.active ? "Active" : "Inactive"}</td>{!readOnly && <td className="table-action">{!row.platformUser && <button className="link-btn" onClick={() => activeUser.mutate({ id: row.id, active: !row.active })}>{row.active ? "Inactivate" : "Activate"}</button>}</td>}</tr>
+        </Fragment>)}</tbody>
       </table></div>
     </DataViewFrame>}
 
-    {tab === "rbac" && <DataViewFrame title="RBAC policies">
+    {tab === "rbac" && <DataViewFrame
+      title="RBAC policies"
+      actions={<DataGridToolbar
+        gridName="RBAC policies"
+        grouped={activeGrouped}
+        groupLabel="Module"
+        onToggleGroup={() => toggleGroup("rbac")}
+        auditEntityType="SCREEN_POLICY"
+        exportFilename="rbac-policies"
+        exportRows={policies.map((row) => ({
+          role: row.roleCode,
+          screen: row.displayName,
+          module: row.moduleCode,
+          route: row.route,
+          read: row.canRead ? "Yes" : "No",
+          write: row.canWrite ? "Yes" : "No",
+          export: row.canExport ? "Yes" : "No",
+          admin: row.canAdmin ? "Yes" : "No",
+          scope: row.scope,
+        }))}
+      />}
+    >
       <div className="role-card-grid">{rolesQ.data?.map((role) => <article className="role-card" key={role.code}><strong>{role.code}</strong><span>{role.scope}</span><p>{role.description}</p></article>)}</div>
       <div className="table-wrap"><table className="data-table"><thead><tr><th>Screen</th><th>Module</th><th>Route</th><th>Read</th><th>Write</th><th>Export</th><th>Admin</th></tr></thead>
-        <tbody>{policiesQ.data?.map((p) => <tr key={`${p.roleCode}-${p.screenCode}`}><td>{p.displayName}</td><td>{p.moduleCode}</td><td>{p.route}</td><td>{p.canRead ? "Yes" : "No"}</td><td>{p.canWrite ? "Yes" : "No"}</td><td>{p.canExport ? "Yes" : "No"}</td><td>{p.canAdmin ? "Yes" : "No"}</td></tr>)}</tbody>
+        <tbody>{policies.map((p, index, all) => <Fragment key={`${p.roleCode}-${p.screenCode}`}>
+          {activeGrouped && groupChanged(index, all, (item) => item.moduleCode) && <tr className="group-row"><th colSpan={7}>{p.moduleCode}</th></tr>}
+          <tr><td>{p.displayName}</td><td>{p.moduleCode}</td><td>{p.route}</td><td>{p.canRead ? "Yes" : "No"}</td><td>{p.canWrite ? "Yes" : "No"}</td><td>{p.canExport ? "Yes" : "No"}</td><td>{p.canAdmin ? "Yes" : "No"}</td></tr>
+        </Fragment>)}</tbody>
       </table></div>
     </DataViewFrame>}
 
-    {tab === "alerts" && <DataViewFrame title="Email and report alerts">
+    {tab === "alerts" && <DataViewFrame
+      title="Email and report alerts"
+      actions={<DataGridToolbar
+        gridName="Email and report alerts"
+        grouped={activeGrouped}
+        groupLabel="Alert type"
+        onToggleGroup={() => toggleGroup("alerts")}
+        auditEntityType="ALERT_CONFIGURATION"
+        exportFilename="alert-configurations"
+        exportRows={alertRows}
+        note="Email and report alert configuration"
+      />}
+    >
       {!readOnly && <div className="alert-config-grid">
         <section className="config-card"><h2>Email alert configuration</h2>
           <input placeholder="Name" value={emailDraft.name} onChange={(event) => setEmailDraft((v) => ({ ...v, name: event.target.value }))} />
@@ -170,21 +242,87 @@ export function AdminPage() {
       </div>
     </DataViewFrame>}
 
-    {tab === "trials" && platform && <DataViewFrame title="Trial accounts">
+    {tab === "trials" && platform && <DataViewFrame
+      title="Trial accounts"
+      actions={<DataGridToolbar
+        gridName="Trial accounts"
+        grouped={activeGrouped}
+        groupLabel="Account status"
+        onToggleGroup={() => toggleGroup("trials")}
+        auditEntityType="TRIAL_ACCOUNT"
+        exportFilename="trial-accounts"
+        exportRows={companies.map((row) => ({
+          company: row.tenantName,
+          status: row.accountStatus,
+          trialStart: row.trialStartAt ?? "",
+          trialEnd: row.trialEndsAt ?? "",
+          extensions: row.trialExtensionCount,
+          maxExtensionDays: row.maxTrialExtensionDays,
+        }))}
+      />}
+    >
       <div className="table-wrap"><table className="data-table"><thead><tr><th>Company</th><th>Status</th><th>Trial end</th><th>Extensions</th>{!readOnly && <th className="table-action">Action</th>}</tr></thead>
-        <tbody>{companiesQ.data?.map((row) => <tr key={row.tenantId}><td>{row.tenantName}</td><td>{row.accountStatus}</td><td>{formatDate(row.trialEndsAt)}</td><td>{row.trialExtensionCount} / {row.maxTrialExtensionDays} days max</td>{!readOnly && <td className="table-action"><button className="link-btn" onClick={() => extendTrial.mutate(row.tenantId)}>Extend 7d</button></td>}</tr>)}</tbody>
+        <tbody>{companies.map((row, index, all) => <Fragment key={row.tenantId}>
+          {activeGrouped && groupChanged(index, all, (item) => item.accountStatus) && <tr className="group-row"><th colSpan={readOnly ? 4 : 5}>{row.accountStatus}</th></tr>}
+          <tr><td>{row.tenantName}</td><td>{row.accountStatus}</td><td>{formatDate(row.trialEndsAt)}</td><td>{row.trialExtensionCount} / {row.maxTrialExtensionDays} days max</td>{!readOnly && <td className="table-action"><button className="link-btn" onClick={() => extendTrial.mutate(row.tenantId)}>Extend 7d</button></td>}</tr>
+        </Fragment>)}</tbody>
       </table></div>
     </DataViewFrame>}
 
-    {tab === "companies" && platform && <DataViewFrame title="Company setup accounts">
+    {tab === "companies" && platform && <DataViewFrame
+      title="Company setup accounts"
+      actions={<DataGridToolbar
+        gridName="Company setup accounts"
+        grouped={activeGrouped}
+        groupLabel="Account status"
+        onToggleGroup={() => toggleGroup("companies")}
+        auditEntityType="COMPANY_ACCOUNT"
+        exportFilename="company-setup-accounts"
+        exportRows={companies.map((row) => ({
+          company: row.legalName,
+          workspace: row.tenantSlug,
+          tenant: row.tenantName,
+          status: row.accountStatus,
+          inactiveReason: row.inactiveReason ?? "",
+          inactiveAt: row.inactiveAt ?? "",
+        }))}
+      />}
+    >
       <div className="table-wrap"><table className="data-table"><thead><tr><th>Company</th><th>Workspace</th><th>Status</th><th>Reason</th>{!readOnly && <th className="table-action">Action</th>}</tr></thead>
-        <tbody>{companiesQ.data?.map((row) => <tr key={row.tenantId}><td>{row.legalName}</td><td>{row.tenantSlug}</td><td>{row.accountStatus}</td><td>{row.inactiveReason ?? "-"}</td>{!readOnly && <td className="table-action company-actions"><button className="link-btn" onClick={() => companyStatus.mutate({ tenantId: row.tenantId, status: "ACTIVE" })}>Active</button><button className="link-btn danger-link" onClick={() => companyStatus.mutate({ tenantId: row.tenantId, status: "PAST_DUE" })}>Past due</button></td>}</tr>)}</tbody>
+        <tbody>{companies.map((row, index, all) => <Fragment key={row.tenantId}>
+          {activeGrouped && groupChanged(index, all, (item) => item.accountStatus) && <tr className="group-row"><th colSpan={readOnly ? 4 : 5}>{row.accountStatus}</th></tr>}
+          <tr><td>{row.legalName}</td><td>{row.tenantSlug}</td><td>{row.accountStatus}</td><td>{row.inactiveReason ?? "-"}</td>{!readOnly && <td className="table-action company-actions"><button className="link-btn" onClick={() => companyStatus.mutate({ tenantId: row.tenantId, status: "ACTIVE" })}>Active</button><button className="link-btn danger-link" onClick={() => companyStatus.mutate({ tenantId: row.tenantId, status: "PAST_DUE" })}>Past due</button></td>}</tr>
+        </Fragment>)}</tbody>
       </table></div>
     </DataViewFrame>}
 
-    {tab === "billing" && platform && <DataViewFrame title="Billing">
+    {tab === "billing" && platform && <DataViewFrame
+      title="Billing"
+      actions={<DataGridToolbar
+        gridName="Billing"
+        grouped={activeGrouped}
+        groupLabel="Payment status"
+        onToggleGroup={() => toggleGroup("billing")}
+        auditEntityType="BILLING_ACCOUNT"
+        exportFilename="billing"
+        exportRows={billing.map((row) => ({
+          company: row.tenantName,
+          plan: row.planCode,
+          payment: row.paymentStatus,
+          billingEmail: row.billingEmail,
+          invoice: row.invoiceNumber ?? "",
+          amount: row.amount ?? "",
+          currency: row.currency ?? "",
+          invoiceStatus: row.invoiceStatus ?? "",
+          dueAt: row.dueAt ?? "",
+        }))}
+      />}
+    >
       <div className="table-wrap"><table className="data-table"><thead><tr><th>Company</th><th>Plan</th><th>Payment</th><th>Billing email</th><th>Invoice</th><th>Amount</th><th>Due</th></tr></thead>
-        <tbody>{billingQ.data?.map((row) => <tr key={row.tenantId}><td>{row.tenantName}</td><td>{row.planCode}</td><td>{row.paymentStatus}</td><td>{row.billingEmail}</td><td>{row.invoiceNumber ?? "-"}</td><td>{row.amount == null ? "-" : formatMoney(row.amount)}</td><td>{formatDate(row.dueAt)}</td></tr>)}</tbody>
+        <tbody>{billing.map((row, index, all) => <Fragment key={row.tenantId}>
+          {activeGrouped && groupChanged(index, all, (item) => item.paymentStatus) && <tr className="group-row"><th colSpan={7}>{row.paymentStatus}</th></tr>}
+          <tr><td>{row.tenantName}</td><td>{row.planCode}</td><td>{row.paymentStatus}</td><td>{row.billingEmail}</td><td>{row.invoiceNumber ?? "-"}</td><td>{row.amount == null ? "-" : formatMoney(row.amount)}</td><td>{formatDate(row.dueAt)}</td></tr>
+        </Fragment>)}</tbody>
       </table></div>
     </DataViewFrame>}
   </>;
@@ -195,4 +333,12 @@ function AlertTable({ title, rows, readOnly }: { title: string; rows: Array<{ id
     <tbody>{rows.map((row) => <tr key={row.id}><td>{row.name}</td><td>{row.subject}</td><td>{row.detail}</td>{!readOnly && <td className="table-action"><button className="link-btn" onClick={row.action}>Queue</button></td>}</tr>)}
     {rows.length === 0 && <tr><td colSpan={readOnly ? 3 : 4} className="empty-note">No alerts configured.</td></tr>}</tbody>
   </table></div></section>;
+}
+
+function sortedBy<T>(rows: T[], group: (row: T) => string, label: (row: T) => string): T[] {
+  return [...rows].sort((a, b) => group(a).localeCompare(group(b)) || label(a).localeCompare(label(b)));
+}
+
+function groupChanged<T>(index: number, rows: T[], group: (row: T) => string): boolean {
+  return index === 0 || group(rows[index - 1]) !== group(rows[index]);
 }

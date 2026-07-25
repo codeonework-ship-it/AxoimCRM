@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { api, isUnreachable, type ReferenceEntry, type ReferenceValueSet } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ApiUnreachable } from "../components/ApiUnreachable";
+import { DataGridToolbar } from "../components/DataGridToolbar";
 import { DataViewFrame } from "../components/DataViewFrame";
 import { canManageMasters } from "../components/MasterToolbar";
 import { useToasts } from "../components/Toasts";
@@ -42,6 +43,7 @@ export function ReferenceDataPage() {
   const [searchParams] = useSearchParams();
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [counts, setCounts] = useState<Record<string, number>>({});
+  const [grouped, setGrouped] = useState(false);
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
   const pendingFocus = useRef<string | null>(null);
   const canManage = canManageMasters(user?.role);
@@ -167,7 +169,28 @@ export function ReferenceDataPage() {
     {setsQ.isError && <p className="empty-note">Reference data failed to load{setsQ.error instanceof Error ? `: ${setsQ.error.message}` : "."}</p>}
     {setsQ.isSuccess && sets.length === 0 && <p className="empty-note">No governed value sets are configured for this tenant.</p>}
 
-    {setsQ.isSuccess && sets.length > 0 && <DataViewFrame title="Reference value-set console">
+    {setsQ.isSuccess && sets.length > 0 && <DataViewFrame
+      title="Reference value-set console"
+      actions={<DataGridToolbar
+        gridName="Reference value-set console"
+        grouped={grouped}
+        groupLabel="Status"
+        onToggleGroup={() => setGrouped((value) => !value)}
+        auditEntityType="REFERENCE_VALUE_SET"
+        exportFilename={`reference-${selectedApiName || "value-set"}`}
+        exportRows={(entriesQ.data ?? []).map((entry) => ({
+          valueSet: activeSet?.label ?? selectedApiName,
+          code: entry.code,
+          label: entry.label,
+          sortOrder: entry.sortOrder,
+          status: entry.active ? "Active" : "Inactive",
+          systemManaged: entry.systemManaged ? "Yes" : "No",
+          effectiveFrom: entry.effectiveFrom ?? "",
+          effectiveTo: entry.effectiveTo ?? "",
+        }))}
+        note="Current value set"
+      />}
+    >
       <div className="master-tabs" role="tablist" aria-label="Master value sets" aria-orientation="horizontal" onKeyDown={onTabStripKeyDown}>
         {sets.map((set) => {
           const selected = set.apiName === selectedApiName;
@@ -208,13 +231,26 @@ export function ReferenceDataPage() {
         {entriesQ.isLoading && <GridLoader label="Reading value set" rows={5} columns={5} />}
         {entriesQ.isError && <p className="empty-note">Entries failed to load{entriesQ.error instanceof Error ? `: ${entriesQ.error.message}` : "."}</p>}
         {entriesQ.isSuccess && <div className="table-wrap"><table className="data-table"><thead><tr><th>Code</th><th>Label</th><th>Order</th><th>Status</th>{canManage && <th className="table-action">Action</th>}</tr></thead>
-          <tbody>{entriesQ.data.map((entry) => <tr key={entry.id}>
-            <td>{entry.code}</td><td>{entry.label}</td><td>{entry.sortOrder}</td><td>{entry.active ? "Active" : "Inactive"}</td>
-            {canManage && <td className="table-action"><button className="link-btn" disabled={updateMutation.isPending || entry.systemManaged} onClick={() => updateMutation.mutate(entry)}>{entry.active ? "Deactivate" : "Activate"}</button></td>}
-          </tr>)}
+          <tbody>{sortEntries(entriesQ.data, grouped).map((entry, index, all) => {
+            const group = entry.active ? "Active" : "Inactive";
+            const previous = all[index - 1];
+            const showGroup = grouped && (!previous || (previous.active ? "Active" : "Inactive") !== group);
+            return <Fragment key={entry.id}>
+              {showGroup && <tr className="group-row"><th colSpan={canManage ? 5 : 4}>{group}</th></tr>}
+              <tr>
+                <td>{entry.code}</td><td>{entry.label}</td><td>{entry.sortOrder}</td><td>{group}</td>
+                {canManage && <td className="table-action"><button className="link-btn" disabled={updateMutation.isPending || entry.systemManaged} onClick={() => updateMutation.mutate(entry)}>{entry.active ? "Deactivate" : "Activate"}</button></td>}
+              </tr>
+            </Fragment>;
+          })}
           {entriesQ.data.length === 0 && <tr><td colSpan={canManage ? 5 : 4} className="empty-note">No entries in this value set.</td></tr>}</tbody>
         </table></div>}
       </section>}
     </DataViewFrame>}
   </>;
+}
+
+function sortEntries(entries: ReferenceEntry[], grouped: boolean): ReferenceEntry[] {
+  if (!grouped) return entries;
+  return [...entries].sort((a, b) => Number(b.active) - Number(a.active) || a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
 }

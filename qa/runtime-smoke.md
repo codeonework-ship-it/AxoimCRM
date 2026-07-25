@@ -139,4 +139,10 @@ The canonical Compose file builds the Spring Boot API and React web application 
 - The grid Full size/Restore control remains in the same sticky header, so users retain the whole utility set while reviewing expanded tables.
 - Audit drawers now use a shared reusable component and are scoped by the active grid entity type, keeping master and workspace evidence access consistent.
 
+## 2026-07-25 universal Data Grid utility-frame verification
+
+- Frontend `npm run build` passed after extending the standard Data Grid utility header to Activities, CPQ, Reports, Reference Data and all Administration sub-screens.
+- Reports now show grid-level Export Excel, Export Word, Export PDF, Audit, Group and Full size/Restore in the catalogue frame while keeping Jasper PDF/XLSX/DOCX downloads on each report card.
+- Screens without a dedicated backend export endpoint use a current-view client export fallback so the utility is still available from the Data Grid in normal and full-size views; screens with governed backend exports continue to use those server routes.
+
 Docker Hub pulls were blocked on this workstation by Docker Desktop's internal HTTPS proxy. Local runtime images plus PostgreSQL 16 and Kafka 3.7 were used for this workstation's live verification only; that private recovery override is deliberately not part of the repository. The canonical, reproducible Compose definition and version targets remain unchanged and are the CI/release contract.

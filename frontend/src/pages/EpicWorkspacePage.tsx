@@ -1,8 +1,8 @@
 import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, isUnreachable, type DownloadedFile, type WorkspaceRow } from "../api/client";
-import { AuditDrawer } from "../components/AuditDrawer";
+import { api, isUnreachable, type WorkspaceRow } from "../api/client";
 import { ApiUnreachable } from "../components/ApiUnreachable";
+import { DataGridToolbar } from "../components/DataGridToolbar";
 import { DataViewFrame } from "../components/DataViewFrame";
 import { GridLoader } from "../components/Loaders";
 import { useToasts } from "../components/Toasts";
@@ -70,7 +70,6 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [grouped, setGrouped] = useState(false);
-  const [auditOpen, setAuditOpen] = useState(false);
   const toasts = useToasts();
   const queryClient = useQueryClient();
   const workspaceQ = useQuery({
@@ -99,15 +98,6 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
     : rows;
   const total = workspace?.rows.total ?? 0;
   const totalPages = workspace?.rows.totalPages ?? 0;
-
-  async function download(format: "XLSX" | "DOCX" | "PDF", label: string) {
-    try {
-      saveFile(await api.exportWorkspace(module, format, { page, search, status }));
-      toasts.push("info", `${label} ready`, "The export used the current page, search and status filters.");
-    } catch (error) {
-      toasts.push("error", `${label} failed`, error instanceof Error ? error.message : "Download failed.");
-    }
-  }
 
   return <>
     <div className="page-head epic-head">
@@ -151,17 +141,16 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
 
     <DataViewFrame
       title={`${workspace?.title ?? titleFromModule(module)} register`}
-      actions={<div className="master-toolbar data-grid-toolbar" role="toolbar" aria-label={`${titleFromModule(module)} data tools`}>
-        <button className={`btn btn-sm${grouped ? " active" : ""}`} aria-pressed={grouped} onClick={() => setGrouped((value) => !value)}>
-          Group: {grouped ? "Status" : "Off"}
-        </button>
-        <button className="btn btn-sm" onClick={() => setAuditOpen(true)}>Audit</button>
-        <span className="toolbar-divider" aria-hidden />
-        <button className="btn btn-sm" onClick={() => void download("XLSX", "Export Excel")}>Export Excel</button>
-        <button className="btn btn-sm" onClick={() => void download("DOCX", "Export Word")}>Export Word</button>
-        <button className="btn btn-sm" onClick={() => void download("PDF", "Export PDF")}>Export PDF</button>
-        <span className="cpq-note">100 rows/page - tenant/RLS governed</span>
-      </div>}
+      actions={<DataGridToolbar
+        gridName={`${workspace?.title ?? titleFromModule(module)} register`}
+        grouped={grouped}
+        groupLabel="Status"
+        onToggleGroup={() => setGrouped((value) => !value)}
+        auditEntityType={auditEntityFor(module)}
+        exportFilename={`${module}-workspace`}
+        onExport={(format) => api.exportWorkspace(module, format, { page, search, status })}
+        note="100 rows/page - tenant/RLS governed"
+      />}
     >
       {workspaceQ.isLoading && <GridLoader label="Reading operational workspace" rows={6} columns={6} />}
       {workspaceQ.isError && <p className="empty-note">Workspace failed to load{workspaceQ.error instanceof Error ? `: ${workspaceQ.error.message}` : "."}</p>}
@@ -175,13 +164,6 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
         </div>
       </footer>}
     </DataViewFrame>
-    <AuditDrawer
-      open={auditOpen}
-      entityType={auditEntityFor(module)}
-      title={`${titleFromModule(module)} audit`}
-      emptyLabel="No audited actions for this workspace yet."
-      onClose={() => setAuditOpen(false)}
-    />
   </>;
 }
 
@@ -288,17 +270,6 @@ async function runWorkspaceAction(module: WorkspaceModule, row: WorkspaceRow) {
   }
   if (module === "commodity") return api.offerCommodityEnquiry(row.id);
   throw new Error("No governed action is available for this workspace.");
-}
-
-function saveFile(file: DownloadedFile) {
-  const url = URL.createObjectURL(file.blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = file.filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
 function titleFromModule(module: WorkspaceModule): string {

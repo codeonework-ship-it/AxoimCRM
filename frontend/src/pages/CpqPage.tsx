@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { api, isUnreachable, type CpqPriceBook, type CpqProduct, type CpqQuote, type DownloadedFile } from "../api/client";
+import { api, isUnreachable, type CpqPriceBook, type CpqProduct, type CpqQuote } from "../api/client";
 import { ApiUnreachable } from "../components/ApiUnreachable";
+import { DataGridToolbar, saveDownloadedFile } from "../components/DataGridToolbar";
 import { DataViewFrame } from "../components/DataViewFrame";
 import { GridLoader } from "../components/Loaders";
 import { useToasts } from "../components/Toasts";
@@ -22,6 +23,7 @@ export function CpqPage({ section }: CpqPageProps) {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("");
+  const [grouped, setGrouped] = useState(false);
 
   const productsQ = useQuery({
     queryKey: ["cpq", "products", page, search, filter],
@@ -49,6 +51,9 @@ export function CpqPage({ section }: CpqPageProps) {
   const pageData = activeQ.data;
   const total = pageData?.total ?? 0;
   const totalPages = pageData?.totalPages ?? 0;
+  const productRows = ((section === "products" ? pageData?.items : []) ?? []) as CpqProduct[];
+  const priceBookRows = ((section === "price-books" ? pageData?.items : []) ?? []) as CpqPriceBook[];
+  const quoteRows = ((section === "quotes" ? pageData?.items : []) ?? []) as CpqQuote[];
 
   function resetFilters() {
     setSearch("");
@@ -58,7 +63,7 @@ export function CpqPage({ section }: CpqPageProps) {
 
   async function downloadQuote(quote: CpqQuote, format: "PDF" | "DOCX" | "XLSX") {
     try {
-      saveFile(await api.downloadQuote(quote.id, format));
+      saveDownloadedFile(await api.downloadQuote(quote.id, format));
       toasts.push("info", "Quote document ready", `${quote.quoteNumber} was downloaded as ${format}.`);
     } catch (error) {
       toasts.push("error", "Quote download failed", error instanceof Error ? error.message : "Download failed.");
@@ -98,13 +103,22 @@ export function CpqPage({ section }: CpqPageProps) {
 
     <DataViewFrame
       title={section === "products" ? "Product catalogue" : section === "price-books" ? "Price book register" : "Quote register"}
-      actions={<span className="cpq-note">100 rows/page - vendor integrations pending</span>}
+      actions={<DataGridToolbar
+        gridName={section === "products" ? "Product catalogue" : section === "price-books" ? "Price book register" : "Quote register"}
+        grouped={grouped}
+        groupLabel={section === "products" ? "Category" : "Status"}
+        onToggleGroup={() => setGrouped((value) => !value)}
+        auditEntityType={section === "products" ? "PRODUCT" : section === "price-books" ? "PRICE_BOOK" : "QUOTE"}
+        exportFilename={`cpq-${section}`}
+        exportRows={cpqExportRows(section, productRows, priceBookRows, quoteRows)}
+        note="Current filtered page - vendor integrations pending"
+      />}
     >
       {activeQ.isLoading && <GridLoader label="Reading governed CPQ records" rows={6} columns={6} />}
       {activeQ.isError && <p className="empty-note">CPQ records failed to load{activeQ.error instanceof Error ? `: ${activeQ.error.message}` : "."}</p>}
-      {activeQ.isSuccess && section === "products" && <ProductTable rows={(pageData?.items ?? []) as CpqProduct[]} />}
-      {activeQ.isSuccess && section === "price-books" && <PriceBookTable rows={(pageData?.items ?? []) as CpqPriceBook[]} />}
-      {activeQ.isSuccess && section === "quotes" && <QuoteTable rows={(pageData?.items ?? []) as CpqQuote[]} onDownload={downloadQuote} />}
+      {activeQ.isSuccess && section === "products" && <ProductTable rows={grouped ? sortedBy(productRows, (row) => row.category ?? "Unclassified", (row) => row.name) : productRows} grouped={grouped} />}
+      {activeQ.isSuccess && section === "price-books" && <PriceBookTable rows={grouped ? sortedBy(priceBookRows, (row) => row.status, (row) => row.name) : priceBookRows} grouped={grouped} />}
+      {activeQ.isSuccess && section === "quotes" && <QuoteTable rows={grouped ? sortedBy(quoteRows, (row) => row.status, (row) => row.quoteNumber) : quoteRows} grouped={grouped} onDownload={downloadQuote} />}
       {activeQ.isSuccess && <footer className="page-controls" aria-label="CPQ pagination">
         <span>Showing {pageData?.items.length ?? 0} of {total} records - 100 rows per page</span>
         <div>
@@ -117,56 +131,106 @@ export function CpqPage({ section }: CpqPageProps) {
   </>;
 }
 
-function ProductTable({ rows }: { rows: CpqProduct[] }) {
+function ProductTable({ rows, grouped }: { rows: CpqProduct[]; grouped: boolean }) {
+  let previousGroup = "";
   return <div className="table-wrap"><table className="data-table cpq-table">
     <thead><tr><th>Code</th><th>Product</th><th>Family</th><th>Category</th><th>UOM</th><th>Active prices</th><th>Status</th></tr></thead>
     <tbody>
-      {rows.map((row) => <tr key={row.id}>
-        <td className="mono">{row.code}</td><td>{row.name}</td><td>{row.productFamily ?? "-"}</td><td>{row.category ?? "-"}</td><td>{row.unitOfMeasure}</td><td>{row.activePriceCount}</td>
-        <td><span className={`chip ${row.active ? "chip-open" : "chip-cancelled"}`}>{row.active ? "ACTIVE" : "INACTIVE"}</span>{row.subscription && <span className="chip cpq-mini">SUBSCRIPTION</span>}</td>
-      </tr>)}
+      {rows.map((row) => {
+        const group = row.category ?? "Unclassified";
+        const showGroup = grouped && group !== previousGroup;
+        previousGroup = group;
+        return <Fragment key={row.id}>
+          {showGroup && <tr className="group-row"><th colSpan={7}>{group}</th></tr>}
+          <tr>
+            <td className="mono">{row.code}</td><td>{row.name}</td><td>{row.productFamily ?? "-"}</td><td>{row.category ?? "-"}</td><td>{row.unitOfMeasure}</td><td>{row.activePriceCount}</td>
+            <td><span className={`chip ${row.active ? "chip-open" : "chip-cancelled"}`}>{row.active ? "ACTIVE" : "INACTIVE"}</span>{row.subscription && <span className="chip cpq-mini">SUBSCRIPTION</span>}</td>
+          </tr>
+        </Fragment>;
+      })}
       {rows.length === 0 && <tr><td colSpan={7} className="empty-note">No products match the current query.</td></tr>}
     </tbody>
   </table></div>;
 }
 
-function PriceBookTable({ rows }: { rows: CpqPriceBook[] }) {
+function PriceBookTable({ rows, grouped }: { rows: CpqPriceBook[]; grouped: boolean }) {
+  let previousGroup = "";
   return <div className="table-wrap"><table className="data-table cpq-table">
     <thead><tr><th>Code</th><th>Name</th><th>Currency</th><th>Segment</th><th>Version</th><th>Entries</th><th>Status</th></tr></thead>
     <tbody>
-      {rows.map((row) => <tr key={row.id}>
-        <td className="mono">{row.code}</td><td>{row.name}{row.defaultBook && <span className="chip cpq-mini">DEFAULT</span>}</td><td>{row.currencyCode}</td><td>{row.customerSegment ?? row.businessUnitCode ?? "All"}</td><td>v{row.versionNumber}</td><td>{row.entryCount}</td>
-        <td><span className={`chip chip-${row.status.toLowerCase()}`}>{row.status}</span><small>{row.activatedAt ? `Activated ${formatDate(row.activatedAt)}` : "Not activated"}</small></td>
-      </tr>)}
+      {rows.map((row) => {
+        const showGroup = grouped && row.status !== previousGroup;
+        previousGroup = row.status;
+        return <Fragment key={row.id}>
+          {showGroup && <tr className="group-row"><th colSpan={7}>{row.status}</th></tr>}
+          <tr>
+            <td className="mono">{row.code}</td><td>{row.name}{row.defaultBook && <span className="chip cpq-mini">DEFAULT</span>}</td><td>{row.currencyCode}</td><td>{row.customerSegment ?? row.businessUnitCode ?? "All"}</td><td>v{row.versionNumber}</td><td>{row.entryCount}</td>
+            <td><span className={`chip chip-${row.status.toLowerCase()}`}>{row.status}</span><small>{row.activatedAt ? `Activated ${formatDate(row.activatedAt)}` : "Not activated"}</small></td>
+          </tr>
+        </Fragment>;
+      })}
       {rows.length === 0 && <tr><td colSpan={7} className="empty-note">No price books match the current query.</td></tr>}
     </tbody>
   </table></div>;
 }
 
-function QuoteTable({ rows, onDownload }: { rows: CpqQuote[]; onDownload: (quote: CpqQuote, format: "PDF" | "DOCX" | "XLSX") => void }) {
+function QuoteTable({ rows, grouped, onDownload }: { rows: CpqQuote[]; grouped: boolean; onDownload: (quote: CpqQuote, format: "PDF" | "DOCX" | "XLSX") => void }) {
+  let previousGroup = "";
   return <div className="table-wrap"><table className="data-table cpq-table">
     <thead><tr><th>Quote</th><th>Account</th><th>Opportunity</th><th>Owner</th><th>Total</th><th>Margin</th><th>Status</th><th>Docs</th></tr></thead>
     <tbody>
-      {rows.map((row) => <tr key={row.id}>
-        <td><span className="mono">{row.quoteNumber}</span><small>{row.name} - v{row.versionNumber}</small></td>
-        <td>{row.accountName}</td><td>{row.opportunityName ?? "-"}</td><td>{row.ownerName ?? "-"}</td>
-        <td>{formatMoney(row.grandTotal)}<small>Discount {formatMoney(row.discountTotal)}</small></td>
-        <td>{row.marginPct == null ? "-" : `${row.marginPct.toFixed(1)}%`}</td>
-        <td><span className={`chip chip-${row.status.toLowerCase()}`}>{row.status}</span><small>{row.approvalStatus} - expires {formatDate(row.expiresAt)}</small></td>
-        <td className="quote-doc-actions"><button className="link-btn" onClick={() => onDownload(row, "PDF")}>PDF</button><button className="link-btn" onClick={() => onDownload(row, "DOCX")}>Word</button><button className="link-btn" onClick={() => onDownload(row, "XLSX")}>Excel</button></td>
-      </tr>)}
+      {rows.map((row) => {
+        const showGroup = grouped && row.status !== previousGroup;
+        previousGroup = row.status;
+        return <Fragment key={row.id}>
+          {showGroup && <tr className="group-row"><th colSpan={8}>{row.status}</th></tr>}
+          <tr>
+            <td><span className="mono">{row.quoteNumber}</span><small>{row.name} - v{row.versionNumber}</small></td>
+            <td>{row.accountName}</td><td>{row.opportunityName ?? "-"}</td><td>{row.ownerName ?? "-"}</td>
+            <td>{formatMoney(row.grandTotal)}<small>Discount {formatMoney(row.discountTotal)}</small></td>
+            <td>{row.marginPct == null ? "-" : `${row.marginPct.toFixed(1)}%`}</td>
+            <td><span className={`chip chip-${row.status.toLowerCase()}`}>{row.status}</span><small>{row.approvalStatus} - expires {formatDate(row.expiresAt)}</small></td>
+            <td className="quote-doc-actions"><button className="link-btn" onClick={() => onDownload(row, "PDF")}>PDF</button><button className="link-btn" onClick={() => onDownload(row, "DOCX")}>Word</button><button className="link-btn" onClick={() => onDownload(row, "XLSX")}>Excel</button></td>
+          </tr>
+        </Fragment>;
+      })}
       {rows.length === 0 && <tr><td colSpan={8} className="empty-note">No quotes match the current query.</td></tr>}
     </tbody>
   </table></div>;
 }
 
-function saveFile(file: DownloadedFile) {
-  const url = URL.createObjectURL(file.blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = file.filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 500);
+function sortedBy<T>(rows: T[], group: (row: T) => string, label: (row: T) => string): T[] {
+  return [...rows].sort((a, b) => group(a).localeCompare(group(b)) || label(a).localeCompare(label(b)));
+}
+
+function cpqExportRows(section: CpqSection, products: CpqProduct[], priceBooks: CpqPriceBook[], quotes: CpqQuote[]) {
+  if (section === "products") return products.map((row) => ({
+    code: row.code,
+    name: row.name,
+    family: row.productFamily ?? "",
+    category: row.category ?? "",
+    unitOfMeasure: row.unitOfMeasure,
+    activePrices: row.activePriceCount,
+    status: row.active ? "ACTIVE" : "INACTIVE",
+  }));
+  if (section === "price-books") return priceBooks.map((row) => ({
+    code: row.code,
+    name: row.name,
+    currency: row.currencyCode,
+    segment: row.customerSegment ?? row.businessUnitCode ?? "All",
+    version: row.versionNumber,
+    entries: row.entryCount,
+    status: row.status,
+  }));
+  return quotes.map((row) => ({
+    quoteNumber: row.quoteNumber,
+    name: row.name,
+    account: row.accountName,
+    opportunity: row.opportunityName ?? "",
+    owner: row.ownerName ?? "",
+    grandTotal: row.grandTotal,
+    marginPct: row.marginPct ?? "",
+    status: row.status,
+    approvalStatus: row.approvalStatus,
+  }));
 }
