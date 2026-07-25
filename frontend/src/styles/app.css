@@ -2843,3 +2843,186 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
     --control-icon-size: 44px;
   }
 }
+
+/* ============================================================================
+   HEADER AND USER-MANUAL ALIGNMENT POLISH
+
+   These rules deliberately sit after the universal control contract. The header
+   needs a quieter hierarchy: the sidebar toggle, workspace context, command
+   search, manual button and user trigger should sit on one optical baseline,
+   while the identity text needs breathing room between name and role.
+   ========================================================================== */
+:root body .topbar {
+  min-height: 66px;
+  gap: 14px;
+  padding-inline: 22px 18px;
+}
+
+:root body .topbar .mobile-menu {
+  flex: 0 0 var(--control-icon-size);
+  margin-inline-end: 2px;
+}
+
+:root body .topbar-context {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  min-inline-size: 260px;
+  align-self: stretch;
+}
+
+:root body .topbar-title,
+:root body .topbar-tenant,
+:root body .workspace-switch select {
+  line-height: 1.1;
+}
+
+:root body .topbar-title {
+  margin: 0;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+}
+
+:root body .topbar-tenant,
+:root body .workspace-switch select {
+  color: var(--slate);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+:root body .workspace-switch {
+  display: inline-flex;
+  align-items: center;
+  min-inline-size: 0;
+}
+
+:root body .workspace-switch select {
+  inline-size: auto;
+  min-inline-size: 0;
+  block-size: 20px;
+  min-block-size: 20px;
+  padding: 0 20px 0 0;
+  border: 0;
+  background-color: transparent;
+}
+
+:root body .search-box {
+  min-inline-size: 320px;
+  block-size: var(--control-height);
+  min-block-size: var(--control-height);
+}
+
+:root body .manual-button {
+  inline-size: 132px;
+  min-inline-size: 132px;
+}
+
+:root body .user-menu {
+  flex: 0 0 auto;
+}
+
+:root body .user-trigger {
+  justify-content: flex-start;
+  gap: 10px;
+  inline-size: 184px;
+  min-inline-size: 184px;
+  padding-inline: 7px 10px;
+}
+
+:root body .user-id {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-inline-size: 0;
+  flex: 1 1 auto;
+  line-height: 1;
+}
+
+:root body .user-id strong,
+:root body .user-id small {
+  display: block;
+  line-height: 1.05;
+}
+
+:root body .user-id strong {
+  max-inline-size: 100%;
+  font-size: 11px;
+}
+
+:root body .user-id small {
+  margin-block-start: 0;
+  font-size: 9px;
+}
+
+:root body .drawer-actions {
+  gap: 10px;
+}
+
+:root body .help-drawer .drawer-head {
+  min-height: 98px;
+  padding-block: 18px;
+}
+
+:root body .help-drawer .drawer-head > div:first-child {
+  min-inline-size: 0;
+}
+
+:root body .help-drawer .drawer-head h2 {
+  line-height: 1.15;
+}
+
+:root body .help-drawer .drawer-actions .icon-btn {
+  inline-size: var(--control-sm-height);
+  min-inline-size: var(--control-sm-height);
+  block-size: var(--control-sm-height);
+  min-block-size: var(--control-sm-height);
+  flex: 0 0 var(--control-sm-height);
+}
+
+@media (max-width: 1080px) {
+  :root body .topbar-context {
+    min-inline-size: 210px;
+  }
+  :root body .search-box {
+    min-inline-size: 240px;
+  }
+  :root body .user-trigger {
+    inline-size: 164px;
+    min-inline-size: 164px;
+  }
+}
+
+@media (max-width: 760px) {
+  :root body .topbar {
+    gap: 8px;
+    padding-inline: 10px;
+  }
+  :root body .topbar-context {
+    min-inline-size: 0;
+    flex: 1 1 auto;
+  }
+  :root body .search-box {
+    min-inline-size: var(--control-icon-size);
+  }
+  :root body .manual-button {
+    inline-size: var(--control-icon-size);
+    min-inline-size: var(--control-icon-size);
+  }
+  :root body .user-trigger {
+    inline-size: var(--control-icon-size);
+    min-inline-size: var(--control-icon-size);
+    padding: 0;
+    justify-content: center;
+  }
+  :root body .user-trigger .user-id,
+  :root body .user-trigger > svg {
+    display: none;
+  }
+}

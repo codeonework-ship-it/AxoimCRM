@@ -150,5 +150,6 @@ The canonical Compose file builds the Spring Boot API and React web application 
 - Frontend `npm run build` passed after adding the cross-screen button sizing contract.
 - The User Manual drawer, Data Grid toolbars, report cards, admin tabs, notification controls, menus, icon buttons and row actions now share fixed height/min-width tokens for consistent button geometry across normal and responsive layouts.
 - Bootstrap compatibility was hardened by mapping Bootstrap button variables to Axiom design tokens, using logical sizing properties, shared focus rings, disabled states and larger coarse-pointer touch targets.
+- Header visual polish passed frontend build: the workspace context, command search, manual button and user menu now align to one optical baseline; the username/role stack has explicit spacing; the User Manual close control is a compact square instead of a full-width action button.
 
 Docker Hub pulls were blocked on this workstation by Docker Desktop's internal HTTPS proxy. Local runtime images plus PostgreSQL 16 and Kafka 3.7 were used for this workstation's live verification only; that private recovery override is deliberately not part of the repository. The canonical, reproducible Compose definition and version targets remain unchanged and are the CI/release contract.
