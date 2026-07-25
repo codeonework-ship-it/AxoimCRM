@@ -85,4 +85,14 @@ The canonical Compose file builds the Spring Boot API and React web application 
 - Workspace export audit smoke passed: three `WORKSPACE_EXPORT` audit rows were visible for entity type `WORKSPACE`.
 - Electron local publish passed with `npm run package`; generated artifact is `electron-client/release/AxiomCRM-win-x64-0.1.0.zip` and is intentionally ignored from Git because it is a generated binary artifact.
 
+## 2026-07-25 Account 360, lead recycle and quote document verification
+
+- Backend `mvn verify` passed after adding Account 360, lead disqualification and quote document endpoints.
+- Frontend `npm run build` passed after adding the Account 360 drawer, lead disqualification action and quote PDF/Word/Excel download controls.
+- Docker Compose rebuild passed for API and web; PostgreSQL 17, Kafka 3.7, API and web containers are healthy.
+- Authenticated same-origin login through `http://localhost:4280/api/v1/auth/login` succeeded for tenant `meridian`.
+- Account 360 smoke passed: `GET /api/v1/accounts/{id}` returned `Arcstone Retail Group`; `GET /api/v1/accounts/{id}/hierarchy` returned hierarchy data.
+- Lead disqualification smoke passed: `POST /api/v1/leads/{id}/disqualify` accepted governed reason `NOT_A_FIT`, wrote a future recycle date of `2026-08-15`, and returned status `DISQUALIFIED`.
+- CPQ quote document smoke passed: `GET /api/v1/cpq/quotes/{id}/download?format=PDF`, `DOCX` and `XLSX` each returned HTTP 200 with non-zero payloads and the expected attachment content types.
+
 Docker Hub pulls were blocked on this workstation by Docker Desktop's internal HTTPS proxy. Local runtime images plus PostgreSQL 16 and Kafka 3.7 were used for this workstation's live verification only; that private recovery override is deliberately not part of the repository. The canonical, reproducible Compose definition and version targets remain unchanged and are the CI/release contract.

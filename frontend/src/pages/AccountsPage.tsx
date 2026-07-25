@@ -1,6 +1,6 @@
 import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, isUnreachable, type Account } from "../api/client";
+import { api, isUnreachable, type Account, type AccountDetail, type AccountHierarchy } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataViewFrame } from "../components/DataViewFrame";
@@ -13,6 +13,7 @@ export function AccountsPage() {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [industryFilter, setIndustryFilter] = useState("");
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const toasts = useToasts();
@@ -20,6 +21,18 @@ export function AccountsPage() {
   const accountsQ = useQuery({
     queryKey: ["accounts", page, search, industryFilter],
     queryFn: () => api.accounts({ page, search, filter: industryFilter }),
+    retry: 1,
+  });
+  const detailQ = useQuery({
+    queryKey: ["accounts", selectedId, "detail"],
+    queryFn: () => api.account(selectedId as string),
+    enabled: !!selectedId,
+    retry: 1,
+  });
+  const hierarchyQ = useQuery({
+    queryKey: ["accounts", selectedId, "hierarchy"],
+    queryFn: () => api.accountHierarchy(selectedId as string),
+    enabled: !!selectedId,
     retry: 1,
   });
 
@@ -61,14 +74,14 @@ export function AccountsPage() {
     <DataViewFrame title="Accounts results">
       {accountsQ.isLoading && <GridLoader label="Reading client register" rows={6} columns={4} />}
       {accountsQ.isError && <p className="empty-note">Accounts failed to load{accountsQ.error instanceof Error ? `: ${accountsQ.error.message}` : "."}</p>}
-      {accountsQ.isSuccess && <div className="table-wrap"><table className="data-table"><thead><tr><th>Name</th><th>Industry</th><th>Owner</th>{canManageMasters(user?.role) && <th className="table-action">Action</th>}</tr></thead>
+      {accountsQ.isSuccess && <div className="table-wrap"><table className="data-table"><thead><tr><th>Name</th><th>Industry</th><th>Owner</th><th className="table-action">Action</th></tr></thead>
       <tbody>{accounts.map((account) => {
         const group = account.industry ?? "Unclassified";
         const showGroup = grouped && group !== previousGroup; previousGroup = group;
-        return <Fragment key={account.id}>{showGroup && <tr className="group-row"><th colSpan={canManageMasters(user?.role) ? 4 : 3}>{group}</th></tr>}
+        return <Fragment key={account.id}>{showGroup && <tr className="group-row"><th colSpan={4}>{group}</th></tr>}
           <tr><td>{account.name}</td><td>{account.industry ?? "-"}</td><td>{account.ownerName ?? "-"}</td>
-            {canManageMasters(user?.role) && <td className="table-action"><button className="link-btn danger-link" disabled={deleteMutation.isPending} onClick={() => remove(account)}>Delete</button></td>}</tr></Fragment>;
-      })}{accounts.length === 0 && <tr><td colSpan={canManageMasters(user?.role) ? 4 : 3} className="empty-note">No accounts match the current query.</td></tr>}</tbody>
+            <td className="table-action"><button className="link-btn" onClick={() => setSelectedId(account.id)}>View 360</button>{canManageMasters(user?.role) && <button className="link-btn danger-link" disabled={deleteMutation.isPending} onClick={() => remove(account)}>Delete</button>}</td></tr></Fragment>;
+      })}{accounts.length === 0 && <tr><td colSpan={4} className="empty-note">No accounts match the current query.</td></tr>}</tbody>
     </table></div>}
       {accountsQ.isSuccess && <footer className="page-controls" aria-label="Account pagination">
         <span>Showing {accounts.length} of {total} records - 100 rows per page</span>
@@ -79,5 +92,25 @@ export function AccountsPage() {
         </div>
       </footer>}
     </DataViewFrame>
+    <AccountDrawer detail={detailQ.data} hierarchy={hierarchyQ.data} loading={detailQ.isLoading || hierarchyQ.isLoading} error={detailQ.isError || hierarchyQ.isError} onClose={() => setSelectedId(null)} />
   </>;
+}
+
+function AccountDrawer({ detail, hierarchy, loading, error, onClose }: { detail?: AccountDetail; hierarchy?: AccountHierarchy; loading: boolean; error: boolean; onClose: () => void }) {
+  if (!loading && !detail && !error) return null;
+  return <div className="drawer-scrim" role="presentation" onMouseDown={onClose}>
+    <aside className="audit-drawer account-360-drawer" role="dialog" aria-modal="true" aria-label="Account 360" onMouseDown={(event) => event.stopPropagation()}>
+      <header className="drawer-head"><div><span className="eyebrow">Account 360</span><h2>{detail?.name ?? "Loading account"}</h2></div><button className="icon-btn" onClick={onClose} aria-label="Close account 360">×</button></header>
+      {loading && <p className="loading-note">Loading relationship, health and ownership context...</p>}
+      {error && <p className="empty-note">Account 360 failed to load.</p>}
+      {detail && <div className="audit-list">
+        <article className="audit-event"><strong>Profile</strong><p>{[detail.recordType, detail.industry, detail.segment, detail.status].filter(Boolean).join(" · ") || "Standard account"}</p><small>Owner {detail.ownerName ?? "-"} · territory {detail.territory ?? "-"}</small></article>
+        <article className="audit-event"><strong>Health</strong><p>{detail.healthBand ?? "Unscored"} {detail.healthScore == null ? "" : `(${detail.healthScore})`}</p><small>{detail.fieldsHiddenByPermission.length > 0 ? `Hidden fields: ${detail.fieldsHiddenByPermission.join(", ")}` : "No fields hidden for this role"}</small></article>
+        <article className="audit-event"><strong>Commercial</strong><p>{detail.annualRevenue == null ? "Revenue hidden or unavailable" : `${detail.currencyCode ?? ""} ${detail.annualRevenue.toLocaleString()}`}</p><small>{detail.employeeCount == null ? "Employee count unavailable" : `${detail.employeeCount.toLocaleString()} employees`}</small></article>
+        {hierarchy && <article className="audit-event"><strong>Hierarchy</strong><p>{hierarchy.ultimateParentName ?? detail.name}</p><small>{hierarchy.restricted ? hierarchy.restrictionNote : `${hierarchy.nodes.length} visible node(s)`}</small>
+          <div className="hierarchy-mini">{hierarchy.nodes.map((node) => <div key={node.id} className={node.isSelf ? "is-self" : ""} style={{ paddingLeft: `${Math.min(node.depth, 4) * 12}px` }}>{node.name} <span>{node.status}</span></div>)}</div>
+        </article>}
+      </div>}
+    </aside>
+  </div>;
 }

@@ -2603,3 +2603,39 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
 @media (max-width: 680px) {
   .locale-pop { left: auto; right: 8px; max-width: calc(100vw - 16px); }
 }
+
+.account-360-drawer .audit-event strong {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink);
+}
+
+.hierarchy-mini {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.hierarchy-mini div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper-sunk);
+}
+
+.hierarchy-mini div.is-self {
+  border-color: var(--ion-600);
+  color: var(--ion-600);
+}
+
+.quote-doc-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 128px;
+}

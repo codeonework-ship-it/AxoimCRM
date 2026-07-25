@@ -129,6 +129,52 @@ export interface Account {
   ownerName: string | null;
 }
 
+export interface AccountDetail extends Account {
+  legalName: string | null;
+  accountNumber: string | null;
+  recordType: string | null;
+  parentAccountId: string | null;
+  parentAccountName: string | null;
+  ultimateParentId: string | null;
+  ultimateParentName: string | null;
+  hierarchyDepth: number;
+  hierarchyPath: string | null;
+  ownerId: string | null;
+  businessUnit: string | null;
+  territory: string | null;
+  segment: string | null;
+  employeeCount: number | null;
+  annualRevenue: number | null;
+  currencyCode: string | null;
+  website: string | null;
+  emailDomain: string | null;
+  phone: string | null;
+  status: string | null;
+  healthScore: number | null;
+  healthBand: string | null;
+  fieldsHiddenByPermission: string[];
+}
+
+export interface AccountHierarchyNode {
+  id: string;
+  name: string;
+  parentAccountId: string | null;
+  depth: number;
+  status: string;
+  healthScore: number | null;
+  healthBand: string | null;
+  isSelf: boolean;
+}
+
+export interface AccountHierarchy {
+  accountId: string;
+  ultimateParentId: string | null;
+  ultimateParentName: string | null;
+  nodes: AccountHierarchyNode[];
+  restricted: boolean;
+  restrictionNote: string | null;
+}
+
 export type LeadStatus =
   | "NEW"
   | "WORKING"
@@ -658,6 +704,14 @@ export const api = {
     })}`);
   },
 
+  account(id: string): Promise<AccountDetail> {
+    return request<AccountDetail>("GET", `/accounts/${encodeURIComponent(id)}`);
+  },
+
+  accountHierarchy(id: string): Promise<AccountHierarchy> {
+    return request<AccountHierarchy>("GET", `/accounts/${encodeURIComponent(id)}/hierarchy`);
+  },
+
   leads(params?: ListParams): Promise<PageResult<Lead>> {
     return request<PageResult<{
       id: string; firstName: string; lastName: string; company: string | null;
@@ -681,6 +735,10 @@ export const api = {
 
   convertLead(leadId: string): Promise<void> {
     return request<void>("POST", `/leads/${encodeURIComponent(leadId)}/convert`);
+  },
+
+  disqualifyLead(leadId: string, req: { reasonCode: string; note?: string | null; recycleDate?: string | null }): Promise<{ leadId: string; status: string; reasonCode: string; recycleDate: string | null }> {
+    return request<{ leadId: string; status: string; reasonCode: string; recycleDate: string | null }>("POST", `/leads/${encodeURIComponent(leadId)}/disqualify`, req);
   },
 
   pipelineBoard(): Promise<PipelineBoard> {
@@ -857,6 +915,10 @@ export const api = {
 
   cpqQuoteSummary(): Promise<CpqQuoteSummary> {
     return request<CpqQuoteSummary>("GET", "/cpq/quotes/summary");
+  },
+
+  downloadQuote(quoteId: string, format: "PDF" | "DOCX" | "XLSX"): Promise<DownloadedFile> {
+    return fileRequest(`/cpq/quotes/${encodeURIComponent(quoteId)}/download${queryString({ format })}`);
   },
 
   workspace(module: "forecast" | "contracts" | "campaigns" | "cases" | "migration" | "partners" | "automation" | "analytics" | "copilot" | "mobile" | "integrations" | "sandbox" | "audit" | "bfsi" | "commodity", params?: ListParams & { status?: string }): Promise<WorkspacePage> {

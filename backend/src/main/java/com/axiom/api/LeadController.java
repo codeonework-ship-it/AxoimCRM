@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @RestController
@@ -33,6 +34,7 @@ public class LeadController {
     }
 
     public record ConvertRequest(String accountName, String opportunityName, BigDecimal amount) {}
+    public record DisqualifyRequest(String reasonCode, String note, LocalDate recycleDate) {}
 
     @PostMapping("/{id}/convert")
     @ResponseStatus(HttpStatus.CREATED)
@@ -40,5 +42,11 @@ public class LeadController {
                                                 @RequestBody(required = false) ConvertRequest request) {
         ConvertRequest r = request == null ? new ConvertRequest(null, null, null) : request;
         return leadService.convert(id, r.accountName(), r.opportunityName(), r.amount());
+    }
+
+    @PostMapping("/{id}/disqualify")
+    public LeadService.DisqualificationResult disqualify(@PathVariable UUID id,
+                                                         @RequestBody DisqualifyRequest request) {
+        return leadService.disqualify(id, request.reasonCode(), request.note(), request.recycleDate());
     }
 }

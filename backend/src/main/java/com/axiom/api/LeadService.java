@@ -1,5 +1,7 @@
 package com.axiom.api;
 
+import com.axiom.audit.AuditService;
+import com.axiom.auth.CrmRole;
 import com.axiom.common.ConflictException;
 import com.axiom.common.NotFoundException;
 import com.axiom.domain.Account;
@@ -17,8 +19,10 @@ import com.axiom.notifications.NotificationWriter;
 import com.axiom.tenancy.TenantContext;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -33,10 +37,12 @@ public class LeadService {
     private final PipelineStageRepository stages;
     private final OutboxWriter outbox;
     private final NotificationWriter notifications;
+    private final JdbcTemplate jdbc;
+    private final AuditService audit;
 
     public LeadService(LeadRepository leads, AccountRepository accounts, ContactRepository contacts,
                        OpportunityRepository opportunities, PipelineStageRepository stages, OutboxWriter outbox,
-                       NotificationWriter notifications) {
+                       NotificationWriter notifications, JdbcTemplate jdbc, AuditService audit) {
         this.leads = leads;
         this.accounts = accounts;
         this.contacts = contacts;
@@ -44,9 +50,12 @@ public class LeadService {
         this.stages = stages;
         this.outbox = outbox;
         this.notifications = notifications;
+        this.jdbc = jdbc;
+        this.audit = audit;
     }
 
     public record ConversionResult(UUID leadId, UUID accountId, UUID contactId, UUID opportunityId) {}
+    public record DisqualificationResult(UUID leadId, String status, String reasonCode, LocalDate recycleDate) {}
 
     /**
      * Atomic lead conversion (FR-LED-011 shape, skeleton scope): account is
@@ -58,6 +67,9 @@ public class LeadService {
      */
     @Transactional
     public ConversionResult convert(UUID leadId, String accountName, String opportunityName, BigDecimal amount) {
+        if (CrmRole.current(TenantContext.get().role()).readOnly()) {
+            throw new ConflictException("Read-only roles cannot convert leads");
+        }
         TenantContext.Principal principal = TenantContext.get();
         UUID tenantId = principal.tenantId();
 
@@ -98,12 +110,85 @@ public class LeadService {
         payload.put("contactId", contact.getId().toString());
         payload.put("opportunityId", opportunityId == null ? null : opportunityId.toString());
         outbox.write("lead", lead.getId(), "lead.converted", payload);
-        notifications.notifyCurrentUser(
-                "SYSTEM", "NORMAL", "Lead conversion complete",
-                lead.getFirstName() + " " + lead.getLastName()
-                        + " is now linked to account " + account.getName() + ".",
-                "/accounts", "You converted this lead.", false);
+        if (canNotifyCurrentUser(tenantId, principal.userId())) {
+            notifications.notifyCurrentUser(
+                    "SYSTEM", "NORMAL", "Lead conversion complete",
+                    lead.getFirstName() + " " + lead.getLastName()
+                            + " is now linked to account " + account.getName() + ".",
+                    "/accounts", "You converted this lead.", false);
+        }
 
         return new ConversionResult(lead.getId(), account.getId(), contact.getId(), opportunityId);
+    }
+
+    @Transactional
+    public DisqualificationResult disqualify(UUID leadId, String reasonCode, String note, LocalDate recycleDate) {
+        if (CrmRole.current(TenantContext.get().role()).readOnly()) {
+            throw new ConflictException("Read-only roles cannot disqualify leads");
+        }
+        UUID tenantId = TenantContext.get().tenantId();
+        Lead lead = leads.findByTenantIdAndId(tenantId, leadId)
+                .orElseThrow(() -> new NotFoundException("Lead not found: " + leadId));
+        if ("CONVERTED".equals(lead.getStatus())) {
+            throw new ConflictException("Converted leads are read-only and cannot be disqualified");
+        }
+        if ("DISQUALIFIED".equals(lead.getStatus())) {
+            throw new ConflictException("Lead is already disqualified");
+        }
+        String code = clean(reasonCode);
+        if (code == null) throw new ConflictException("Disqualification requires a governed reason code");
+        code = code.toUpperCase();
+        Integer reasonExists = jdbc.queryForObject("""
+                select count(*)
+                from reference.value_set s
+                join reference.value_set_entry e on e.tenant_id = s.tenant_id and e.value_set_id = s.id
+                where s.tenant_id = ? and s.api_name = 'lead_disqualification_reason'
+                  and e.code = ? and e.active = true
+                """, Integer.class, tenantId, code);
+        if (reasonExists == null || reasonExists == 0) {
+            throw new ConflictException("Unknown lead disqualification reason: " + code
+                    + ". Pick an active value from lead_disqualification_reason.");
+        }
+        if (recycleDate != null && recycleDate.isBefore(LocalDate.now())) {
+            throw new ConflictException("Recycle date cannot be in the past");
+        }
+        int updated = jdbc.update("""
+                update crm.lead
+                set status = 'DISQUALIFIED',
+                    disqualify_reason = ?,
+                    disqualification_reason_code = ?,
+                    disqualified_at = now(),
+                    recycle_date = ?,
+                    updated_at = now()
+                where tenant_id = ? and id = ? and deleted_at is null
+                """, clean(note) == null ? code : clean(note), code, recycleDate, tenantId, leadId);
+        if (updated == 0) throw new NotFoundException("Lead not found: " + leadId);
+
+        audit.recordWithReason("LEAD_DISQUALIFY", "LEAD", leadId,
+                "Disqualified lead " + lead.getFirstName() + " " + lead.getLastName(),
+                code, Map.of("reasonCode", code, "recycleDate", recycleDate == null ? "" : recycleDate.toString()));
+        outbox.write("lead", leadId, "lead.disqualified", Map.of(
+                "leadId", leadId.toString(), "reasonCode", code,
+                "recycleDate", recycleDate == null ? "" : recycleDate.toString()));
+        if (canNotifyCurrentUser(tenantId, TenantContext.get().userId())) {
+            notifications.notifyCurrentUser("SYSTEM", "LOW", "Lead disqualified",
+                    lead.getFirstName() + " " + lead.getLastName() + " was moved out of the active queue.",
+                    "/leads", "You disqualified this lead.", false);
+        }
+        return new DisqualificationResult(leadId, "DISQUALIFIED", code, recycleDate);
+    }
+
+    private boolean canNotifyCurrentUser(UUID tenantId, UUID userId) {
+        Integer count = jdbc.queryForObject("""
+                select count(*) from identity.app_user
+                where tenant_id = ? and id = ? and active = true
+                """, Integer.class, tenantId, userId);
+        return count != null && count > 0;
+    }
+
+    private String clean(String value) {
+        if (value == null) return null;
+        String cleaned = value.trim();
+        return cleaned.isEmpty() ? null : cleaned;
     }
 }

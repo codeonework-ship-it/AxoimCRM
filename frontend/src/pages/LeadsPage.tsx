@@ -26,6 +26,16 @@ export function LeadsPage() {
     retry: 1,
   });
   const convertMutation = useMutation({ mutationFn: (leadId: string) => api.convertLead(leadId) });
+  const disqualifyMutation = useMutation({
+    mutationFn: ({ id, reasonCode, note, recycleDate }: { id: string; reasonCode: string; note?: string | null; recycleDate?: string | null }) =>
+      api.disqualifyLead(id, { reasonCode, note, recycleDate }),
+    onSuccess: () => {
+      toasts.push("info", "Lead disqualified", "Reason and recycle timing were captured for audit.");
+      void queryClient.invalidateQueries({ queryKey: ["leads"] });
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+    onError: (error) => toasts.push("error", "Disqualify failed", error instanceof Error ? error.message : "Update failed."),
+  });
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.deleteMaster("leads", id),
     onSuccess: () => {
@@ -44,6 +54,19 @@ export function LeadsPage() {
         void queryClient.invalidateQueries({ queryKey: ["dashboard", "summary"] });
       },
       onError: (error) => toasts.push("error", "Convert failed", isUnreachable(error) ? "API unreachable - lead not converted." : error instanceof Error ? error.message : "Unknown error."),
+    });
+  }
+
+  function disqualify(lead: Lead) {
+    const reasonCode = window.prompt("Disqualification reason code", "NOT_A_FIT");
+    if (!reasonCode) return;
+    const recycleDate = window.prompt("Recycle date (YYYY-MM-DD, optional)", "");
+    const note = window.prompt("Short note (optional)", "");
+    disqualifyMutation.mutate({
+      id: lead.id,
+      reasonCode,
+      recycleDate: recycleDate?.trim() ? recycleDate.trim() : null,
+      note: note?.trim() ? note.trim() : null,
     });
   }
 
@@ -77,6 +100,7 @@ export function LeadsPage() {
         {showGroup && <div className="lead-group">{lead.status}</div>}<div className="lead-row"><div><div className="lead-name">{lead.name}</div><div className="lead-meta">{[lead.company, lead.email, lead.ownerName].filter(Boolean).join(" - ") || "-"}</div></div>
         <span className={`chip chip-${lead.status.toLowerCase()}`} style={{ marginLeft: "auto" }}>{lead.status}</span>
         {CONVERTIBLE.has(lead.status) && <button className="btn btn-sm" onClick={() => convert(lead)} disabled={convertMutation.isPending && convertMutation.variables === lead.id}>{convertMutation.isPending && convertMutation.variables === lead.id ? "Converting..." : "Convert"}</button>}
+        {CONVERTIBLE.has(lead.status) && <button className="btn btn-sm" onClick={() => disqualify(lead)} disabled={disqualifyMutation.isPending}>{disqualifyMutation.isPending && disqualifyMutation.variables?.id === lead.id ? "Disqualifying..." : "Disqualify"}</button>}
         {canManageMasters(user?.role) && <button className="link-btn danger-link" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm(`Delete ${lead.name}? Converted or in-use records will be protected.`)) deleteMutation.mutate(lead.id); }}>Delete</button>}
       </div></Fragment>; })}
       {leadsQ.isSuccess && <footer className="page-controls" aria-label="Lead pagination">

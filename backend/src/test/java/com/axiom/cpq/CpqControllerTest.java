@@ -2,8 +2,11 @@ package com.axiom.cpq;
 
 import com.axiom.api.PageResult;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.ResponseEntity;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.mock;
@@ -29,5 +32,21 @@ class CpqControllerTest {
 
         assertEquals(page, controller.quotes("kestrel", "SENT", 1));
         verify(service).quotes("kestrel", "SENT", 1);
+    }
+
+    @Test void quoteDocumentReturnsAttachment() {
+        CpqService service = mock(CpqService.class);
+        CpqController controller = new CpqController(service);
+        UUID quoteId = UUID.randomUUID();
+        CpqService.FilePayload file = new CpqService.FilePayload(
+                "quote".getBytes(StandardCharsets.UTF_8), "text/plain", "q-1.txt");
+        when(service.quoteDocument(quoteId, CpqService.QuoteDocumentFormat.PDF)).thenReturn(file);
+
+        ResponseEntity<byte[]> response = controller.quoteDocument(quoteId, CpqService.QuoteDocumentFormat.PDF);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("attachment; filename=\"q-1.txt\"", response.getHeaders().getFirst("Content-Disposition"));
+        assertEquals("quote", new String(response.getBody(), StandardCharsets.UTF_8));
+        verify(service).quoteDocument(quoteId, CpqService.QuoteDocumentFormat.PDF);
     }
 }

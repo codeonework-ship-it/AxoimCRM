@@ -1,10 +1,11 @@
+import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
-import { api, isUnreachable, type CpqPriceBook, type CpqProduct, type CpqQuote } from "../api/client";
+import { api, isUnreachable, type CpqPriceBook, type CpqProduct, type CpqQuote, type DownloadedFile } from "../api/client";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataViewFrame } from "../components/DataViewFrame";
 import { GridLoader } from "../components/Loaders";
+import { useToasts } from "../components/Toasts";
 import { formatDate, formatMoney } from "../lib/format";
 
 type CpqSection = "products" | "price-books" | "quotes";
@@ -17,6 +18,7 @@ const QUOTE_STATUSES = ["DRAFT", "IN_APPROVAL", "SENT", "ACCEPTED", "REJECTED", 
 const PRICE_BOOK_STATUSES = ["DRAFT", "ACTIVE", "ARCHIVED"];
 
 export function CpqPage({ section }: CpqPageProps) {
+  const toasts = useToasts();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("");
@@ -54,6 +56,15 @@ export function CpqPage({ section }: CpqPageProps) {
     setPage(0);
   }
 
+  async function downloadQuote(quote: CpqQuote, format: "PDF" | "DOCX" | "XLSX") {
+    try {
+      saveFile(await api.downloadQuote(quote.id, format));
+      toasts.push("info", "Quote document ready", `${quote.quoteNumber} was downloaded as ${format}.`);
+    } catch (error) {
+      toasts.push("error", "Quote download failed", error instanceof Error ? error.message : "Download failed.");
+    }
+  }
+
   return <>
     <div className="page-head cpq-head">
       <div>
@@ -73,8 +84,8 @@ export function CpqPage({ section }: CpqPageProps) {
     <div className="kpi-row cpq-kpis">
       <div className="kpi"><span className="label">Quote pipeline</span><div className="kpi-value">{formatMoney(summaryQ.data?.netPipeline)}</div><div className="kpi-sub">Draft, approval and sent quotes</div></div>
       <div className="kpi"><span className="label">Accepted revenue</span><div className="kpi-value">{formatMoney(summaryQ.data?.acceptedRevenue)}</div><div className="kpi-sub">Accepted or converted quotes</div></div>
-      <div className="kpi"><span className="label">In approval</span><div className="kpi-value">{summaryQ.data?.approvalQuotes ?? "…"}</div><div className="kpi-sub">Discount or margin governance</div></div>
-      <div className="kpi"><span className="label">Sent</span><div className="kpi-value">{summaryQ.data?.sentQuotes ?? "…"}</div><div className="kpi-sub">Awaiting customer response</div></div>
+      <div className="kpi"><span className="label">In approval</span><div className="kpi-value">{summaryQ.data?.approvalQuotes ?? "..."}</div><div className="kpi-sub">Discount or margin governance</div></div>
+      <div className="kpi"><span className="label">Sent</span><div className="kpi-value">{summaryQ.data?.sentQuotes ?? "..."}</div><div className="kpi-sub">Awaiting customer response</div></div>
     </div>
 
     <section className="list-controls" aria-label="CPQ search and filters">
@@ -87,13 +98,13 @@ export function CpqPage({ section }: CpqPageProps) {
 
     <DataViewFrame
       title={section === "products" ? "Product catalogue" : section === "price-books" ? "Price book register" : "Quote register"}
-      actions={<span className="cpq-note">100 rows/page · vendor integrations pending</span>}
+      actions={<span className="cpq-note">100 rows/page - vendor integrations pending</span>}
     >
       {activeQ.isLoading && <GridLoader label="Reading governed CPQ records" rows={6} columns={6} />}
       {activeQ.isError && <p className="empty-note">CPQ records failed to load{activeQ.error instanceof Error ? `: ${activeQ.error.message}` : "."}</p>}
       {activeQ.isSuccess && section === "products" && <ProductTable rows={(pageData?.items ?? []) as CpqProduct[]} />}
       {activeQ.isSuccess && section === "price-books" && <PriceBookTable rows={(pageData?.items ?? []) as CpqPriceBook[]} />}
-      {activeQ.isSuccess && section === "quotes" && <QuoteTable rows={(pageData?.items ?? []) as CpqQuote[]} />}
+      {activeQ.isSuccess && section === "quotes" && <QuoteTable rows={(pageData?.items ?? []) as CpqQuote[]} onDownload={downloadQuote} />}
       {activeQ.isSuccess && <footer className="page-controls" aria-label="CPQ pagination">
         <span>Showing {pageData?.items.length ?? 0} of {total} records - 100 rows per page</span>
         <div>
@@ -132,18 +143,30 @@ function PriceBookTable({ rows }: { rows: CpqPriceBook[] }) {
   </table></div>;
 }
 
-function QuoteTable({ rows }: { rows: CpqQuote[] }) {
+function QuoteTable({ rows, onDownload }: { rows: CpqQuote[]; onDownload: (quote: CpqQuote, format: "PDF" | "DOCX" | "XLSX") => void }) {
   return <div className="table-wrap"><table className="data-table cpq-table">
-    <thead><tr><th>Quote</th><th>Account</th><th>Opportunity</th><th>Owner</th><th>Total</th><th>Margin</th><th>Status</th></tr></thead>
+    <thead><tr><th>Quote</th><th>Account</th><th>Opportunity</th><th>Owner</th><th>Total</th><th>Margin</th><th>Status</th><th>Docs</th></tr></thead>
     <tbody>
       {rows.map((row) => <tr key={row.id}>
-        <td><span className="mono">{row.quoteNumber}</span><small>{row.name} · v{row.versionNumber}</small></td>
+        <td><span className="mono">{row.quoteNumber}</span><small>{row.name} - v{row.versionNumber}</small></td>
         <td>{row.accountName}</td><td>{row.opportunityName ?? "-"}</td><td>{row.ownerName ?? "-"}</td>
         <td>{formatMoney(row.grandTotal)}<small>Discount {formatMoney(row.discountTotal)}</small></td>
-        <td>{row.marginPct == null ? "—" : `${row.marginPct.toFixed(1)}%`}</td>
-        <td><span className={`chip chip-${row.status.toLowerCase()}`}>{row.status}</span><small>{row.approvalStatus} · expires {formatDate(row.expiresAt)}</small></td>
+        <td>{row.marginPct == null ? "-" : `${row.marginPct.toFixed(1)}%`}</td>
+        <td><span className={`chip chip-${row.status.toLowerCase()}`}>{row.status}</span><small>{row.approvalStatus} - expires {formatDate(row.expiresAt)}</small></td>
+        <td className="quote-doc-actions"><button className="link-btn" onClick={() => onDownload(row, "PDF")}>PDF</button><button className="link-btn" onClick={() => onDownload(row, "DOCX")}>Word</button><button className="link-btn" onClick={() => onDownload(row, "XLSX")}>Excel</button></td>
       </tr>)}
-      {rows.length === 0 && <tr><td colSpan={7} className="empty-note">No quotes match the current query.</td></tr>}
+      {rows.length === 0 && <tr><td colSpan={8} className="empty-note">No quotes match the current query.</td></tr>}
     </tbody>
   </table></div>;
+}
+
+function saveFile(file: DownloadedFile) {
+  const url = URL.createObjectURL(file.blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = file.filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 500);
 }
