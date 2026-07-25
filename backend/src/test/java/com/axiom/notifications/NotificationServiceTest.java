@@ -29,7 +29,7 @@ class NotificationServiceTest {
     void setUp() {
         jdbc = mock(JdbcTemplate.class);
         service = new NotificationService(jdbc);
-        TenantContext.set(new TenantContext.Principal(tenantId, userId, "SALES", "Test User"));
+        TenantContext.set(new TenantContext.Principal(tenantId, userId, "SALES", "Test User", "test@example.com"));
     }
 
     @AfterEach

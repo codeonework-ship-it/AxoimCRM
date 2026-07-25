@@ -32,7 +32,7 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
         className="help-drawer"
         role="dialog"
         aria-modal="true"
-        aria-label="Axiom operator guide"
+        aria-label="Axiom User Manual"
         onMouseDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
           if (event.key !== "Tab") return;
@@ -48,7 +48,7 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
         <header className="drawer-head">
           <div>
             <span className="eyebrow">Field manual · 01</span>
-            <h2>Operator guide</h2>
+            <h2>User Manual</h2>
           </div>
           <button ref={closeRef} className="icon-btn" onClick={onClose} aria-label="Close guide"><CloseIcon /></button>
         </header>

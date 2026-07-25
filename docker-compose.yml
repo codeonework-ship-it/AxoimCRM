@@ -4,28 +4,29 @@
 
 services:
   postgres:
-    image: postgres:17-alpine
+    image: ${AXIOM_POSTGRES_IMAGE:-postgres:17-alpine}
     environment:
-      POSTGRES_DB: axiom
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${AXIOM_DB_NAME:-AxiomCRMDB_Dev}
+      POSTGRES_USER: ${AXIOM_DB_USER:-AxiomCRM}
+      POSTGRES_PASSWORD: ${AXIOM_DB_PASSWORD:-AxiomCRM@12345}
     ports:
-      - "5432:5432"
+      - "${AXIOM_DB_PORT:-5432}:5432"
     volumes:
       - axiom-pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d axiom"]
+      test: ["CMD-SHELL", "pg_isready -U ${AXIOM_DB_USER:-AxiomCRM} -d ${AXIOM_DB_NAME:-AxiomCRMDB_Dev}"]
       interval: 5s
       timeout: 5s
       retries: 12
 
   kafka:
-    image: apache/kafka:3.8.0
+    image: ${AXIOM_KAFKA_IMAGE:-apache/kafka:3.7.0}
     environment:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: broker,controller
       KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
       KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:${AXIOM_KAFKA_PORT:-29092}
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
@@ -34,7 +35,7 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     ports:
-      - "29092:29092"
+      - "${AXIOM_KAFKA_PORT:-29092}:29092"
     healthcheck:
       test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 > /dev/null 2>&1"]
       interval: 10s
@@ -51,22 +52,27 @@ services:
         condition: service_healthy
     environment:
       # Runtime traffic: least-privilege axiom_app, subject to RLS (ADR-001).
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/axiom
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      AXIOM_ENVIRONMENT: ${AXIOM_ENVIRONMENT:-dev}
+      AXIOM_DB_NAME: ${AXIOM_DB_NAME:-AxiomCRMDB_Dev}
+      AXIOM_DB_USER: ${AXIOM_DB_USER:-AxiomCRM}
+      AXIOM_DB_PASSWORD: ${AXIOM_DB_PASSWORD:-AxiomCRM@12345}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${AXIOM_DB_NAME:-AxiomCRMDB_Dev}
       SPRING_DATASOURCE_USERNAME: axiom_app
       SPRING_DATASOURCE_PASSWORD: axiom_app_dev_password
       # Migrations run as postgres superuser (owns schema, defines policies).
-      FLYWAY_URL: jdbc:postgresql://postgres:5432/axiom
-      FLYWAY_USER: postgres
-      FLYWAY_PASSWORD: postgres
+      FLYWAY_URL: jdbc:postgresql://postgres:5432/${AXIOM_DB_NAME:-AxiomCRMDB_Dev}
+      FLYWAY_USER: ${AXIOM_DB_USER:-AxiomCRM}
+      FLYWAY_PASSWORD: ${AXIOM_DB_PASSWORD:-AxiomCRM@12345}
       # Outbox relay: dedicated role that may read/update outbox_event across
       # tenants and nothing else (V3__outbox_relay_role.sql).
-      AXIOM_RELAY_DATASOURCE_URL: jdbc:postgresql://postgres:5432/axiom
+      AXIOM_RELAY_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${AXIOM_DB_NAME:-AxiomCRMDB_Dev}
       AXIOM_RELAY_DATASOURCE_USERNAME: axiom_relay
       AXIOM_RELAY_DATASOURCE_PASSWORD: axiom_relay_dev_password
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      AXIOM_CORS_ORIGINS: http://localhost:5173,http://localhost:4280
+      AXIOM_CORS_ORIGINS: ${AXIOM_CORS_ORIGINS:-http://localhost:5173,http://localhost:4280}
     ports:
-      - "8080:8080"
+      - "${AXIOM_API_PORT:-8080}:8080"
 
   web:
     build: ./frontend
@@ -74,7 +80,7 @@ services:
       api:
         condition: service_healthy
     ports:
-      - "4280:80"
+      - "${AXIOM_WEB_PORT:-4280}:80"
     restart: unless-stopped
 
 

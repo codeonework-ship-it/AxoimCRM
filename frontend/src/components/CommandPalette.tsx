@@ -100,7 +100,7 @@ export function CommandPalette({ open, onClose, onOpenHelp }: CommandPaletteProp
         </div>
         <footer className="command-footer">
           <span>Type to filter · Enter to open</span>
-          <button onClick={() => { onClose(); onOpenHelp(); }}>Open operator guide</button>
+          <button onClick={() => { onClose(); onOpenHelp(); }}>Open User Manual</button>
         </footer>
       </section>
     </div>

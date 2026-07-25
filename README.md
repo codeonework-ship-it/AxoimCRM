@@ -29,7 +29,8 @@ backend/            # Spring Boot modular-monolith skeleton (Java 21)
 frontend/           # React + TypeScript + Vite scaffold
 electron-client/    # Electron desktop shell scaffold
 qa/                 # QA/UAT strategy, automation scenarios, runtime evidence
-docker-compose.yml  # Local stack: Postgres 17 + Kafka + API
+deploy/env/         # dev/qa/uat/prod runtime environment files
+docker-compose.yml  # Local stack: Postgres + Kafka + API + web
 ```
 
 ## The documentation set
@@ -86,6 +87,23 @@ docker compose up -d --build
 # API: http://localhost:8080 — health at /actuator/health
 ```
 
+Environment-specific database files live in `deploy/env/`. The shared CRM database login requested for each environment is:
+
+| Environment | Database | User | Password |
+|---|---|---|---|
+| Dev | `AxiomCRMDB_Dev` | `AxiomCRM` | `AxiomCRM@12345` |
+| QA | `AxiomCRMDB_QA` | `AxiomCRM` | `AxiomCRM@12345` |
+| UAT | `AxiomCRMDB_UAT` | `AxiomCRM` | `AxiomCRM@12345` |
+| Prod | `AxiomCRMDB_Prod` | `AxiomCRM` | `AxiomCRM@12345` |
+
+For the current development profile:
+
+```bash
+docker compose --env-file deploy/env/dev.env up -d --build
+```
+
+The compose images are configurable with `AXIOM_POSTGRES_IMAGE` and `AXIOM_KAFKA_IMAGE`; the default Kafka image is set to a locally verified Apache Kafka tag for reproducible dev startup.
+
 ### Demo access
 
 Open `http://localhost:4280` and use workspace `meridian` with password
@@ -93,9 +111,12 @@ Open `http://localhost:4280` and use workspace `meridian` with password
 
 | Persona | Email | Role |
 |---|---|---|
+| Axiom Super Admin | `superadmin@axiomcrm.com` | Super admin across tenants |
+| Axiom Super Auditor | `superaudit@axiomcrm.com` | Read-only auditor across tenants |
 | Priya Nair | `priya.nair@meridianfab.com` | Sales |
-| Raj Malhotra | `raj.malhotra@meridianfab.com` | Admin |
+| Raj Malhotra | `raj.malhotra@meridianfab.com` | Tenant admin |
 | Maya Torres | `maya.torres@meridianfab.com` | Sales |
+| Ava Chen | `ava.chen@northstar.example` | Tenant admin for workspace `northstar` |
 
 These credentials are development seed data only. They must not be reused in a
 shared, staging, or production environment.
@@ -116,6 +137,8 @@ mvn spring-boot:run
 Flyway applies `V1__baseline.sql` (schema + RLS policies) and the demo seed on first boot.
 
 **What you get, and don't:** a booting API with an RLS-enforced schema, outbox relay, seed data, a user-scoped in-app notification service, and a production-built web preview. The UI covers the walking lead→opportunity slice. There is no SSO, general record-sharing model, email/push notification delivery, automation engine, or production AI yet — see [epic-status.md](docs/epic-status.md) for the exact boundary.
+
+Current verified increment: platform super-admin/super-audit roles, tenant switching, governed master toolbars, account/lead bulk-upload templates, soft-delete protections, immutable audit, server-side pagination/search/filtering at 100 rows per page, and export parity for Excel, Word, and PDF. Vendor and third-party connector implementations remain intentionally pending.
 
 ## Frontend and desktop client
 

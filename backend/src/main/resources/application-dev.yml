@@ -1,0 +1,10 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${AXIOM_DB_HOST:localhost}:${AXIOM_DB_PORT:5432}/${AXIOM_DB_NAME:AxiomCRMDB_Dev}}
+
+axiom:
+  environment:
+    name: dev

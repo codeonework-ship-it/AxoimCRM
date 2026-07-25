@@ -19,6 +19,25 @@ Object-level and record-level access (layers 1–4) determine *whether* a record
 
 ## 2. Profiles and permission sets
 
+### 2.1 Implemented preview role catalogue
+
+The runnable preview uses a compact role catalogue while the full profile/permission-set model is still being built. These roles are enforced by the API and mirrored in the UI:
+
+| Role | Scope | Write access | Notes |
+|---|---|---|---|
+| `SUPER_ADMIN` | All active tenants | Yes | Platform administrator; can switch tenant workspaces and administer master data. |
+| `SUPER_AUDIT` | All active tenants | No | Platform-wide read/view auditor; write, import and delete requests are rejected. |
+| `TENANT_ADMIN` | Current tenant | Yes | Tenant administrator; replaces the original demo `ADMIN` role. |
+| `SALES_MANAGER` | Current tenant | Yes | Sales leadership role reserved for manager views and team workflows. |
+| `SALES` | Current tenant | Yes | Standard seller role for leads, accounts, and opportunities. |
+| `MARKETING` | Current tenant | Yes | Reserved for campaign and lead-source workflows. |
+| `SERVICE` | Current tenant | Yes | Reserved for cases, entitlements, and SLA workflows. |
+| `OPERATIONS` | Current tenant | Yes | Reserved for operational administration and data quality workflows. |
+| `FINANCE` | Current tenant | Yes | Reserved for quotes, approvals, renewals, and finance views. |
+| `DATA_STEWARD` | Current tenant | Yes | Can import, export, and administer governed master data. |
+| `AUDITOR` | Current tenant | No | Tenant-scoped read/view auditor. |
+| `INTEGRATION` | Current tenant | Yes | Reserved for service/API users; vendor integrations remain pending. |
+
 | Concept | Cardinality | Determines |
 |---|---|---|
 | **Profile** | Exactly one per user | Baseline object permissions (create/read/edit/delete/view-all/modify-all), baseline field permissions, system permissions |

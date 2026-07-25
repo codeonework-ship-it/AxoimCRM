@@ -72,6 +72,8 @@ Administrators see per-integration health: last successful sync, failure count, 
 
 ## 2. Connector catalogue
 
+> **Implementation note (2026-07-25):** The current runnable increment keeps vendor and third-party connector implementations pending by design. The API, Kafka/outbox plumbing, import templates and export surfaces are in place for non-vendor CRM workflows; Microsoft, Google, telephony, ERP, enrichment, payment, and other vendor adapters remain specification-only until their integration stories are started.
+
 Connectors are supported product, not sample code: each ships with configuration, health status and field mapping (`FR-INT-008`, `F-281`, `F-282`). Every connector sits behind an anti-corruption layer — a capability contract in Axiom's vocabulary, an adapter per vendor — so external models never enter core domain code ([ADR-007](../architecture/adr/ADR-007-external-system-integration.md)). Every connector has a defined behaviour when its external system is absent; "the product stops" is not one of them.
 
 | Connector class | Serves | Defined absence behaviour |

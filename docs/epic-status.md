@@ -34,6 +34,15 @@ _Last updated: 2026-07-25_
 
 **0 / 23 epics completed · 4 partial (walking vertical slice) · 19 not started.**
 
+## 2026-07-25 implementation increment
+
+The current runnable slice now includes these additional partial deliveries:
+
+- **E01/E02:** platform `SUPER_ADMIN` and `SUPER_AUDIT` identities, tenant switching, tenant-scoped JWTs, and read-only write blocking for auditor roles.
+- **E03/E20:** account/lead master toolbar, audit drawer, immutable audit events, templates, atomic CSV bulk upload validation, governed Excel/Word/PDF exports, soft delete only, and in-use delete protection.
+- **E04/E05:** account and lead lists use server-side search/filtering and 100-row pagination; grouped display remains available for the current page.
+- **E17:** API CORS is locked to explicit configured origins and exposes only the headers needed by the frontend. Vendor and third-party integrations remain intentionally pending.
+
 ## Skeleton work in detail
 
 What exists in `backend/` today, honestly stated — a walking skeleton proving the architecture's spine, not delivered stories:

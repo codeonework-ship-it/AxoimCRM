@@ -20,6 +20,7 @@ export interface AuthUser {
   displayName: string;
   email: string;
   role: string;
+  platformUser: boolean;
 }
 
 export interface AuthTenant {
@@ -38,6 +39,40 @@ export interface LoginResponse {
   token: string;
   user: AuthUser;
   tenant: AuthTenant;
+}
+
+export interface TenantOption extends AuthTenant {}
+
+export interface AuditEvent {
+  id: string;
+  actorName: string;
+  actorRole: string;
+  action: string;
+  entityType: string;
+  entityId: string | null;
+  summary: string;
+  details: Record<string, unknown>;
+  correlationId: string | null;
+  occurredAt: string;
+}
+
+export interface DownloadedFile {
+  blob: Blob;
+  filename: string;
+}
+
+export interface PageResult<T> {
+  items: T[];
+  page: number;
+  size: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface ListParams {
+  page?: number;
+  search?: string;
+  filter?: string;
 }
 
 export interface MeResponse {
@@ -219,6 +254,36 @@ async function request<T>(
   return (text ? JSON.parse(text) : undefined) as T;
 }
 
+async function fileRequest(path: string, init?: RequestInit): Promise<DownloadedFile> {
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      ...init,
+      headers: { ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}), ...init?.headers },
+    });
+  } catch {
+    throw new ApiUnreachableError();
+  }
+  if (res.status === 401) { onUnauthorized?.(); throw new ApiError(401, "Your session has expired. Sign in again."); }
+  if (!res.ok) {
+    let message = `Request failed (${res.status})`;
+    try { const data = await res.json() as { message?: string }; if (data.message) message = data.message; } catch { /* binary/non-JSON */ }
+    throw new ApiError(res.status, message);
+  }
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const filename = /filename="?([^";]+)"?/i.exec(disposition)?.[1] ?? "axiom-download";
+  return { blob: await res.blob(), filename };
+}
+
+function queryString(params?: Record<string, string | number | undefined>): string {
+  const search = new URLSearchParams();
+  Object.entries(params ?? {}).forEach(([key, value]) => {
+    if (value !== undefined && `${value}`.trim() !== "") search.set(key, `${value}`);
+  });
+  const text = search.toString();
+  return text ? `?${text}` : "";
+}
+
 /* ------------------------------------------------------------------ */
 /* Endpoints                                                           */
 /* ------------------------------------------------------------------ */
@@ -234,22 +299,68 @@ export const api = {
     return request<MeResponse>("GET", "/auth/me");
   },
 
-  accounts(): Promise<Account[]> {
-    return request<Account[]>("GET", "/accounts");
+  tenants(): Promise<TenantOption[]> {
+    return request<TenantOption[]>("GET", "/auth/tenants");
   },
 
-  leads(): Promise<Lead[]> {
-    return request<Array<{
+  switchTenant(tenantSlug: string): Promise<LoginResponse> {
+    return request<LoginResponse>("POST", "/auth/switch-tenant", { tenantSlug });
+  },
+
+  auditEvents(entityType?: string): Promise<AuditEvent[]> {
+    const query = entityType ? `?entityType=${encodeURIComponent(entityType)}` : "";
+    return request<AuditEvent[]>("GET", `/audit${query}`);
+  },
+
+  masterTemplate(master: string): Promise<DownloadedFile> {
+    return fileRequest(`/master-data/${encodeURIComponent(master)}/template`);
+  },
+
+  exportMaster(master: string, format: "XLSX" | "DOCX" | "PDF", params?: ListParams): Promise<DownloadedFile> {
+    return fileRequest(`/master-data/${encodeURIComponent(master)}/export${queryString({
+      format,
+      search: params?.search,
+      filter: params?.filter,
+    })}`);
+  },
+
+  importMaster(master: string, file: File): Promise<{ imported: number; message: string }> {
+    const form = new FormData(); form.append("file", file);
+    return fileRequest(`/master-data/${encodeURIComponent(master)}/import`, { method: "POST", body: form })
+      .then(async ({ blob }) => JSON.parse(await blob.text()) as { imported: number; message: string });
+  },
+
+  deleteMaster(master: string, id: string): Promise<void> {
+    return request<void>("DELETE", `/master-data/${encodeURIComponent(master)}/${encodeURIComponent(id)}`);
+  },
+
+  accounts(params?: ListParams): Promise<PageResult<Account>> {
+    return request<PageResult<Account>>("GET", `/accounts${queryString({
+      page: params?.page ?? 0,
+      search: params?.search,
+      industry: params?.filter,
+    })}`);
+  },
+
+  leads(params?: ListParams): Promise<PageResult<Lead>> {
+    return request<PageResult<{
       id: string; firstName: string; lastName: string; company: string | null;
       email: string | null; status: LeadStatus; ownerName: string | null;
-    }>>("GET", "/leads").then((rows) => rows.map((row) => ({
-      id: row.id,
-      name: [row.firstName, row.lastName].filter(Boolean).join(" "),
-      company: row.company,
-      email: row.email,
-      status: row.status,
-      ownerName: row.ownerName,
-    })));
+    }>>("GET", `/leads${queryString({
+      page: params?.page ?? 0,
+      search: params?.search,
+      status: params?.filter,
+    })}`).then((page) => ({
+      ...page,
+      items: page.items.map((row) => ({
+        id: row.id,
+        name: [row.firstName, row.lastName].filter(Boolean).join(" "),
+        company: row.company,
+        email: row.email,
+        status: row.status,
+        ownerName: row.ownerName,
+      })),
+    }));
   },
 
   convertLead(leadId: string): Promise<void> {

@@ -4,9 +4,11 @@ server:
 spring:
   application:
     name: axiom-api
+  profiles:
+    default: dev
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/axiom}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${AXIOM_DB_HOST:localhost}:${AXIOM_DB_PORT:5432}/${AXIOM_DB_NAME:AxiomCRMDB_Dev}}
     username: ${SPRING_DATASOURCE_USERNAME:axiom_app}
     password: ${SPRING_DATASOURCE_PASSWORD:axiom_app_dev_password}
     hikari:
@@ -24,9 +26,9 @@ spring:
           time_zone: UTC
 
   flyway:
-    url: ${FLYWAY_URL:jdbc:postgresql://localhost:5432/axiom}
-    user: ${FLYWAY_USER:postgres}
-    password: ${FLYWAY_PASSWORD:postgres}
+    url: ${FLYWAY_URL:${spring.datasource.url}}
+    user: ${FLYWAY_USER:${AXIOM_DB_USER:AxiomCRM}}
+    password: ${FLYWAY_PASSWORD:${AXIOM_DB_PASSWORD:AxiomCRM@12345}}
     baseline-on-migrate: true
     connect-retries: 10
 
@@ -38,6 +40,8 @@ spring:
       acks: all
 
 axiom:
+  environment:
+    name: ${AXIOM_ENVIRONMENT:dev}
   relay:
     # Second datasource used ONLY by OutboxRelay — connects as axiom_relay,
     # whose RLS policies (V3) allow cross-tenant reads of outbox_event only.

@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
+import { api } from "../api/client";
 import { useNotifications } from "./notifications";
-import { BellIcon, HelpIcon, MenuIcon, SearchIcon, SunMoonIcon } from "./icons";
+import { BellIcon, MenuIcon, SearchIcon, SunMoonIcon } from "./icons";
 
 function toggleTheme(): "light" | "dark" {
   const root = document.documentElement;
@@ -18,12 +20,20 @@ function toggleTheme(): "light" | "dark" {
 interface TopBarProps {
   onOpenCommand: () => void;
   onOpenHelp: () => void;
-  onOpenNav: () => void;
+  onToggleNav: () => void;
+  navExpanded: boolean;
 }
 
-export function TopBar({ onOpenCommand, onOpenHelp, onOpenNav }: TopBarProps) {
+export function TopBar({ onOpenCommand, onOpenHelp, onToggleNav, navExpanded }: TopBarProps) {
   const navigate = useNavigate();
-  const { tenant } = useAuth();
+  const { user, tenant, switchTenant } = useAuth();
+  const tenantsQ = useQuery({
+    queryKey: ["auth", "tenants"],
+    queryFn: api.tenants,
+    enabled: !!user?.platformUser,
+    staleTime: 60_000,
+  });
+  const switchMutation = useMutation({ mutationFn: switchTenant });
   const { notifications, unreadCount, isLoading, isError, markRead, markUnread, markAllRead, refetch } =
     useNotifications();
   const [panelOpen, setPanelOpen] = useState(false);
@@ -67,10 +77,16 @@ export function TopBar({ onOpenCommand, onOpenHelp, onOpenNav }: TopBarProps) {
 
   return (
     <header className="topbar">
-      <button className="icon-btn mobile-menu" aria-label="Open navigation" onClick={onOpenNav}><MenuIcon /></button>
+      <button className="icon-btn mobile-menu" aria-label="Toggle sidebar" aria-expanded={navExpanded} title="Toggle sidebar" onClick={onToggleNav}><MenuIcon /></button>
       <div className="topbar-context">
         <span className="topbar-title">Revenue operations</span>
-        <span className="topbar-tenant">{tenant?.name ?? "—"} · Live workspace</span>
+        {user?.platformUser && tenantsQ.data ? (
+          <label className="workspace-switch"><span className="sr-only">Active tenant</span><select
+            value={tenant?.slug ?? ""}
+            disabled={switchMutation.isPending}
+            onChange={(event) => switchMutation.mutate(event.target.value)}
+          >{tenantsQ.data.map((option) => <option key={option.id} value={option.slug}>{option.name}</option>)}</select></label>
+        ) : <span className="topbar-tenant">{tenant?.name ?? "—"} · Live workspace</span>}
       </div>
 
       <button className="search-box" onClick={onOpenCommand} aria-label="Open search and command center">
@@ -146,8 +162,8 @@ export function TopBar({ onOpenCommand, onOpenHelp, onOpenNav }: TopBarProps) {
         )}
       </div>
 
-      <button className="icon-btn help-button" aria-label="Open operator guide" title="Help (Ctrl+/)" onClick={onOpenHelp}>
-        <HelpIcon />
+      <button className="manual-button help-button" aria-label="Open User Manual" title="User Manual (Ctrl+/)" onClick={onOpenHelp}>
+        User Manual
       </button>
 
       <button

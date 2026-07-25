@@ -10,7 +10,7 @@ import java.util.UUID;
  */
 public final class TenantContext {
 
-    public record Principal(UUID tenantId, UUID userId, String role, String displayName) {}
+    public record Principal(UUID tenantId, UUID userId, String role, String displayName, String email) {}
 
     private static final ThreadLocal<Principal> CURRENT = new ThreadLocal<>();
 

@@ -15,6 +15,7 @@ import {
   type AuthUser,
   type LoginRequest,
 } from "../api/client";
+import { useQueryClient } from "@tanstack/react-query";
 
 const STORAGE_KEY = "axiom.session";
 
@@ -29,6 +30,7 @@ interface AuthState {
   tenant: AuthTenant | null;
   isAuthenticated: boolean;
   login: (req: LoginRequest) => Promise<void>;
+  switchTenant: (tenantSlug: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -47,6 +49,7 @@ function loadSession(): StoredSession | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [session, setSession] = useState<StoredSession | null>(() => {
     const stored = loadSession();
     // Prime the in-memory token before the first render so early queries
@@ -73,6 +76,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(next);
   }, []);
 
+  const switchTenant = useCallback(async (tenantSlug: string) => {
+    const res = await api.switchTenant(tenantSlug);
+    const next: StoredSession = { token: res.token, user: res.user, tenant: res.tenant };
+    setAuthToken(res.token);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    queryClient.clear();
+    setSession(next);
+  }, [queryClient]);
+
   // Any 401 from the API drops the session; the route guard then
   // redirects to /login.
   useEffect(() => {
@@ -86,9 +98,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tenant: session?.tenant ?? null,
       isAuthenticated: !!session,
       login,
+      switchTenant,
       logout,
     }),
-    [session, login, logout],
+    [session, login, switchTenant, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

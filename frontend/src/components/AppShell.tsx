@@ -11,6 +11,7 @@ export function AppShell() {
   const [commandOpen, setCommandOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
+  const [railCollapsed, setRailCollapsed] = useState(false);
 
   useEffect(() => {
     let goPrefix = false;
@@ -57,13 +58,17 @@ export function AppShell() {
 
   return (
     <NotificationsProvider>
-      <div className="shell">
+      <div className={`shell${railCollapsed ? " rail-collapsed" : ""}`}>
         <CommandRail open={navOpen} onNavigate={() => setNavOpen(false)} />
         <div className="shell-main">
           <TopBar
             onOpenCommand={() => setCommandOpen(true)}
             onOpenHelp={() => setHelpOpen(true)}
-            onOpenNav={() => setNavOpen(true)}
+            onToggleNav={() => {
+              if (window.matchMedia("(max-width: 900px)").matches) setNavOpen((open) => !open);
+              else setRailCollapsed((collapsed) => !collapsed);
+            }}
+            navExpanded={navOpen || !railCollapsed}
           />
           <main className="shell-content app-ground">
             <Outlet />

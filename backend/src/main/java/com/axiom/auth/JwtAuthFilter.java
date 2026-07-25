@@ -64,16 +64,33 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                     UUID.fromString(claims.get("tid", String.class)),
                     UUID.fromString(claims.get("uid", String.class)),
                     claims.get("role", String.class),
-                    claims.get("name", String.class)));
+                    claims.get("name", String.class),
+                    claims.getSubject()));
         } catch (JwtException | IllegalArgumentException e) {
             reject(response, "Invalid or expired token");
             return;
         }
         try {
+            CrmRole role = CrmRole.current(TenantContext.get().role());
+            boolean mutation = !(request.getMethod().equalsIgnoreCase("GET")
+                    || request.getMethod().equalsIgnoreCase("HEAD")
+                    || request.getMethod().equalsIgnoreCase("OPTIONS"));
+            boolean tenantSwitch = request.getRequestURI().equals("/api/v1/auth/switch-tenant");
+            if (role.readOnly() && mutation && !tenantSwitch) {
+                rejectForbidden(response, "This audit role is read-only across every surface");
+                return;
+            }
             chain.doFilter(request, response);
         } finally {
             TenantContext.clear();
         }
+    }
+
+    private void rejectForbidden(HttpServletResponse response, String message) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+        objectMapper.writeValue(response.getWriter(),
+                ApiError.of("FORBIDDEN", message, MDC.get(CorrelationIdFilter.MDC_KEY)));
     }
 
     private void reject(HttpServletResponse response, String message) throws IOException {

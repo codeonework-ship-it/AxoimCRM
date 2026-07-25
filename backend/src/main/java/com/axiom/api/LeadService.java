@@ -81,7 +81,7 @@ public class LeadService {
         // Optional opportunity in the first stage of the pipeline.
         UUID opportunityId = null;
         if (opportunityName != null && !opportunityName.isBlank()) {
-            PipelineStage firstStage = stages.findFirstByTenantIdOrderBySortOrderAsc(tenantId)
+            PipelineStage firstStage = stages.findFirstByTenantIdAndDeletedAtIsNullOrderBySortOrderAsc(tenantId)
                     .orElseThrow(() -> new ConflictException("No pipeline stages configured for tenant"));
             Opportunity opp = opportunities.save(new Opportunity(
                     tenantId, opportunityName.trim(), account.getId(), firstStage.getId(),

@@ -52,9 +52,9 @@ public class OpportunityService {
 
         Opportunity opp = opportunities.findByTenantIdAndId(tenantId, opportunityId)
                 .orElseThrow(() -> new NotFoundException("Opportunity not found: " + opportunityId));
-        PipelineStage target = stages.findByTenantIdAndId(tenantId, targetStageId)
+        PipelineStage target = stages.findByTenantIdAndIdAndDeletedAtIsNull(tenantId, targetStageId)
                 .orElseThrow(() -> new NotFoundException("Pipeline stage not found: " + targetStageId));
-        PipelineStage from = stages.findByTenantIdAndId(tenantId, opp.getStageId())
+        PipelineStage from = stages.findByTenantIdAndIdAndDeletedAtIsNull(tenantId, opp.getStageId())
                 .orElseThrow(() -> new NotFoundException("Current stage not found: " + opp.getStageId()));
 
         if (target.getId().equals(from.getId())) {

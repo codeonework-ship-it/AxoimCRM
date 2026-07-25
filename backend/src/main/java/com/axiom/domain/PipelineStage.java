@@ -5,6 +5,7 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -32,6 +33,9 @@ public class PipelineStage {
     @Column(name = "requires_economic_buyer", nullable = false)
     private boolean requiresEconomicBuyer;
 
+    @Column(name = "deleted_at")
+    private Instant deletedAt;
+
     protected PipelineStage() {}
 
     public UUID getId() { return id; }
@@ -41,4 +45,5 @@ public class PipelineStage {
     public boolean isClosed() { return closed; }
     public boolean isWon() { return won; }
     public boolean isRequiresEconomicBuyer() { return requiresEconomicBuyer; }
+    public Instant getDeletedAt() { return deletedAt; }
 }

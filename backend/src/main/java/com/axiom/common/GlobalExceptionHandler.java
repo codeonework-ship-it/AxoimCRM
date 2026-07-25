@@ -44,6 +44,12 @@ public class GlobalExceptionHandler {
                 .body(ApiError.of("UNAUTHORIZED", ex.getMessage(), correlationId()));
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ApiError> forbidden(ForbiddenException ex) {
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiError.of("FORBIDDEN", ex.getMessage(), correlationId()));
+    }
+
     @ExceptionHandler(NotFoundException.class)
     public ResponseEntity<ApiError> notFound(NotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -60,6 +66,12 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiError> conflict(ConflictException ex) {
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(ApiError.of("CONFLICT", ex.getMessage(), correlationId()));
+    }
+
+    @ExceptionHandler(BulkValidationException.class)
+    public ResponseEntity<ApiError> bulkValidation(BulkValidationException ex) {
+        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY)
+                .body(new ApiError("BULK_VALIDATION_FAILED", ex.getMessage(), ex.details(), correlationId()));
     }
 
     @ExceptionHandler(Exception.class)

@@ -57,6 +57,18 @@ If something here doesn't match what you see on screen, your administrator may h
 
 The current walking preview uses the local workspace, email, and password form. The target product supports two organization-selected methods:
 
+For the runnable preview at `http://localhost:4280`, use password `axiom-demo` with one of these accounts:
+
+| Workspace | Email | Role |
+|---|---|---|
+| `meridian` | `superadmin@axiomcrm.com` | Super admin, read/write across all active tenants |
+| `meridian` | `superaudit@axiomcrm.com` | Super audit, read/view only across all active tenants |
+| `meridian` | `raj.malhotra@meridianfab.com` | Tenant admin |
+| `meridian` | `priya.nair@meridianfab.com` | Sales |
+| `northstar` | `ava.chen@northstar.example` | Tenant admin |
+
+Platform users can switch active workspace from the top bar. Tenant users stay in their own workspace.
+
 - **Single sign-on (SSO).** Most organizations use this. Choose your company's sign-in button and you'll be taken to the same login you use for email or your intranet. No separate Axiom password to remember.
 - **Username and password.** If your organization uses local sign-in, use the email address and password you were given. Forgot it? Use **Forgot password** on the sign-in screen — the reset link goes to your email.
 
@@ -164,6 +176,19 @@ Won or lost, closing asks for a reason from your organization's list, and for lo
 ---
 
 ## Accounts and contacts
+
+### Lists, exports and governed master data
+
+Accounts and Leads use server-side search, filtering and pagination. Each page returns 100 records; exports use the same active search and filter values, so Excel, Word and PDF downloads match the working list rather than a stale client-side subset.
+
+The master toolbar provides:
+
+- **Group** to group the current page by the main master field.
+- **Audit** to open immutable master activity.
+- **Export Excel**, **Export Word** and **Export PDF** for governed downloads.
+- **Download template** and **Bulk upload** for roles allowed to import master data.
+
+Bulk upload uses the downloaded CSV template and validates the full file before writing. If any row fails validation, no records from that file are imported. Deletes are soft deletes only, and records already used by related records are protected with a clear in-use message.
 
 ### The account 360 timeline
 
@@ -415,4 +440,4 @@ A: Yes — the full product works in a tablet or phone browser, and native mobil
 
 ---
 
-*This guide combines walking-preview instructions with the approved target-product manual. The preview boundary at the top and [`../epic-status.md`](../epic-status.md) are authoritative for shipped behavior. Press **⌘/** or **Ctrl+/** for the in-product operator guide.*
+*This guide combines walking-preview instructions with the approved target-product manual. The preview boundary at the top and [`../epic-status.md`](../epic-status.md) are authoritative for shipped behavior. Press **⌘/** or **Ctrl+/** for the in-product User Manual.*

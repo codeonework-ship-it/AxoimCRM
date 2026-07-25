@@ -1,38 +1,21 @@
 package com.axiom.auth;
 
 import com.axiom.common.UnauthorizedException;
+import com.axiom.tenancy.TenantContext;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 /**
- * Login flow. This is the ONE place that must read tenant-scoped data
- * (app_user) before any tenant context exists — a chicken-and-egg with the
- * RLS policies of ADR-001, resolved as follows:
- *
- * <ol>
- *   <li>Resolve the tenant by slug from the {@code tenant} table, which is a
- *       platform table deliberately left WITHOUT row-level security (V1) —
- *       a slug is not tenant data, it is the address of a tenant.</li>
- *   <li>Inside the same transaction, bind the freshly resolved tenant id to
- *       the Postgres session with {@code set_config('app.tenant_id', ?, true)}
- *       (SET LOCAL semantics — dies with the transaction, so the pooled
- *       connection carries no residual identity). This is safe because the
- *       tenant id came from OUR database via the trusted slug lookup, never
- *       from a client-supplied identifier.</li>
- *   <li>Now the {@code app_user} query passes the RLS policy and can only
- *       ever see users of that single tenant — even a bug in the email
- *       predicate could not authenticate a user of another tenant.</li>
- * </ol>
- *
- * TenantContext is NOT bound during login (the aspect is skipped), which is
- * why the set_config call is made explicitly here. Password verification is
- * bcrypt via spring-security-crypto against the pgcrypto-generated hash.
+ * Authenticates tenant users and platform users. Platform identities never bypass
+ * RLS: selecting another tenant issues a newly signed JWT carrying that tenant id,
+ * after which the normal tenant session binding applies.
  */
 @Service
 public class AuthService {
@@ -46,48 +29,90 @@ public class AuthService {
         this.jwtService = jwtService;
     }
 
-    public record AuthResult(String token,
-                             UUID userId, String displayName, String email, String role,
-                             UUID tenantId, String tenantSlug, String tenantName) {}
+    public record AuthResult(String token, UUID userId, String displayName, String email,
+                             String role, boolean platformUser, UUID tenantId,
+                             String tenantSlug, String tenantName) {}
+
+    public record TenantOption(UUID id, String slug, String name) {}
 
     @Transactional
     public AuthResult login(String tenantSlug, String email, String password) {
-        // 1. Tenant by slug — tenant table has no RLS; only active tenants may log in.
-        Map<String, Object> tenant;
-        try {
-            tenant = jdbc.queryForMap(
-                    "select id, slug, name from tenant where slug = ? and status = 'active'",
-                    tenantSlug);
-        } catch (EmptyResultDataAccessException e) {
-            throw new UnauthorizedException("Invalid credentials");
-        }
+        Map<String, Object> tenant = activeTenant(tenantSlug);
         UUID tenantId = (UUID) tenant.get("id");
 
-        // 2. Bind the resolved (trusted) tenant id for this transaction so the
-        //    app_user RLS policy opens for exactly this tenant.
-        jdbc.query("select set_config('app.tenant_id', ?, true)", rs -> null, tenantId.toString());
+        Map<String, Object> platform = optionalPlatformUser(email);
+        if (platform != null && bcrypt.matches(password, (String) platform.get("password_hash"))) {
+            return result(platform, true, tenant);
+        }
 
-        // 3. Tenant-scoped user lookup — RLS is now the second wall around this query.
+        jdbc.query("select set_config('app.tenant_id', ?, true)", rs -> null, tenantId.toString());
         Map<String, Object> user;
         try {
             user = jdbc.queryForMap(
                     "select id, email, password_hash, display_name, role "
-                            + "from app_user where tenant_id = ? and email = ?",
+                            + "from app_user where tenant_id = ? and lower(email) = lower(?)",
                     tenantId, email);
         } catch (EmptyResultDataAccessException e) {
             throw new UnauthorizedException("Invalid credentials");
         }
-
         if (!bcrypt.matches(password, (String) user.get("password_hash"))) {
             throw new UnauthorizedException("Invalid credentials");
         }
+        return result(user, false, tenant);
+    }
 
+    @Transactional(readOnly = true)
+    public List<TenantOption> tenants() {
+        TenantContext.Principal principal = TenantContext.get();
+        if (!CrmRole.current(principal.role()).platform()) {
+            return jdbc.query("select id, slug, name from tenant where id = ? and status = 'active'",
+                    (rs, i) -> new TenantOption(rs.getObject("id", UUID.class), rs.getString("slug"), rs.getString("name")),
+                    principal.tenantId());
+        }
+        return jdbc.query("select id, slug, name from tenant where status = 'active' order by name",
+                (rs, i) -> new TenantOption(rs.getObject("id", UUID.class), rs.getString("slug"), rs.getString("name")));
+    }
+
+    @Transactional(readOnly = true)
+    public AuthResult switchTenant(String tenantSlug) {
+        TenantContext.Principal principal = TenantContext.get();
+        CrmRole.requirePlatform(principal.role());
+        Map<String, Object> tenant = activeTenant(tenantSlug);
+        Map<String, Object> platform = optionalPlatformUser(principal.email());
+        if (platform == null || !platform.get("id").equals(principal.userId())) {
+            throw new UnauthorizedException("Platform identity is no longer active");
+        }
+        return result(platform, true, tenant);
+    }
+
+    private Map<String, Object> activeTenant(String tenantSlug) {
+        try {
+            return jdbc.queryForMap(
+                    "select id, slug, name from tenant where lower(slug) = lower(?) and status = 'active'",
+                    tenantSlug);
+        } catch (EmptyResultDataAccessException e) {
+            throw new UnauthorizedException("Invalid credentials");
+        }
+    }
+
+    private Map<String, Object> optionalPlatformUser(String email) {
+        try {
+            return jdbc.queryForMap(
+                    "select id, email, password_hash, display_name, role from platform_user "
+                            + "where lower(email) = lower(?) and active = true", email);
+        } catch (EmptyResultDataAccessException e) {
+            return null;
+        }
+    }
+
+    private AuthResult result(Map<String, Object> user, boolean platform, Map<String, Object> tenant) {
         UUID userId = (UUID) user.get("id");
+        String email = (String) user.get("email");
         String role = (String) user.get("role");
         String displayName = (String) user.get("display_name");
+        UUID tenantId = (UUID) tenant.get("id");
         String token = jwtService.issue(tenantId, userId, role, displayName, email);
-
-        return new AuthResult(token, userId, displayName, email, role,
+        return new AuthResult(token, userId, displayName, email, role, platform,
                 tenantId, (String) tenant.get("slug"), (String) tenant.get("name"));
     }
 }
