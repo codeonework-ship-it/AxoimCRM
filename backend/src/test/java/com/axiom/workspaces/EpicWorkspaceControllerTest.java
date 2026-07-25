@@ -32,4 +32,28 @@ class EpicWorkspaceControllerTest {
         assertEquals(page, controller.migrations("contacts", "READY_TO_IMPORT", 1));
         verify(service).migrations("contacts", "READY_TO_IMPORT", 1);
     }
+
+    @Test void delegatesNextFiveEpicWorkspaces() {
+        EpicWorkspaceService service = mock(EpicWorkspaceService.class);
+        EpicWorkspaceController controller = new EpicWorkspaceController(service);
+        EpicWorkspaceService.WorkspacePage page = new EpicWorkspaceService.WorkspacePage(
+                "CHANNEL", "Partners", "desc", List.of(), PageResult.of(List.of(), 0, 100, 0));
+
+        when(service.partners("gold", "ACTIVE", 0)).thenReturn(page);
+        when(service.automation("sla", "ACTIVE", 1)).thenReturn(page);
+        when(service.analytics("revenue", "ACTIVE", 2)).thenReturn(page);
+        when(service.copilot("risk", "READY", 3)).thenReturn(page);
+        when(service.mobile("ios", "ACTIVE", 4)).thenReturn(page);
+
+        assertEquals(page, controller.partners("gold", "ACTIVE", 0));
+        assertEquals(page, controller.automation("sla", "ACTIVE", 1));
+        assertEquals(page, controller.analytics("revenue", "ACTIVE", 2));
+        assertEquals(page, controller.copilot("risk", "READY", 3));
+        assertEquals(page, controller.mobile("ios", "ACTIVE", 4));
+        verify(service).partners("gold", "ACTIVE", 0);
+        verify(service).automation("sla", "ACTIVE", 1);
+        verify(service).analytics("revenue", "ACTIVE", 2);
+        verify(service).copilot("risk", "READY", 3);
+        verify(service).mobile("ios", "ACTIVE", 4);
+    }
 }

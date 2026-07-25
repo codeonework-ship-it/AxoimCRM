@@ -36,12 +36,17 @@ export function App() {
         <Route path="/contracts" element={<EpicWorkspacePage module="contracts" />} />
         <Route path="/campaigns" element={<EpicWorkspacePage module="campaigns" />} />
         <Route path="/cases" element={<EpicWorkspacePage module="cases" />} />
+        <Route path="/partners" element={<EpicWorkspacePage module="partners" />} />
         {/* Bare /reference-data still resolves; the page redirects it onto the
             first master's canonical /reference-data/:setCode path. */}
         <Route path="/reference-data" element={<ReferenceDataPage />} />
         <Route path="/reference-data/:setCode" element={<ReferenceDataPage />} />
         <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/analytics" element={<EpicWorkspacePage module="analytics" />} />
+        <Route path="/copilot" element={<EpicWorkspacePage module="copilot" />} />
         <Route path="/migration" element={<EpicWorkspacePage module="migration" />} />
+        <Route path="/automation" element={<EpicWorkspacePage module="automation" />} />
+        <Route path="/mobile" element={<EpicWorkspacePage module="mobile" />} />
         <Route path="/admin/*" element={<AdminPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -857,7 +857,7 @@ export const api = {
     return request<CpqQuoteSummary>("GET", "/cpq/quotes/summary");
   },
 
-  workspace(module: "forecast" | "contracts" | "campaigns" | "cases" | "migration", params?: ListParams & { status?: string }): Promise<WorkspacePage> {
+  workspace(module: "forecast" | "contracts" | "campaigns" | "cases" | "migration" | "partners" | "automation" | "analytics" | "copilot" | "mobile", params?: ListParams & { status?: string }): Promise<WorkspacePage> {
     return request<WorkspacePage>("GET", `/workspaces/${module}${queryString({
       page: params?.page ?? 0,
       search: params?.search,

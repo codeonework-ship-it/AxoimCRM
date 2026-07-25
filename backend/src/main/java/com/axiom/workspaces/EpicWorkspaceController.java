@@ -48,4 +48,39 @@ public class EpicWorkspaceController {
                                                          @RequestParam(defaultValue = "0") int page) {
         return workspaces.migrations(search, status, page);
     }
+
+    @GetMapping("/partners")
+    public EpicWorkspaceService.WorkspacePage partners(@RequestParam(required = false) String search,
+                                                       @RequestParam(required = false) String status,
+                                                       @RequestParam(defaultValue = "0") int page) {
+        return workspaces.partners(search, status, page);
+    }
+
+    @GetMapping("/automation")
+    public EpicWorkspaceService.WorkspacePage automation(@RequestParam(required = false) String search,
+                                                         @RequestParam(required = false) String status,
+                                                         @RequestParam(defaultValue = "0") int page) {
+        return workspaces.automation(search, status, page);
+    }
+
+    @GetMapping("/analytics")
+    public EpicWorkspaceService.WorkspacePage analytics(@RequestParam(required = false) String search,
+                                                        @RequestParam(required = false) String status,
+                                                        @RequestParam(defaultValue = "0") int page) {
+        return workspaces.analytics(search, status, page);
+    }
+
+    @GetMapping("/copilot")
+    public EpicWorkspaceService.WorkspacePage copilot(@RequestParam(required = false) String search,
+                                                      @RequestParam(required = false) String status,
+                                                      @RequestParam(defaultValue = "0") int page) {
+        return workspaces.copilot(search, status, page);
+    }
+
+    @GetMapping("/mobile")
+    public EpicWorkspaceService.WorkspacePage mobile(@RequestParam(required = false) String search,
+                                                     @RequestParam(required = false) String status,
+                                                     @RequestParam(defaultValue = "0") int page) {
+        return workspaces.mobile(search, status, page);
+    }
 }

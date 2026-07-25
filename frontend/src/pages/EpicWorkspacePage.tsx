@@ -6,7 +6,17 @@ import { DataViewFrame } from "../components/DataViewFrame";
 import { GridLoader } from "../components/Loaders";
 import { formatDate, formatMoney } from "../lib/format";
 
-export type WorkspaceModule = "forecast" | "contracts" | "campaigns" | "cases" | "migration";
+export type WorkspaceModule =
+  | "forecast"
+  | "contracts"
+  | "campaigns"
+  | "cases"
+  | "migration"
+  | "partners"
+  | "automation"
+  | "analytics"
+  | "copilot"
+  | "mobile";
 
 interface EpicWorkspacePageProps {
   module: WorkspaceModule;
@@ -18,6 +28,11 @@ const STATUS_OPTIONS: Record<WorkspaceModule, string[]> = {
   campaigns: ["PLANNED", "ACTIVE", "PAUSED", "COMPLETED", "CANCELLED"],
   cases: ["NEW", "WORKING", "WAITING_ON_CUSTOMER", "ESCALATED", "RESOLVED", "CLOSED"],
   migration: ["UPLOADED", "VALIDATING", "READY_TO_IMPORT", "IMPORTED", "FAILED", "ROLLED_BACK"],
+  partners: ["ONBOARDING", "ACTIVE", "SUSPENDED", "TERMINATED"],
+  automation: ["DRAFT", "ACTIVE", "PAUSED", "RETIRED"],
+  analytics: ["DRAFT", "ACTIVE", "ARCHIVED"],
+  copilot: ["READY", "ACCEPTED", "DISMISSED", "EXPIRED"],
+  mobile: ["ACTIVE", "LOCKED", "WIPED", "EXPIRED"],
 };
 
 const EYEBROWS: Record<WorkspaceModule, string> = {
@@ -26,6 +41,11 @@ const EYEBROWS: Record<WorkspaceModule, string> = {
   campaigns: "Marketing alignment",
   cases: "Service operations",
   migration: "Onboarding command",
+  partners: "Channel command",
+  automation: "Process command",
+  analytics: "Metric command",
+  copilot: "Grounded intelligence",
+  mobile: "Field readiness",
 };
 
 export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
@@ -105,14 +125,15 @@ function WorkspaceTable({ rows }: { rows: WorkspaceRow[] }) {
 }
 
 function titleFromModule(module: WorkspaceModule): string {
+  if (module === "copilot") return "AI Copilot";
   return module === "forecast" ? "Forecast" : module === "migration" ? "Migration" : module.charAt(0).toUpperCase() + module.slice(1);
 }
 
 function statusClass(status: string): string {
   const normalized = status.toLowerCase().replace(/_/g, "-");
-  if (["active", "submitted", "booked", "imported", "met", "ready-to-import"].includes(normalized)) return "chip-active";
-  if (["draft", "planned", "uploaded", "validating", "working", "new", "in-review", "pending-renewal"].includes(normalized)) return "chip-draft";
-  if (["escalated", "failed", "missed", "terminated", "cancelled"].includes(normalized)) return "chip-cancelled";
+  if (["active", "submitted", "booked", "imported", "met", "ready-to-import", "ready", "approved", "converted", "synced"].includes(normalized)) return "chip-active";
+  if (["draft", "planned", "uploaded", "validating", "working", "new", "in-review", "pending-renewal", "onboarding", "queued", "simulated"].includes(normalized)) return "chip-draft";
+  if (["escalated", "failed", "missed", "terminated", "cancelled", "suspended", "rejected", "expired", "locked", "wiped", "conflict", "disabled"].includes(normalized)) return "chip-cancelled";
   return `chip-${normalized}`;
 }
 

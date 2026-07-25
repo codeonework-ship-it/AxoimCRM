@@ -179,6 +179,148 @@ public class EpicWorkspaceService {
                 PageResult.of(rows, safePage, QueryService.PAGE_SIZE, total));
     }
 
+    public WorkspacePage partners(String search, String status, int page) {
+        int safePage = Math.max(page, 0);
+        List<Object> args = new ArrayList<>(List.of(tenantId()));
+        String where = where("p", search, status, args, "p.partner_code", "a.name", "p.tier", "p.territory_scope", "u.display_name");
+        long total = total("""
+                select count(*) from channel.partner_account p
+                join crm.account a on a.tenant_id = p.tenant_id and a.id = p.account_id
+                join identity.app_user u on u.tenant_id = p.tenant_id and u.id = p.manager_id
+                """ + where, args);
+        List<WorkspaceRow> rows = query("""
+                select p.id, p.partner_code as code, a.name as title,
+                       p.tier || ' partner - ' || p.territory_scope || ' - active deals ' || p.active_deal_count as subtitle,
+                       p.status, u.display_name as owner_name, p.sourced_pipeline as amount,
+                       max(r.protection_expires_at)::date as target_date, p.created_at as updated_at,
+                       jsonb_build_object('tier', p.tier, 'influencedPipeline', p.influenced_pipeline, 'registrations', count(r.id), 'openConflicts', count(c.id) filter (where c.status = 'OPEN')) as metrics
+                from channel.partner_account p
+                join crm.account a on a.tenant_id = p.tenant_id and a.id = p.account_id
+                join identity.app_user u on u.tenant_id = p.tenant_id and u.id = p.manager_id
+                left join channel.deal_registration r on r.tenant_id = p.tenant_id and r.partner_account_id = p.id
+                left join channel.channel_conflict c on c.tenant_id = p.tenant_id and c.deal_registration_id = r.id
+                """ + where + """
+                 group by p.id, p.partner_code, a.name, p.tier, p.territory_scope, p.active_deal_count, p.status,
+                         u.display_name, p.sourced_pipeline, p.influenced_pipeline, p.created_at
+                order by p.sourced_pipeline desc, a.name limit ? offset ?""", args, safePage);
+        return new WorkspacePage("CHANNEL", "Partners", "Partner accounts, registered deals and channel conflict evidence.",
+                List.of(metric("Sourced", "sourced_pipeline", "channel.partner_account", "deleted_at is null"),
+                        metric("Influenced", "influenced_pipeline", "channel.partner_account", "deleted_at is null"),
+                        countMetric("Open conflicts", "channel.channel_conflict", "status = 'OPEN'", "warn")),
+                PageResult.of(rows, safePage, QueryService.PAGE_SIZE, total));
+    }
+
+    public WorkspacePage automation(String search, String status, int page) {
+        int safePage = Math.max(page, 0);
+        List<Object> args = new ArrayList<>(List.of(tenantId()));
+        String where = where("r", search, status, args, "r.rule_code", "r.name", "r.trigger_type", "r.object_type", "u.display_name");
+        long total = total("""
+                select count(*) from automation.automation_rule r
+                join identity.app_user u on u.tenant_id = r.tenant_id and u.id = r.owner_id
+                """ + where, args);
+        List<WorkspaceRow> rows = query("""
+                select r.id, r.rule_code as code, r.name as title,
+                       r.trigger_type || ' - ' || r.object_type || ' - version ' || r.active_version as subtitle,
+                       r.status, u.display_name as owner_name, r.run_count::numeric as amount,
+                       r.last_run_at::date as target_date, r.updated_at,
+                       jsonb_build_object('version', r.active_version, 'simulationPassed', r.simulation_passed, 'steps', count(s.id), 'errors', coalesce(sum(run.error_count), 0)) as metrics
+                from automation.automation_rule r
+                join identity.app_user u on u.tenant_id = r.tenant_id and u.id = r.owner_id
+                left join automation.automation_step s on s.tenant_id = r.tenant_id and s.rule_id = r.id
+                left join automation.automation_run run on run.tenant_id = r.tenant_id and run.rule_id = r.id
+                """ + where + """
+                 group by r.id, r.rule_code, r.name, r.trigger_type, r.object_type, r.active_version, r.status,
+                         u.display_name, r.run_count, r.last_run_at, r.updated_at, r.simulation_passed
+                order by r.status, r.last_run_at desc nulls last limit ? offset ?""", args, safePage);
+        return new WorkspacePage("AUTOMATION", "Automation", "Rules, simulations, approvals and execution trace health.",
+                List.of(countMetric("Active rules", "automation.automation_rule", "status = 'ACTIVE'", "good"),
+                        countMetric("Runs", "automation.automation_run", "true", "good"),
+                        countMetric("Errored runs", "automation.automation_run", "error_count > 0", "warn")),
+                PageResult.of(rows, safePage, QueryService.PAGE_SIZE, total));
+    }
+
+    public WorkspacePage analytics(String search, String status, int page) {
+        int safePage = Math.max(page, 0);
+        List<Object> args = new ArrayList<>(List.of(tenantId()));
+        String where = where("d", search, status, args, "d.dashboard_code", "d.name", "u.display_name");
+        long total = total("""
+                select count(*) from reporting.analytics_dashboard d
+                join identity.app_user u on u.tenant_id = d.tenant_id and u.id = d.owner_id
+                """ + where, args);
+        List<WorkspaceRow> rows = query("""
+                select d.id, d.dashboard_code as code, d.name as title,
+                       'Refresh every ' || d.refresh_interval_minutes || ' minutes - widgets ' || count(w.id) as subtitle,
+                       d.status, u.display_name as owner_name, coalesce(sum(w.metric_value), 0) as amount,
+                       d.last_refreshed_at::date as target_date, d.last_refreshed_at as updated_at,
+                       jsonb_build_object('widgets', count(w.id), 'refreshMinutes', d.refresh_interval_minutes, 'kpiWidgets', count(w.id) filter (where w.visualization_type = 'KPI')) as metrics
+                from reporting.analytics_dashboard d
+                join identity.app_user u on u.tenant_id = d.tenant_id and u.id = d.owner_id
+                left join reporting.dashboard_widget w on w.tenant_id = d.tenant_id and w.dashboard_id = d.id
+                """ + where + """
+                 group by d.id, d.dashboard_code, d.name, d.refresh_interval_minutes, d.status, u.display_name, d.last_refreshed_at
+                order by d.last_refreshed_at desc nulls last limit ? offset ?""", args, safePage);
+        return new WorkspacePage("ANALYTICS", "Analytics", "Dashboards, widgets, governed KPI definitions and refresh health.",
+                List.of(countMetric("Dashboards", "reporting.analytics_dashboard", "status = 'ACTIVE'", "good"),
+                        countMetric("Widgets", "reporting.dashboard_widget", "true", "good"),
+                        metric("KPI value", "current_value", "reporting.kpi_definition", "status = 'ACTIVE'")),
+                PageResult.of(rows, safePage, QueryService.PAGE_SIZE, total));
+    }
+
+    public WorkspacePage copilot(String search, String status, int page) {
+        int safePage = Math.max(page, 0);
+        List<Object> args = new ArrayList<>(List.of(tenantId()));
+        String where = where("r", search, status, args, "r.recommendation_number", "r.title", "r.related_entity_type", "p.title", "r.explanation");
+        long total = total("""
+                select count(*) from ai.copilot_recommendation r
+                join ai.copilot_prompt p on p.tenant_id = r.tenant_id and p.id = r.prompt_id
+                """ + where, args);
+        List<WorkspaceRow> rows = query("""
+                select r.id, r.recommendation_number as code, r.title,
+                       p.use_case || ' - ' || r.related_entity_type || ' - citations ' || count(c.id) as subtitle,
+                       r.status, p.title as owner_name, r.confidence_pct as amount,
+                       r.expires_at::date as target_date, r.created_at as updated_at,
+                       jsonb_build_object('confidencePct', r.confidence_pct, 'prompt', p.prompt_code, 'modelPolicy', p.model_policy, 'citations', count(c.id)) as metrics
+                from ai.copilot_recommendation r
+                join ai.copilot_prompt p on p.tenant_id = r.tenant_id and p.id = r.prompt_id
+                left join ai.grounding_citation c on c.tenant_id = r.tenant_id and c.recommendation_id = r.id
+                """ + where + """
+                 group by r.id, r.recommendation_number, r.title, p.use_case, r.related_entity_type, r.status,
+                         p.title, r.confidence_pct, r.expires_at, r.created_at, p.prompt_code, p.model_policy
+                order by r.created_at desc limit ? offset ?""", args, safePage);
+        return new WorkspacePage("AI", "AI Copilot", "Grounded prompts, recommendations, confidence and citation evidence.",
+                List.of(countMetric("Ready", "ai.copilot_recommendation", "status = 'READY'", "good"),
+                        countMetric("Citations", "ai.grounding_citation", "true", "good"),
+                        countMetric("Disabled prompts", "ai.copilot_prompt", "status = 'DISABLED'", "warn")),
+                PageResult.of(rows, safePage, QueryService.PAGE_SIZE, total));
+    }
+
+    public WorkspacePage mobile(String search, String status, int page) {
+        int safePage = Math.max(page, 0);
+        List<Object> args = new ArrayList<>(List.of(tenantId()));
+        String where = where("d", search, status, args, "d.device_label", "d.platform", "u.display_name", "d.app_version");
+        long total = total("""
+                select count(*) from mobile.device_session d
+                join identity.app_user u on u.tenant_id = d.tenant_id and u.id = d.user_id
+                """ + where, args);
+        List<WorkspaceRow> rows = query("""
+                select d.id, d.device_label as code, u.display_name || ' - ' || d.platform as title,
+                       'Offline queue ' || d.offline_queue_count || ' - app ' || d.app_version as subtitle,
+                       d.status, u.display_name as owner_name, d.offline_queue_count::numeric as amount,
+                       d.last_sync_at::date as target_date, d.last_sync_at as updated_at,
+                       jsonb_build_object('platform', d.platform, 'appVersion', d.app_version, 'packages', count(p.id), 'conflicts', count(p.id) filter (where p.status = 'CONFLICT')) as metrics
+                from mobile.device_session d
+                join identity.app_user u on u.tenant_id = d.tenant_id and u.id = d.user_id
+                left join mobile.offline_sync_package p on p.tenant_id = d.tenant_id and p.device_session_id = d.id
+                """ + where + """
+                 group by d.id, d.device_label, u.display_name, d.platform, d.offline_queue_count, d.app_version, d.status, d.last_sync_at
+                order by d.last_sync_at desc nulls last limit ? offset ?""", args, safePage);
+        return new WorkspacePage("MOBILE", "Mobile", "Responsive/mobile profiles, device sessions and offline sync packages.",
+                List.of(countMetric("Active devices", "mobile.device_session", "status = 'ACTIVE'", "good"),
+                        countMetric("Offline profiles", "mobile.mobile_profile", "status = 'ACTIVE'", "good"),
+                        countMetric("Sync conflicts", "mobile.offline_sync_package", "status in ('CONFLICT','FAILED')", "warn")),
+                PageResult.of(rows, safePage, QueryService.PAGE_SIZE, total));
+    }
+
     private List<WorkspaceRow> query(String sql, List<Object> args, int safePage) {
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add(QueryService.PAGE_SIZE);

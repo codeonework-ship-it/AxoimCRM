@@ -50,4 +50,15 @@ The canonical Compose file builds the Spring Boot API and React web application 
 - CORS preflight for `Origin: http://localhost:4280` returned explicit allow-origin, methods and authorization-header access.
 - Kafka broker API health command completed successfully.
 
+## 2026-07-25 second five-epic workspace verification
+
+- Backend `mvn verify` passed: 129 tests, 0 failures; the existing 8 Docker-gated tenancy integration checks were skipped by their environment gate.
+- Frontend `npm run build` passed after adding `/partners`, `/automation`, `/analytics`, `/copilot` and `/mobile`.
+- Docker Compose rebuild passed for API and web; PostgreSQL, Kafka, API and web containers are healthy.
+- Flyway `V94__partner_automation_analytics_ai_mobile_workspaces` applied successfully.
+- Seed verification passed: 3 partner accounts, 3 automation rules, 3 analytics dashboards, 3 AI recommendations and 3 mobile device sessions.
+- Authenticated workspace API smoke passed for `GET /api/v1/workspaces/partners`, `/automation`, `/analytics`, `/copilot` and `/mobile`; each response uses the shared 100-row server pagination contract.
+- Web routes `/partners`, `/automation`, `/analytics`, `/copilot` and `/mobile` returned HTTP 200 through the nginx SPA fallback.
+- CORS preflight for `Origin: http://localhost:4280` returned explicit allow-origin, methods and authorization-header access.
+
 Docker Hub pulls were blocked on this workstation by Docker Desktop's internal HTTPS proxy. Local runtime images plus PostgreSQL 16 and Kafka 3.7 were used for this workstation's live verification only; that private recovery override is deliberately not part of the repository. The canonical, reproducible Compose definition and version targets remain unchanged and are the CI/release contract.

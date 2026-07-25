@@ -121,7 +121,7 @@ export const MODULE_GROUPS: ModuleGroup[] = [
     items: [
       { label: "Campaigns", labelKey: "nav.module.campaigns", to: "/campaigns", icon: CampaignIcon, epic: "E11", status: "partial" },
       { label: "Cases", labelKey: "nav.module.cases", to: "/cases", icon: CaseIcon, epic: "E12", status: "partial" },
-      { label: "Partners", labelKey: "nav.module.partners", to: "/partners", icon: PartnerIcon, epic: "E13", status: "planned" },
+      { label: "Partners", labelKey: "nav.module.partners", to: "/partners", icon: PartnerIcon, epic: "E13", status: "partial" },
     ],
   },
   {
@@ -130,7 +130,8 @@ export const MODULE_GROUPS: ModuleGroup[] = [
     labelKey: "nav.group.intelligence",
     items: [
       { label: "Reports", labelKey: "nav.module.reports", to: "/reports", icon: SparkIcon, epic: "E15", status: "partial" },
-      { label: "AI Copilot", labelKey: "nav.module.copilot", to: "/copilot", icon: AiIcon, epic: "E16", status: "planned" },
+      { label: "Analytics", labelKey: "nav.module.analytics", to: "/analytics", icon: SparkIcon, epic: "E15", status: "partial" },
+      { label: "AI Copilot", labelKey: "nav.module.copilot", to: "/copilot", icon: AiIcon, epic: "E16", status: "partial" },
     ],
   },
   {
@@ -148,10 +149,10 @@ export const MODULE_GROUPS: ModuleGroup[] = [
     labelKey: "nav.group.platform",
     items: [
       { label: "Reference Data", labelKey: "nav.module.referenceData", to: "/reference-data", icon: ReferenceIcon, epic: "E03", status: "partial", roles: GOVERNANCE_ROLES },
-      { label: "Automation", labelKey: "nav.module.automation", to: "/automation", icon: AutomationIcon, epic: "E14", status: "planned", roles: ADMIN_ROLES },
+      { label: "Automation", labelKey: "nav.module.automation", to: "/automation", icon: AutomationIcon, epic: "E14", status: "partial", roles: ADMIN_ROLES },
       { label: "Integrations", labelKey: "nav.module.integrations", to: "/integrations", icon: IntegrationIcon, epic: "E17", status: "planned", roles: ADMIN_ROLES },
       { label: "Migration", labelKey: "nav.module.migration", to: "/migration", icon: MigrationIcon, epic: "E18", status: "partial", roles: ADMIN_ROLES },
-      { label: "Mobile", labelKey: "nav.module.mobile", to: "/mobile", icon: MobileIcon, epic: "E21", status: "planned", roles: ADMIN_ROLES },
+      { label: "Mobile", labelKey: "nav.module.mobile", to: "/mobile", icon: MobileIcon, epic: "E21", status: "partial", roles: ADMIN_ROLES },
     ],
   },
   {
