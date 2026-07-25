@@ -75,4 +75,27 @@ class WorkspaceActionServiceTest {
         assertThrows(ForbiddenException.class,
                 () -> service.clearBfsiOnboarding(id, new WorkspaceActionService.BfsiClearRequest("clear")));
     }
+
+    @Test void readOnlyRoleCannotRefreshDashboard() {
+        assertThrows(ForbiddenException.class,
+                () -> service.refreshDashboard(id, new WorkspaceActionService.DashboardRefreshRequest("refresh")));
+    }
+
+    @Test void readOnlyRoleCannotVerifyIntegrationContract() {
+        assertThrows(ForbiddenException.class, () -> service.verifyIntegrationContract(id));
+    }
+
+    @Test void readOnlyRoleCannotRefreshSandbox() {
+        assertThrows(ForbiddenException.class,
+                () -> service.refreshSandbox(id, new WorkspaceActionService.SandboxRefreshRequest("refresh")));
+    }
+
+    @Test void readOnlyRoleCannotExportAuditPack() {
+        assertThrows(ForbiddenException.class,
+                () -> service.exportAuditPack(id, new WorkspaceActionService.AuditPackExportRequest("SECURE_DOWNLOAD")));
+    }
+
+    @Test void readOnlyRoleCannotOfferCommodityEnquiry() {
+        assertThrows(ForbiddenException.class, () -> service.offerCommodityEnquiry(id));
+    }
 }

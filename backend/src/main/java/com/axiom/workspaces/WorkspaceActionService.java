@@ -43,6 +43,9 @@ public class WorkspaceActionService {
     public record CampaignCompleteRequest(String outcome) {}
     public record CopilotDecisionRequest(String note) {}
     public record BfsiClearRequest(String note) {}
+    public record DashboardRefreshRequest(String note) {}
+    public record SandboxRefreshRequest(String reason) {}
+    public record AuditPackExportRequest(String destination) {}
 
     @Transactional
     public ActionResult submitForecast(UUID id, ForecastSubmitRequest request) {
@@ -444,6 +447,191 @@ public class WorkspaceActionService {
         return new ActionResult(id, "bfsi", "CLEARED", "BFSI onboarding cleared after screening gate passed.", details);
     }
 
+    @Transactional
+    public ActionResult refreshDashboard(UUID id, DashboardRefreshRequest request) {
+        requireWrite("refresh dashboards");
+        Map<String, Object> row = one("""
+                select id, dashboard_code, name, status, last_refreshed_at
+                from reporting.analytics_dashboard
+                where tenant_id = ? and id = ?
+                for update
+                """, id, "Analytics dashboard not found");
+        if (!"ACTIVE".equals(text(row.get("status")))) {
+            throw new ConflictException("Only active dashboards can be refreshed");
+        }
+        Long widgets = jdbc.queryForObject("""
+                select count(*) from reporting.dashboard_widget where tenant_id = ? and dashboard_id = ?
+                """, Long.class, tenantId(), id);
+        jdbc.update("""
+                update reporting.analytics_dashboard
+                set last_refreshed_at = now()
+                where tenant_id = ? and id = ?
+                """, tenantId(), id);
+        jdbc.update("""
+                update reporting.kpi_definition
+                set updated_at = now()
+                where tenant_id = ? and status = 'ACTIVE'
+                """, tenantId());
+        String note = clean(request == null ? null : request.note());
+        Map<String, Object> details = Map.of(
+                "dashboardCode", row.get("dashboard_code"),
+                "widgetCount", widgets == null ? 0 : widgets,
+                "kpiDefinitionsTouched", true);
+        audit.recordWithReason("DASHBOARD_REFRESH", "ANALYTICS_DASHBOARD", id,
+                "Refreshed dashboard " + row.get("dashboard_code"), note, details);
+        outbox.write("analytics_dashboard", id, "dashboard.refreshed", details);
+        return new ActionResult(id, "analytics", "REFRESHED", "Analytics dashboard refreshed and KPI timestamps updated.", details);
+    }
+
+    @Transactional
+    public ActionResult verifyIntegrationContract(UUID id) {
+        requireWrite("verify integration contracts");
+        Map<String, Object> row = one("""
+                select id, contract_code, name, status, direction, auth_type, failure_count
+                from integration.endpoint_contract
+                where tenant_id = ? and id = ?
+                for update
+                """, id, "Integration endpoint contract not found");
+        String status = text(row.get("status"));
+        if ("RETIRED".equals(status) || "DEPRECATED".equals(status)) {
+            throw new ConflictException("Retired or deprecated integration contracts cannot be verified");
+        }
+        jdbc.update("""
+                update integration.endpoint_contract
+                set status = 'ACTIVE', last_verified_at = now(), failure_count = 0
+                where tenant_id = ? and id = ?
+                """, tenantId(), id);
+        Map<String, Object> details = Map.of(
+                "contractCode", row.get("contract_code"),
+                "previousStatus", status,
+                "direction", row.get("direction"),
+                "authType", row.get("auth_type"),
+                "vendorExecution", "PENDING");
+        audit.record("INTEGRATION_CONTRACT_VERIFY", "INTEGRATION_CONTRACT", id,
+                "Verified integration contract " + row.get("contract_code"), details);
+        outbox.write("integration_contract", id, "integration.contract.verified", details);
+        return new ActionResult(id, "integrations", "ACTIVE", "Integration contract verified; vendor execution remains pending.", details);
+    }
+
+    @Transactional
+    public ActionResult refreshSandbox(UUID id, SandboxRefreshRequest request) {
+        requireWrite("refresh sandboxes");
+        Map<String, Object> row = one("""
+                select id, sandbox_code, name, status, sandbox_type, source_environment
+                from platform.sandbox_environment
+                where tenant_id = ? and id = ?
+                for update
+                """, id, "Sandbox environment not found");
+        String status = text(row.get("status"));
+        if ("ARCHIVED".equals(status) || "PROVISIONING".equals(status)) {
+            throw new ConflictException("Archived or provisioning sandboxes cannot be refreshed");
+        }
+        String reason = clean(request == null ? null : request.reason());
+        if (reason == null) throw new ConflictException("Sandbox refresh requires a reason");
+        jdbc.update("""
+                update platform.sandbox_environment
+                set status = 'ACTIVE', last_refreshed_at = now(),
+                    expires_at = coalesce(expires_at, now() + interval '30 days')
+                where tenant_id = ? and id = ?
+                """, tenantId(), id);
+        Map<String, Object> details = Map.of(
+                "sandboxCode", row.get("sandbox_code"),
+                "sandboxType", row.get("sandbox_type"),
+                "sourceEnvironment", row.get("source_environment"),
+                "previousStatus", status);
+        audit.recordWithReason("SANDBOX_REFRESH", "SANDBOX", id,
+                "Refreshed sandbox " + row.get("sandbox_code"), reason, details);
+        outbox.write("sandbox", id, "sandbox.refreshed", details);
+        return new ActionResult(id, "sandbox", "ACTIVE", "Sandbox refresh completed with release evidence.", details);
+    }
+
+    @Transactional
+    public ActionResult exportAuditPack(UUID id, AuditPackExportRequest request) {
+        requireWrite("export audit evidence packs");
+        Map<String, Object> row = one("""
+                select id, pack_code, name, status, scope, event_count, control_count
+                from governance.audit_evidence_pack
+                where tenant_id = ? and id = ?
+                for update
+                """, id, "Audit evidence pack not found");
+        String status = text(row.get("status"));
+        if (!"READY".equals(status)) {
+            throw new ConflictException("Only ready evidence packs can be marked exported");
+        }
+        String destination = clean(request == null ? null : request.destination());
+        if (destination == null) destination = "SECURE_DOWNLOAD";
+        jdbc.update("""
+                update governance.audit_evidence_pack
+                set status = 'EXPORTED', generated_at = coalesce(generated_at, now())
+                where tenant_id = ? and id = ?
+                """, tenantId(), id);
+        Map<String, Object> details = Map.of(
+                "packCode", row.get("pack_code"),
+                "scope", row.get("scope"),
+                "eventCount", row.get("event_count"),
+                "controlCount", row.get("control_count"),
+                "destination", destination,
+                "rowCount", row.get("event_count"));
+        audit.record("EVIDENCE_PACK", "AUDIT_EVIDENCE_PACK", id,
+                "Exported audit evidence pack " + row.get("pack_code"), details);
+        outbox.write("audit_evidence_pack", id, "audit.evidence_pack.exported", details);
+        return new ActionResult(id, "audit", "EXPORTED", "Audit evidence pack marked exported with export audit projection.", details);
+    }
+
+    @Transactional
+    public ActionResult offerCommodityEnquiry(UUID id) {
+        requireWrite("offer commodity enquiries");
+        Map<String, Object> row = one("""
+                select e.id, e.enquiry_number, e.status, e.commodity_name, e.notional_amount,
+                       p.counterparty_code, p.status as counterparty_status, p.credit_limit, p.exposure_amount
+                from commodity.trade_enquiry e
+                join commodity.counterparty_profile p on p.tenant_id = e.tenant_id and p.id = e.counterparty_profile_id
+                where e.tenant_id = ? and e.id = ?
+                for update of e
+                """, id, "Commodity trade enquiry not found");
+        String status = text(row.get("status"));
+        if (!"RECEIVED".equals(status) && !"PRICING".equals(status)) {
+            throw new ConflictException("Only received or pricing enquiries can be offered");
+        }
+        String counterpartyStatus = text(row.get("counterparty_status"));
+        if ("WATCHLIST".equals(counterpartyStatus) || "SUSPENDED".equals(counterpartyStatus) || "CLOSED".equals(counterpartyStatus)) {
+            throw new ConflictException("Counterparty status blocks commodity offer");
+        }
+        java.math.BigDecimal creditLimit = decimal(row.get("credit_limit"));
+        java.math.BigDecimal exposure = decimal(row.get("exposure_amount"));
+        java.math.BigDecimal notional = decimal(row.get("notional_amount"));
+        if (exposure.add(notional).compareTo(creditLimit) > 0) {
+            throw new ConflictException("Commodity offer would exceed counterparty credit limit");
+        }
+        Long approvedTerms = jdbc.queryForObject("""
+                select count(*) from commodity.contract_term_sheet
+                where tenant_id = ? and trade_enquiry_id = ? and status in ('APPROVED','SENT','ACCEPTED')
+                """, Long.class, tenantId(), id);
+        if (approvedTerms == null || approvedTerms == 0) {
+            throw new ConflictException("Commodity offer requires an approved term sheet");
+        }
+        jdbc.update("""
+                update commodity.trade_enquiry
+                set status = 'OFFERED'
+                where tenant_id = ? and id = ?
+                """, tenantId(), id);
+        jdbc.update("""
+                update commodity.contract_term_sheet
+                set status = 'SENT'
+                where tenant_id = ? and trade_enquiry_id = ? and status = 'APPROVED'
+                """, tenantId(), id);
+        Map<String, Object> details = Map.of(
+                "enquiryNumber", row.get("enquiry_number"),
+                "commodity", row.get("commodity_name"),
+                "counterpartyCode", row.get("counterparty_code"),
+                "notionalAmount", notional,
+                "approvedTermSheets", approvedTerms);
+        audit.record("COMMODITY_OFFER", "COMMODITY_ENQUIRY", id,
+                "Offered commodity enquiry " + row.get("enquiry_number"), details);
+        outbox.write("commodity_enquiry", id, "commodity.enquiry.offered", details);
+        return new ActionResult(id, "commodity", "OFFERED", "Commodity enquiry offered after credit and term-sheet gates.", details);
+    }
+
     private Map<String, Object> one(String sql, UUID id, String missingMessage) {
         return jdbc.query(sql, (rs, i) -> {
             int columns = rs.getMetaData().getColumnCount();
@@ -475,5 +663,9 @@ public class WorkspaceActionService {
 
     private long number(Object value) {
         return value instanceof Number n ? n.longValue() : 0;
+    }
+
+    private java.math.BigDecimal decimal(Object value) {
+        return value instanceof java.math.BigDecimal decimal ? decimal : java.math.BigDecimal.ZERO;
     }
 }

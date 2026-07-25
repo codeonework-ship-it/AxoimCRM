@@ -120,4 +120,17 @@ The canonical Compose file builds the Spring Boot API and React web application 
   - `POST /workspaces/copilot/{id}/accept` returned `ACCEPTED` and enforced citation-backed recommendation acceptance.
   - `POST /workspaces/bfsi/{id}/clear` returned `CLEARED` after the local seeded screening hit was waived for the success-path smoke.
 
+## 2026-07-25 third workspace command action verification
+
+- Backend `mvn verify` passed after adding Dashboard Refresh, Integration Contract Verify, Sandbox Refresh, Audit Evidence Pack Export and Commodity Offer commands.
+- Frontend `npm run build` passed after wiring the new row-level actions into the shared epic workspace page.
+- Flyway `V96__commodity_offer_demo_readiness` was added as a forward-only seed migration so the commodity offer demo path has an approved term sheet and sufficient credit without mutating released migration history.
+- Patched API and web images were refreshed locally from the already-available runtime images by copying in the freshly verified Spring Boot JAR and Vite `dist` bundle; PostgreSQL 17, Kafka 3.7, API and web containers are healthy.
+- Authenticated same-origin action smoke passed through `http://localhost:4280/api/v1`:
+  - `POST /workspaces/analytics/{id}/refresh` returned `REFRESHED` and advanced dashboard refresh evidence.
+  - `POST /workspaces/integrations/{id}/verify` returned `ACTIVE`, reset failure count and kept vendor execution pending.
+  - `POST /workspaces/sandbox/{id}/refresh` returned `ACTIVE` after requiring a refresh reason.
+  - `POST /workspaces/audit/{id}/export` returned `EXPORTED` and marked the evidence pack for secure download.
+  - `POST /workspaces/commodity/{id}/offer` returned `OFFERED` after credit exposure and approved term-sheet validation passed.
+
 Docker Hub pulls were blocked on this workstation by Docker Desktop's internal HTTPS proxy. Local runtime images plus PostgreSQL 16 and Kafka 3.7 were used for this workstation's live verification only; that private recovery override is deliberately not part of the repository. The canonical, reproducible Compose definition and version targets remain unchanged and are the CI/release contract.

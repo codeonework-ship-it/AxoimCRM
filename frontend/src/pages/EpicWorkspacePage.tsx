@@ -210,10 +210,15 @@ function actionFor(module: WorkspaceModule, row: WorkspaceRow): string | null {
   if (module === "cases" && !["RESOLVED", "CLOSED"].includes(row.status)) return "Resolve";
   if (module === "partners" && ["ONBOARDING", "SUSPENDED"].includes(row.status)) return "Activate";
   if (module === "automation" && row.status !== "RETIRED") return "Simulate";
+  if (module === "analytics" && row.status === "ACTIVE") return "Refresh";
   if (module === "copilot" && row.status === "READY") return "Accept";
   if (module === "migration" && !["IMPORTED", "ROLLED_BACK"].includes(row.status)) return "Validate";
   if (module === "mobile" && row.status === "ACTIVE") return "Ack sync";
+  if (module === "integrations" && !["DEPRECATED", "RETIRED"].includes(row.status)) return "Verify";
+  if (module === "sandbox" && !["ARCHIVED", "PROVISIONING"].includes(row.status)) return "Refresh";
+  if (module === "audit" && row.status === "READY") return "Export pack";
   if (module === "bfsi" && !["CLEARED", "REJECTED"].includes(row.status)) return "Clear KYC";
+  if (module === "commodity" && ["RECEIVED", "PRICING"].includes(row.status)) return "Offer";
   return null;
 }
 
@@ -243,6 +248,10 @@ async function runWorkspaceAction(module: WorkspaceModule, row: WorkspaceRow) {
     if (!Number.isFinite(sampleSize)) throw new Error("Simulation sample size must be numeric.");
     return api.simulateAutomation(row.id, sampleSize);
   }
+  if (module === "analytics") {
+    const note = window.prompt(`Refresh dashboard ${row.code}? Optional note`, "");
+    return api.refreshDashboard(row.id, note ?? undefined);
+  }
   if (module === "partners") return api.activatePartner(row.id);
   if (module === "copilot") {
     const note = window.prompt(`Accept copilot recommendation ${row.code}? Optional note`, "");
@@ -250,11 +259,22 @@ async function runWorkspaceAction(module: WorkspaceModule, row: WorkspaceRow) {
   }
   if (module === "migration") return api.validateMigration(row.id);
   if (module === "mobile") return api.acknowledgeMobileSync(row.id);
+  if (module === "integrations") return api.verifyIntegrationContract(row.id);
+  if (module === "sandbox") {
+    const reason = window.prompt(`Refresh sandbox ${row.code}. Reason`, "Operator requested environment refresh.");
+    if (!reason) throw new Error("Sandbox refresh requires a reason.");
+    return api.refreshSandbox(row.id, reason);
+  }
+  if (module === "audit") {
+    const destination = window.prompt(`Export evidence pack ${row.code}. Destination`, "SECURE_DOWNLOAD");
+    return api.exportAuditPack(row.id, destination || "SECURE_DOWNLOAD");
+  }
   if (module === "bfsi") {
     const note = window.prompt(`Clear BFSI onboarding ${row.code}. Compliance note`, "All screening results are clear or waived.");
     if (!note) throw new Error("BFSI clearance requires a compliance note.");
     return api.clearBfsiOnboarding(row.id, note);
   }
+  if (module === "commodity") return api.offerCommodityEnquiry(row.id);
   throw new Error("No governed action is available for this workspace.");
 }
 

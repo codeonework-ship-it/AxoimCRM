@@ -7,6 +7,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import { ToastProvider } from "./components/Toasts";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { I18nProvider } from "./i18n/I18nProvider";
+import { DEFAULT_THEME, isThemeId } from "./components/ThemeSwitcher";
 import { ApiUnreachableError } from "./api/client";
 import { isDesktop } from "./lib/desktop";
 /*
@@ -30,8 +31,7 @@ import "./styles/motora.css";
  * remembered; "light" remains a first-class daylight-ops mode.
  */
 const savedTheme = localStorage.getItem("axiom.theme");
-document.documentElement.dataset.theme =
-  savedTheme === "light" || savedTheme === "dark" ? savedTheme : "dark";
+document.documentElement.dataset.theme = isThemeId(savedTheme) ? savedTheme : DEFAULT_THEME;
 
 const queryClient = new QueryClient({
   defaultOptions: {

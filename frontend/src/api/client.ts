@@ -989,4 +989,26 @@ export const api = {
   clearBfsiOnboarding(id: string, note: string): Promise<WorkspaceActionResult> {
     return request<WorkspaceActionResult>("POST", `/workspaces/bfsi/${encodeURIComponent(id)}/clear`, { note });
   },
+
+  refreshDashboard(id: string, note?: string): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/analytics/${encodeURIComponent(id)}/refresh`, {
+      note: note?.trim() || null,
+    });
+  },
+
+  verifyIntegrationContract(id: string): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/integrations/${encodeURIComponent(id)}/verify`);
+  },
+
+  refreshSandbox(id: string, reason: string): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/sandbox/${encodeURIComponent(id)}/refresh`, { reason });
+  },
+
+  exportAuditPack(id: string, destination = "SECURE_DOWNLOAD"): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/audit/${encodeURIComponent(id)}/export`, { destination });
+  },
+
+  offerCommodityEnquiry(id: string): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/commodity/${encodeURIComponent(id)}/offer`);
+  },
 };

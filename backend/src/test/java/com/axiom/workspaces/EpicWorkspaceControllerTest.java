@@ -122,6 +122,9 @@ class EpicWorkspaceControllerTest {
         WorkspaceActionService.CampaignCompleteRequest completeCampaign = new WorkspaceActionService.CampaignCompleteRequest("met goals");
         WorkspaceActionService.CopilotDecisionRequest copilot = new WorkspaceActionService.CopilotDecisionRequest("accepted");
         WorkspaceActionService.BfsiClearRequest bfsi = new WorkspaceActionService.BfsiClearRequest("screening clear");
+        WorkspaceActionService.DashboardRefreshRequest dashboard = new WorkspaceActionService.DashboardRefreshRequest("refresh");
+        WorkspaceActionService.SandboxRefreshRequest sandbox = new WorkspaceActionService.SandboxRefreshRequest("refresh");
+        WorkspaceActionService.AuditPackExportRequest auditPack = new WorkspaceActionService.AuditPackExportRequest("SECURE_DOWNLOAD");
         WorkspaceActionService.ActionResult forecast = new WorkspaceActionService.ActionResult(
                 id, "forecast", "SUBMITTED", "ok", Map.of());
         WorkspaceActionService.ActionResult automation = new WorkspaceActionService.ActionResult(
@@ -137,6 +140,11 @@ class EpicWorkspaceControllerTest {
         when(actions.activatePartner(id)).thenReturn(forecast);
         when(actions.acceptCopilotRecommendation(id, copilot)).thenReturn(forecast);
         when(actions.clearBfsiOnboarding(id, bfsi)).thenReturn(forecast);
+        when(actions.refreshDashboard(id, dashboard)).thenReturn(forecast);
+        when(actions.verifyIntegrationContract(id)).thenReturn(forecast);
+        when(actions.refreshSandbox(id, sandbox)).thenReturn(forecast);
+        when(actions.exportAuditPack(id, auditPack)).thenReturn(forecast);
+        when(actions.offerCommodityEnquiry(id)).thenReturn(forecast);
 
         assertEquals(forecast, controller.submitForecast(id, submit));
         assertEquals(forecast, controller.resolveCase(id, resolve));
@@ -148,6 +156,11 @@ class EpicWorkspaceControllerTest {
         assertEquals(forecast, controller.activatePartner(id));
         assertEquals(forecast, controller.acceptCopilotRecommendation(id, copilot));
         assertEquals(forecast, controller.clearBfsiOnboarding(id, bfsi));
+        assertEquals(forecast, controller.refreshDashboard(id, dashboard));
+        assertEquals(forecast, controller.verifyIntegrationContract(id));
+        assertEquals(forecast, controller.refreshSandbox(id, sandbox));
+        assertEquals(forecast, controller.exportAuditPack(id, auditPack));
+        assertEquals(forecast, controller.offerCommodityEnquiry(id));
         verify(actions).submitForecast(id, submit);
         verify(actions).resolveCase(id, resolve);
         verify(actions).simulateAutomation(id, simulate);
@@ -158,5 +171,10 @@ class EpicWorkspaceControllerTest {
         verify(actions).activatePartner(id);
         verify(actions).acceptCopilotRecommendation(id, copilot);
         verify(actions).clearBfsiOnboarding(id, bfsi);
+        verify(actions).refreshDashboard(id, dashboard);
+        verify(actions).verifyIntegrationContract(id);
+        verify(actions).refreshSandbox(id, sandbox);
+        verify(actions).exportAuditPack(id, auditPack);
+        verify(actions).offerCommodityEnquiry(id);
     }
 }

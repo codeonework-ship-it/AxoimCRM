@@ -208,4 +208,35 @@ public class EpicWorkspaceController {
             @RequestBody WorkspaceActionService.BfsiClearRequest request) {
         return actions.clearBfsiOnboarding(id, request);
     }
+
+    @PostMapping("/analytics/{id}/refresh")
+    public WorkspaceActionService.ActionResult refreshDashboard(
+            @PathVariable UUID id,
+            @RequestBody(required = false) WorkspaceActionService.DashboardRefreshRequest request) {
+        return actions.refreshDashboard(id, request);
+    }
+
+    @PostMapping("/integrations/{id}/verify")
+    public WorkspaceActionService.ActionResult verifyIntegrationContract(@PathVariable UUID id) {
+        return actions.verifyIntegrationContract(id);
+    }
+
+    @PostMapping("/sandbox/{id}/refresh")
+    public WorkspaceActionService.ActionResult refreshSandbox(
+            @PathVariable UUID id,
+            @RequestBody WorkspaceActionService.SandboxRefreshRequest request) {
+        return actions.refreshSandbox(id, request);
+    }
+
+    @PostMapping("/audit/{id}/export")
+    public WorkspaceActionService.ActionResult exportAuditPack(
+            @PathVariable UUID id,
+            @RequestBody(required = false) WorkspaceActionService.AuditPackExportRequest request) {
+        return actions.exportAuditPack(id, request);
+    }
+
+    @PostMapping("/commodity/{id}/offer")
+    public WorkspaceActionService.ActionResult offerCommodityEnquiry(@PathVariable UUID id) {
+        return actions.offerCommodityEnquiry(id);
+    }
 }

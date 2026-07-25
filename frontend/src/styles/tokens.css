@@ -102,31 +102,100 @@
    to earn its contrast in both rooms. */
 
 :root[data-theme="light"] {
-  --bg: #eef1f6;
-  --bg-raise: #e2e7f0;
-  --panel: #ffffff;
-  --panel-2: #f7f9fc;
-  --line-m: #ccd4e0;
-  --line-bright: #a7b2c6;
-  --cyan: #0a6f8c;
-  --cyan-deep: #084f64;
-  --cyan-dim: rgba(10, 111, 140, 0.1);
-  --amber: #9a6b00;
-  --red: #c93b3b;
-  --green: #1f7a52;
-  --text: #0a1020;
-  --muted: #55627a;
+  /* ---- ARCTIC FROST ------------------------------------------------------
+     The daylight world, designed rather than inverted. Glacial whites and
+     frost-blue greys, a single deep-ice accent, hairline structure and no glow.
+     Sharp and quiet: the cinematic energy of the dark deck comes from light on
+     black, which has no honest equivalent on white — so Arctic Frost gets its
+     character from precision instead: crisp 1px rules, tight tracking, generous
+     white, and one confident accent.
+     Every value below is checked for WCAG AA on --panel (#FFFFFF). */
 
-  --ink-soft: #2f3a4f;
-  --slate-faint: #7a869c;
-  --steel-900: #0f1a2f;
-  --steel-800: #1b2c50;
-  --ion-500: #0d8bad;
-  --gold-600: #7d5600;
-  --gold-100: rgba(154, 107, 0, 0.1);
-  --gold-border: rgba(154, 107, 0, 0.38);
-  --info: #4459a8;
+  --bg: #eef3f8;          /* ice field — the ground */
+  --bg-raise: #e3ebf3;    /* packed frost — sunken wells, table heads */
+  --panel: #ffffff;       /* snow — raised surfaces */
+  --panel-2: #f8fbfd;     /* the faintest gradient partner for panels */
+  --line-m: #d3dfeb;      /* frost hairline */
+  --line-bright: #a9bed2; /* defined edge */
+
+  /* Deep ice. 5.6:1 on white, so it is usable as TEXT, not just as a fill —
+     the previous accent failed that and forced muddy workarounds. */
+  --cyan: #0b6e8f;
+  --cyan-deep: #084f68;
+  --cyan-dim: rgba(11, 110, 143, 0.09);
+
+  /* Amber stays the AI-provenance mark; darkened to clear AA on white. */
+  --amber: #8a5a00;
+  --red: #b3323b;
+  --green: #16704e;
+
+  --text: #0d1b2a;        /* 16.9:1 */
+  --muted: #556879;       /*  5.6:1 — smallest text that still passes */
+
+  --ink-soft: #29394a;    /* 10.9:1 */
+  --slate-faint: #7d8fa0; /*  3.6:1 — large/decorative only */
+  --steel-900: #0d1b2a;
+  --steel-800: #1d3348;
+  --ion-500: #0d86ad;
+  --gold-600: #6f4800;
+  --gold-100: rgba(138, 90, 0, 0.09);
+  --gold-border: rgba(138, 90, 0, 0.34);
+  --info: #3c5a99;
+
+  /* No glow in daylight. Depth comes from hairlines and a whisper of shadow. */
   --glow: none;
 
   color-scheme: light;
+}
+
+/* ============================================================================
+   MARK VII — the Iron Man suite.
+   Hot-rod red armour plating, gold trim, arc-reactor glow.
+
+   One product rule constrains the palette and is worth stating: GOLD IS
+   RESERVED FOR AI PROVENANCE across every theme. So gold cannot become the
+   interactive accent here, however tempting. Instead the ARC REACTOR supplies
+   the interactive colour — canonical to the character, and a blue-white reads
+   as "actionable" where red would read as "error". Red stays where it belongs:
+   armour surfaces, and genuine danger.
+   ============================================================================ */
+
+:root[data-theme="ironman"] {
+  /* Warm charcoal — armour undersuit, never neutral grey. */
+  --bg: #140e0e;
+  --bg-raise: #1b1312;
+  --panel: #211715;
+  --panel-2: #2a1d1a;
+  --line-m: #3a2724;
+  --line-bright: #5e3a34;
+
+  /* Arc reactor — the interactive signal. 8.4:1 on --panel. */
+  --cyan: #5fd3ee;
+  --cyan-deep: #1c7f96;
+  --cyan-dim: rgba(95, 211, 238, 0.12);
+
+  /* Gold trim — AI provenance ONLY, per the product-wide rule. */
+  --amber: #f5b32a;
+  --gold-500: #f5b32a;
+  --gold-600: #ffc95c;
+  --gold-100: rgba(245, 179, 42, 0.1);
+  --gold-border: rgba(245, 179, 42, 0.42);
+
+  /* Hot-rod red — armour and danger. */
+  --red: #e8474f;
+  --green: #3fbf87;
+
+  --text: #f7edea;        /* warm white, not clinical */
+  --muted: #b19792;       /* 5.9:1 on --panel */
+  --ink-soft: #ddc9c4;
+  --slate-faint: #8a6f6a;
+
+  --steel-900: #180f0f;
+  --steel-800: #2b1a17;
+  --ion-500: #8ee2f5;
+  --info: #8fa5ff;
+
+  --glow: 0 0 18px rgba(95, 211, 238, 0.4);
+
+  color-scheme: dark;
 }

@@ -6,19 +6,9 @@ import { api } from "../api/client";
 import { useT } from "../i18n/I18nProvider";
 import { LocaleSwitcher } from "../i18n/LocaleSwitcher";
 import { useNotifications } from "./notifications";
+import { ThemeSwitcher } from "./ThemeSwitcher";
 import { UserMenu } from "./UserMenu";
-import { BellIcon, MenuIcon, SearchIcon, SunMoonIcon } from "./icons";
-
-function toggleTheme(): "light" | "dark" {
-  const root = document.documentElement;
-  const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const current =
-    root.dataset.theme ?? (prefersDark ? "dark" : "light");
-  const next = current === "dark" ? "light" : "dark";
-  root.dataset.theme = next;
-  localStorage.setItem("axiom.theme", next);
-  return next;
-}
+import { BellIcon, MenuIcon, SearchIcon } from "./icons";
 
 interface TopBarProps {
   onOpenCommand: () => void;
@@ -42,11 +32,6 @@ export function TopBar({ onOpenCommand, onOpenHelp, onToggleNav, navExpanded }: 
     useNotifications();
   const [panelOpen, setPanelOpen] = useState(false);
   const [filter, setFilter] = useState<"all" | "unread">("all");
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
-    if (document.documentElement.dataset.theme === "light") return "light";
-    if (document.documentElement.dataset.theme === "dark") return "dark";
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  });
   const bellWrapRef = useRef<HTMLDivElement>(null);
   const bellButtonRef = useRef<HTMLButtonElement>(null);
 
@@ -189,15 +174,9 @@ export function TopBar({ onOpenCommand, onOpenHelp, onToggleNav, navExpanded }: 
 
       <LocaleSwitcher />
 
-      <button
-        className="icon-btn"
-        aria-label={t("shell.theme", "Toggle theme")}
-        aria-pressed={theme === "dark"}
-        title={t("shell.theme", "Toggle theme")}
-        onClick={() => setTheme(toggleTheme())}
-      >
-        <SunMoonIcon />
-      </button>
+      {/* Three visual worlds now, so a named list replaces the binary toggle —
+          a toggle cannot reach a third option, nor predict what it gives you. */}
+      <ThemeSwitcher />
 
       {/* Identity and sign-out live top-right — the conventional place, and
           visible even when the rail is collapsed to icons. */}
