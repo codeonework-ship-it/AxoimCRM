@@ -1,0 +1,71 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: axiom-api
+
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/axiom}
+    username: ${SPRING_DATASOURCE_USERNAME:axiom_app}
+    password: ${SPRING_DATASOURCE_PASSWORD:axiom_app_dev_password}
+    hikari:
+      maximum-pool-size: 10
+      pool-name: axiom-app-pool
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: false
+        jdbc:
+          time_zone: UTC
+
+  flyway:
+    url: ${FLYWAY_URL:jdbc:postgresql://localhost:5432/axiom}
+    user: ${FLYWAY_USER:postgres}
+    password: ${FLYWAY_PASSWORD:postgres}
+    baseline-on-migrate: true
+    connect-retries: 10
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+
+axiom:
+  relay:
+    # Second datasource used ONLY by OutboxRelay — connects as axiom_relay,
+    # whose RLS policies (V3) allow cross-tenant reads of outbox_event only.
+    datasource:
+      url: ${AXIOM_RELAY_DATASOURCE_URL:${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/axiom}}
+      username: ${AXIOM_RELAY_DATASOURCE_USERNAME:axiom_relay}
+      password: ${AXIOM_RELAY_DATASOURCE_PASSWORD:axiom_relay_dev_password}
+  jwt:
+    secret: ${AXIOM_JWT_SECRET:dev-only-secret-key-change-me-please-32bytes-min}
+    ttl-minutes: ${AXIOM_JWT_TTL_MINUTES:480}
+  outbox:
+    topic: ${AXIOM_OUTBOX_TOPIC:axiom.domain-events}
+    poll-fixed-delay-ms: 2000
+    batch-size: 100
+  cors:
+    allowed-origins: ${AXIOM_CORS_ORIGINS:http://localhost:5173,http://localhost:4280}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+
+logging:
+  level:
+    com.axiom: INFO

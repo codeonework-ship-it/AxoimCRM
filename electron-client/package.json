@@ -1,0 +1,13 @@
+{
+  "name": "axiom-crm-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Axiom CRM desktop shell",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^31.3.0"
+  }
+}

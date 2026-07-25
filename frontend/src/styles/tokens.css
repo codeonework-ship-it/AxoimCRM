@@ -1,0 +1,121 @@
+/* ============================================================
+   AEGIS design tokens — Axiom CRM cinematic ops theme.
+   Light is the base; dark is the flagship look.
+   Dark applies via prefers-color-scheme OR [data-theme="dark"]
+   on <html>; [data-theme="light"] forces light back.
+   ============================================================ */
+
+:root {
+  /* Surfaces */
+  --paper: #eef1f6;
+  --paper-raised: #f8fafd;
+  --paper-sunk: #e2e7f0;
+
+  /* Text */
+  --ink: #0e1626;
+  --ink-soft: #3a465e;
+  --slate: #66738d;
+  --slate-faint: #98a3b9;
+
+  /* Hairlines */
+  --line: #d5dbe7;
+  --line-strong: #b6c0d4;
+
+  /* Structural steel */
+  --steel-900: #101c34;
+  --steel-800: #1c2e55;
+
+  /* Ion — proprietary interaction / focus / system-confidence signal */
+  --ion-600: #0968c7;
+  --ion-500: #237fe0;
+  --ion-100: #d7eaff;
+
+  /* Gold — AI provenance ONLY */
+  --gold-600: #9a6b00;
+  --gold-500: #c08a0f;
+  --gold-100: #f9efd4;
+  --gold-border: #e3c87e;
+
+  /* Status */
+  --good: var(--ion-600);
+  --warn: #c4611b;
+  --crit: #c93b3b;
+  --info: #5a6bb0;
+
+  --glow: none;
+
+  /* Geometry & type */
+  --chamfer: polygon(
+    0 0,
+    calc(100% - 12px) 0,
+    100% 12px,
+    100% 100%,
+    12px 100%,
+    0 calc(100% - 12px)
+  );
+  --radius: 2px;
+  --rail-w: 232px;
+  --grid-size: 56px;
+  --font-ui: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial,
+    sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas,
+    "Liberation Mono", Menlo, monospace;
+
+  color-scheme: light;
+}
+
+/* ---- Dark palette (flagship) -------------------------------- */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #070b12;
+    --paper-raised: #111925;
+    --paper-sunk: #05070c;
+    --ink: #e8edf6;
+    --ink-soft: #b7c1d4;
+    --slate: #98a8bf;
+    --slate-faint: #74839b;
+    --line: #263246;
+    --line-strong: #3b4b64;
+    --steel-900: #0c1526;
+    --steel-800: #182741;
+    --ion-600: #48b8ff;
+    --ion-500: #72c9ff;
+    --ion-100: #0f2a3f;
+    --gold-600: #f5b83d;
+    --gold-500: #e8a020;
+    --gold-100: #2e2208;
+    --gold-border: #6b5212;
+    --warn: #ff9f3d;
+    --crit: #ff5c5c;
+    --info: #8fa5ff;
+    --glow: 0 0 16px rgba(56, 182, 255, 0.35);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --paper: #070b12;
+  --paper-raised: #111925;
+  --paper-sunk: #05070c;
+  --ink: #e8edf6;
+  --ink-soft: #b7c1d4;
+  --slate: #98a8bf;
+  --slate-faint: #74839b;
+  --line: #263246;
+  --line-strong: #3b4b64;
+  --steel-900: #0c1526;
+  --steel-800: #182741;
+  --ion-600: #48b8ff;
+  --ion-500: #72c9ff;
+  --ion-100: #0f2a3f;
+  --gold-600: #f5b83d;
+  --gold-500: #e8a020;
+  --gold-100: #2e2208;
+  --gold-border: #6b5212;
+  --warn: #ff9f3d;
+  --crit: #ff5c5c;
+  --info: #8fa5ff;
+  --glow: 0 0 16px rgba(56, 182, 255, 0.35);
+  color-scheme: dark;
+}
