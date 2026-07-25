@@ -108,4 +108,16 @@ The canonical Compose file builds the Spring Boot API and React web application 
   - `POST /workspaces/migration/{id}/validate` returned validation status based on recorded validation errors.
   - `POST /workspaces/mobile/{id}/sync` returned `SYNCED` and cleared the offline queue.
 
+## 2026-07-25 second workspace command action verification
+
+- Backend `mvn verify` passed after extending the shared workspace command layer to contracts, campaigns, partners, copilot and BFSI.
+- Frontend `npm run build` passed after adding the new action labels/prompts to the shared operational workspace page.
+- Patched API and web images were refreshed locally from the already-available runtime images by copying in the freshly verified Spring Boot JAR and Vite `dist` bundle; PostgreSQL 17, Kafka 3.7, API and web containers are healthy.
+- Authenticated same-origin action smoke passed through `http://localhost:4280/api/v1`:
+  - `POST /workspaces/contracts/{id}/activate` returned `ACTIVE` with signed-document evidence.
+  - `POST /workspaces/campaigns/{id}/complete` returned `COMPLETED` with campaign outcome evidence.
+  - `POST /workspaces/partners/{id}/activate` returned `ACTIVE` after the local seeded channel conflict was waived for the success-path smoke.
+  - `POST /workspaces/copilot/{id}/accept` returned `ACCEPTED` and enforced citation-backed recommendation acceptance.
+  - `POST /workspaces/bfsi/{id}/clear` returned `CLEARED` after the local seeded screening hit was waived for the success-path smoke.
+
 Docker Hub pulls were blocked on this workstation by Docker Desktop's internal HTTPS proxy. Local runtime images plus PostgreSQL 16 and Kafka 3.7 were used for this workstation's live verification only; that private recovery override is deliberately not part of the repository. The canonical, reproducible Compose definition and version targets remain unchanged and are the CI/release contract.

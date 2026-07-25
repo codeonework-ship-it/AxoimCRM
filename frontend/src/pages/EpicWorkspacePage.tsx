@@ -204,15 +204,30 @@ function WorkspaceTable({ rows, grouped, module, busyId, onAction }: { rows: Wor
 }
 
 function actionFor(module: WorkspaceModule, row: WorkspaceRow): string | null {
+  if (module === "contracts" && ["DRAFT", "IN_REVIEW", "EXPIRING"].includes(row.status)) return "Activate";
+  if (module === "campaigns" && !["COMPLETED", "CANCELLED"].includes(row.status)) return "Complete";
   if (module === "forecast" && ["DRAFT", "MANAGER_ADJUSTED"].includes(row.status)) return "Submit";
   if (module === "cases" && !["RESOLVED", "CLOSED"].includes(row.status)) return "Resolve";
+  if (module === "partners" && ["ONBOARDING", "SUSPENDED"].includes(row.status)) return "Activate";
   if (module === "automation" && row.status !== "RETIRED") return "Simulate";
+  if (module === "copilot" && row.status === "READY") return "Accept";
   if (module === "migration" && !["IMPORTED", "ROLLED_BACK"].includes(row.status)) return "Validate";
   if (module === "mobile" && row.status === "ACTIVE") return "Ack sync";
+  if (module === "bfsi" && !["CLEARED", "REJECTED"].includes(row.status)) return "Clear KYC";
   return null;
 }
 
 async function runWorkspaceAction(module: WorkspaceModule, row: WorkspaceRow) {
+  if (module === "contracts") {
+    const signedDocumentRef = window.prompt(`Signed document reference for ${row.code}`, `signed://${row.code.toLowerCase()}`);
+    if (!signedDocumentRef) throw new Error("Contract activation requires a signed document reference.");
+    return api.activateContract(row.id, signedDocumentRef);
+  }
+  if (module === "campaigns") {
+    const outcome = window.prompt(`Complete campaign ${row.code}. Outcome`, "Campaign completed after operator review.");
+    if (!outcome) throw new Error("Campaign completion outcome is required.");
+    return api.completeCampaign(row.id, outcome);
+  }
   if (module === "forecast") {
     const note = window.prompt(`Submit forecast ${row.code}? Optional manager note`, "");
     return api.submitForecast(row.id, note ?? undefined);
@@ -228,8 +243,18 @@ async function runWorkspaceAction(module: WorkspaceModule, row: WorkspaceRow) {
     if (!Number.isFinite(sampleSize)) throw new Error("Simulation sample size must be numeric.");
     return api.simulateAutomation(row.id, sampleSize);
   }
+  if (module === "partners") return api.activatePartner(row.id);
+  if (module === "copilot") {
+    const note = window.prompt(`Accept copilot recommendation ${row.code}? Optional note`, "");
+    return api.acceptCopilotRecommendation(row.id, note ?? undefined);
+  }
   if (module === "migration") return api.validateMigration(row.id);
   if (module === "mobile") return api.acknowledgeMobileSync(row.id);
+  if (module === "bfsi") {
+    const note = window.prompt(`Clear BFSI onboarding ${row.code}. Compliance note`, "All screening results are clear or waived.");
+    if (!note) throw new Error("BFSI clearance requires a compliance note.");
+    return api.clearBfsiOnboarding(row.id, note);
+  }
   throw new Error("No governed action is available for this workspace.");
 }
 

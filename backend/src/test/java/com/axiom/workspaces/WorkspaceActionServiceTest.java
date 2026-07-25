@@ -51,4 +51,28 @@ class WorkspaceActionServiceTest {
     @Test void readOnlyRoleCannotAcknowledgeMobileSync() {
         assertThrows(ForbiddenException.class, () -> service.acknowledgeMobileSync(id));
     }
+
+    @Test void readOnlyRoleCannotActivateContract() {
+        assertThrows(ForbiddenException.class,
+                () -> service.activateContract(id, new WorkspaceActionService.ContractActivateRequest("signed://x")));
+    }
+
+    @Test void readOnlyRoleCannotCompleteCampaign() {
+        assertThrows(ForbiddenException.class,
+                () -> service.completeCampaign(id, new WorkspaceActionService.CampaignCompleteRequest("complete")));
+    }
+
+    @Test void readOnlyRoleCannotActivatePartner() {
+        assertThrows(ForbiddenException.class, () -> service.activatePartner(id));
+    }
+
+    @Test void readOnlyRoleCannotAcceptCopilotRecommendation() {
+        assertThrows(ForbiddenException.class,
+                () -> service.acceptCopilotRecommendation(id, new WorkspaceActionService.CopilotDecisionRequest("accept")));
+    }
+
+    @Test void readOnlyRoleCannotClearBfsiOnboarding() {
+        assertThrows(ForbiddenException.class,
+                () -> service.clearBfsiOnboarding(id, new WorkspaceActionService.BfsiClearRequest("clear")));
+    }
 }

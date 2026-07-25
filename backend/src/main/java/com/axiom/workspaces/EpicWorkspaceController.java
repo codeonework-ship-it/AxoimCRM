@@ -175,4 +175,37 @@ public class EpicWorkspaceController {
     public WorkspaceActionService.ActionResult acknowledgeMobileSync(@PathVariable UUID id) {
         return actions.acknowledgeMobileSync(id);
     }
+
+    @PostMapping("/contracts/{id}/activate")
+    public WorkspaceActionService.ActionResult activateContract(
+            @PathVariable UUID id,
+            @RequestBody WorkspaceActionService.ContractActivateRequest request) {
+        return actions.activateContract(id, request);
+    }
+
+    @PostMapping("/campaigns/{id}/complete")
+    public WorkspaceActionService.ActionResult completeCampaign(
+            @PathVariable UUID id,
+            @RequestBody WorkspaceActionService.CampaignCompleteRequest request) {
+        return actions.completeCampaign(id, request);
+    }
+
+    @PostMapping("/partners/{id}/activate")
+    public WorkspaceActionService.ActionResult activatePartner(@PathVariable UUID id) {
+        return actions.activatePartner(id);
+    }
+
+    @PostMapping("/copilot/{id}/accept")
+    public WorkspaceActionService.ActionResult acceptCopilotRecommendation(
+            @PathVariable UUID id,
+            @RequestBody(required = false) WorkspaceActionService.CopilotDecisionRequest request) {
+        return actions.acceptCopilotRecommendation(id, request);
+    }
+
+    @PostMapping("/bfsi/{id}/clear")
+    public WorkspaceActionService.ActionResult clearBfsiOnboarding(
+            @PathVariable UUID id,
+            @RequestBody WorkspaceActionService.BfsiClearRequest request) {
+        return actions.clearBfsiOnboarding(id, request);
+    }
 }

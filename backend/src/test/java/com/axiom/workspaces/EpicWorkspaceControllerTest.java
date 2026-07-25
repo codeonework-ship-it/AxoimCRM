@@ -118,6 +118,10 @@ class EpicWorkspaceControllerTest {
         WorkspaceActionService.ForecastSubmitRequest submit = new WorkspaceActionService.ForecastSubmitRequest("commit lock");
         WorkspaceActionService.CaseResolveRequest resolve = new WorkspaceActionService.CaseResolveRequest("fixed");
         WorkspaceActionService.AutomationSimulateRequest simulate = new WorkspaceActionService.AutomationSimulateRequest(50);
+        WorkspaceActionService.ContractActivateRequest activateContract = new WorkspaceActionService.ContractActivateRequest("signed://contract");
+        WorkspaceActionService.CampaignCompleteRequest completeCampaign = new WorkspaceActionService.CampaignCompleteRequest("met goals");
+        WorkspaceActionService.CopilotDecisionRequest copilot = new WorkspaceActionService.CopilotDecisionRequest("accepted");
+        WorkspaceActionService.BfsiClearRequest bfsi = new WorkspaceActionService.BfsiClearRequest("screening clear");
         WorkspaceActionService.ActionResult forecast = new WorkspaceActionService.ActionResult(
                 id, "forecast", "SUBMITTED", "ok", Map.of());
         WorkspaceActionService.ActionResult automation = new WorkspaceActionService.ActionResult(
@@ -128,16 +132,31 @@ class EpicWorkspaceControllerTest {
         when(actions.simulateAutomation(id, simulate)).thenReturn(automation);
         when(actions.validateMigration(id)).thenReturn(forecast);
         when(actions.acknowledgeMobileSync(id)).thenReturn(forecast);
+        when(actions.activateContract(id, activateContract)).thenReturn(forecast);
+        when(actions.completeCampaign(id, completeCampaign)).thenReturn(forecast);
+        when(actions.activatePartner(id)).thenReturn(forecast);
+        when(actions.acceptCopilotRecommendation(id, copilot)).thenReturn(forecast);
+        when(actions.clearBfsiOnboarding(id, bfsi)).thenReturn(forecast);
 
         assertEquals(forecast, controller.submitForecast(id, submit));
         assertEquals(forecast, controller.resolveCase(id, resolve));
         assertEquals(automation, controller.simulateAutomation(id, simulate));
         assertEquals(forecast, controller.validateMigration(id));
         assertEquals(forecast, controller.acknowledgeMobileSync(id));
+        assertEquals(forecast, controller.activateContract(id, activateContract));
+        assertEquals(forecast, controller.completeCampaign(id, completeCampaign));
+        assertEquals(forecast, controller.activatePartner(id));
+        assertEquals(forecast, controller.acceptCopilotRecommendation(id, copilot));
+        assertEquals(forecast, controller.clearBfsiOnboarding(id, bfsi));
         verify(actions).submitForecast(id, submit);
         verify(actions).resolveCase(id, resolve);
         verify(actions).simulateAutomation(id, simulate);
         verify(actions).validateMigration(id);
         verify(actions).acknowledgeMobileSync(id);
+        verify(actions).activateContract(id, activateContract);
+        verify(actions).completeCampaign(id, completeCampaign);
+        verify(actions).activatePartner(id);
+        verify(actions).acceptCopilotRecommendation(id, copilot);
+        verify(actions).clearBfsiOnboarding(id, bfsi);
     }
 }

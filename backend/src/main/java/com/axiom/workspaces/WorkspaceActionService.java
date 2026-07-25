@@ -39,6 +39,10 @@ public class WorkspaceActionService {
     public record ForecastSubmitRequest(String managerNote) {}
     public record CaseResolveRequest(String outcome) {}
     public record AutomationSimulateRequest(Integer sampleSize) {}
+    public record ContractActivateRequest(String signedDocumentRef) {}
+    public record CampaignCompleteRequest(String outcome) {}
+    public record CopilotDecisionRequest(String note) {}
+    public record BfsiClearRequest(String note) {}
 
     @Transactional
     public ActionResult submitForecast(UUID id, ForecastSubmitRequest request) {
@@ -241,6 +245,203 @@ public class WorkspaceActionService {
                 "Acknowledged mobile sync for " + row.get("device_label"), details);
         outbox.write("device_session", deviceSessionId, "mobile.sync.acknowledged", details);
         return new ActionResult(deviceSessionId, "mobile", "SYNCED", "Device sync acknowledged and offline queue cleared.", details);
+    }
+
+    @Transactional
+    public ActionResult activateContract(UUID id, ContractActivateRequest request) {
+        requireWrite("activate contracts");
+        Map<String, Object> row = one("""
+                select id, contract_number, title, status, start_date, end_date, signed_document_ref
+                from contracting.contract_record
+                where tenant_id = ? and id = ? and deleted_at is null
+                for update
+                """, id, "Contract not found");
+        String status = text(row.get("status"));
+        if (!"DRAFT".equals(status) && !"IN_REVIEW".equals(status) && !"EXPIRING".equals(status)) {
+            throw new ConflictException("Only draft, in-review or expiring contracts can be activated");
+        }
+        String signedRef = clean(request == null ? null : request.signedDocumentRef());
+        if (signedRef == null) signedRef = clean(text(row.get("signed_document_ref")));
+        if (signedRef == null) throw new ConflictException("Contract activation requires a signed document reference");
+        jdbc.update("""
+                update contracting.contract_record
+                set status = 'ACTIVE', signed_document_ref = ?, updated_at = now()
+                where tenant_id = ? and id = ?
+                """, signedRef, tenantId(), id);
+        Map<String, Object> details = Map.of(
+                "contractNumber", row.get("contract_number"),
+                "previousStatus", status,
+                "signedDocumentRef", signedRef);
+        audit.recordWithReason("CONTRACT_ACTIVATE", "CONTRACT", id,
+                "Activated contract " + row.get("contract_number"), signedRef, details);
+        outbox.write("contract", id, "contract.activated", details);
+        return new ActionResult(id, "contracts", "ACTIVE", "Contract activated with signed document evidence.", details);
+    }
+
+    @Transactional
+    public ActionResult completeCampaign(UUID id, CampaignCompleteRequest request) {
+        requireWrite("complete campaigns");
+        Map<String, Object> row = one("""
+                select id, code, name, status, start_date, end_date
+                from marketing.campaign
+                where tenant_id = ? and id = ? and deleted_at is null
+                for update
+                """, id, "Campaign not found");
+        String status = text(row.get("status"));
+        if ("COMPLETED".equals(status) || "CANCELLED".equals(status)) {
+            throw new ConflictException("Campaign is already completed or cancelled");
+        }
+        String outcome = clean(request == null ? null : request.outcome());
+        if (outcome == null) throw new ConflictException("Campaign completion requires an outcome");
+        Map<String, Object> metrics = jdbc.queryForMap("""
+                select count(*) as members,
+                       count(*) filter (where status in ('RESPONDED','MQL','SQL')) as responses
+                from marketing.campaign_member
+                where tenant_id = ? and campaign_id = ?
+                """, tenantId(), id);
+        jdbc.update("""
+                update marketing.campaign
+                set status = 'COMPLETED',
+                    end_date = greatest(current_date, start_date)
+                where tenant_id = ? and id = ?
+                """, tenantId(), id);
+        Map<String, Object> details = Map.of(
+                "campaignCode", row.get("code"),
+                "previousStatus", status,
+                "outcome", outcome,
+                "members", number(metrics.get("members")),
+                "responses", number(metrics.get("responses")));
+        audit.recordWithReason("CAMPAIGN_COMPLETE", "CAMPAIGN", id,
+                "Completed campaign " + row.get("code"), outcome, details);
+        outbox.write("campaign", id, "campaign.completed", details);
+        return new ActionResult(id, "campaigns", "COMPLETED", "Campaign completed with response evidence.", details);
+    }
+
+    @Transactional
+    public ActionResult activatePartner(UUID id) {
+        requireWrite("activate partners");
+        Map<String, Object> row = one("""
+                select id, partner_code, tier, status
+                from channel.partner_account
+                where tenant_id = ? and id = ? and deleted_at is null
+                for update
+                """, id, "Partner account not found");
+        String status = text(row.get("status"));
+        if (!"ONBOARDING".equals(status) && !"SUSPENDED".equals(status)) {
+            throw new ConflictException("Only onboarding or suspended partners can be activated");
+        }
+        Long openConflicts = jdbc.queryForObject("""
+                select count(*)
+                from channel.deal_registration r
+                join channel.channel_conflict c on c.tenant_id = r.tenant_id and c.deal_registration_id = r.id
+                where r.tenant_id = ? and r.partner_account_id = ? and c.status = 'OPEN'
+                """, Long.class, tenantId(), id);
+        if (openConflicts != null && openConflicts > 0) {
+            throw new ConflictException("Partner has open channel conflicts and cannot be activated");
+        }
+        jdbc.update("""
+                update channel.partner_account
+                set status = 'ACTIVE'
+                where tenant_id = ? and id = ?
+                """, tenantId(), id);
+        Map<String, Object> details = Map.of(
+                "partnerCode", row.get("partner_code"),
+                "tier", row.get("tier"),
+                "previousStatus", status);
+        audit.record("PARTNER_ACTIVATE", "PARTNER_ACCOUNT", id,
+                "Activated partner " + row.get("partner_code"), details);
+        outbox.write("partner_account", id, "partner.activated", details);
+        return new ActionResult(id, "partners", "ACTIVE", "Partner activated after conflict gate passed.", details);
+    }
+
+    @Transactional
+    public ActionResult acceptCopilotRecommendation(UUID id, CopilotDecisionRequest request) {
+        requireWrite("accept copilot recommendations");
+        Map<String, Object> row = one("""
+                select r.id, r.recommendation_number, r.title, r.status, r.expires_at,
+                       p.prompt_code, p.model_policy
+                from ai.copilot_recommendation r
+                join ai.copilot_prompt p on p.tenant_id = r.tenant_id and p.id = r.prompt_id
+                where r.tenant_id = ? and r.id = ?
+                for update of r
+                """, id, "Copilot recommendation not found");
+        if (!"READY".equals(text(row.get("status")))) {
+            throw new ConflictException("Only ready copilot recommendations can be accepted");
+        }
+        Integer expired = jdbc.queryForObject("""
+                select case when expires_at is not null and expires_at < now() then 1 else 0 end
+                from ai.copilot_recommendation where tenant_id = ? and id = ?
+                """, Integer.class, tenantId(), id);
+        if (expired != null && expired == 1) {
+            jdbc.update("update ai.copilot_recommendation set status = 'EXPIRED' where tenant_id = ? and id = ?", tenantId(), id);
+            throw new ConflictException("Copilot recommendation has expired");
+        }
+        Long citations = jdbc.queryForObject("""
+                select count(*) from ai.grounding_citation where tenant_id = ? and recommendation_id = ?
+                """, Long.class, tenantId(), id);
+        if (citations == null || citations == 0) {
+            throw new ConflictException("Copilot recommendation cannot be accepted without grounding citations");
+        }
+        String note = clean(request == null ? null : request.note());
+        jdbc.update("""
+                update ai.copilot_recommendation
+                set status = 'ACCEPTED'
+                where tenant_id = ? and id = ?
+                """, tenantId(), id);
+        Map<String, Object> details = Map.of(
+                "recommendationNumber", row.get("recommendation_number"),
+                "promptCode", row.get("prompt_code"),
+                "modelPolicy", row.get("model_policy"),
+                "citations", citations);
+        audit.recordWithReason("COPILOT_ACCEPT", "COPILOT_RECOMMENDATION", id,
+                "Accepted copilot recommendation " + row.get("recommendation_number"), note, details);
+        outbox.write("copilot_recommendation", id, "copilot.recommendation.accepted", details);
+        return new ActionResult(id, "copilot", "ACCEPTED", "Copilot recommendation accepted with citation evidence.", details);
+    }
+
+    @Transactional
+    public ActionResult clearBfsiOnboarding(UUID id, BfsiClearRequest request) {
+        requireWrite("clear BFSI onboarding");
+        Map<String, Object> row = one("""
+                select id, onboarding_number, kyc_status, risk_rating
+                from bfsi.client_onboarding
+                where tenant_id = ? and id = ?
+                for update
+                """, id, "BFSI onboarding record not found");
+        if ("CLEARED".equals(text(row.get("kyc_status")))) {
+            throw new ConflictException("BFSI onboarding is already cleared");
+        }
+        if ("REJECTED".equals(text(row.get("kyc_status"))) || "PROHIBITED".equals(text(row.get("risk_rating")))) {
+            throw new ConflictException("Rejected or prohibited-risk BFSI onboarding cannot be cleared");
+        }
+        Map<String, Object> screening = jdbc.queryForMap("""
+                select count(*) filter (where status = 'PENDING') as pending,
+                       count(*) filter (where status = 'HIT') as hits,
+                       count(*) filter (where status in ('CLEAR','WAIVED')) as cleared
+                from bfsi.compliance_screening
+                where tenant_id = ? and onboarding_id = ?
+                """, tenantId(), id);
+        long pending = number(screening.get("pending"));
+        long hits = number(screening.get("hits"));
+        if (pending > 0 || hits > 0) {
+            throw new ConflictException("BFSI onboarding has pending or hit screening results");
+        }
+        String note = clean(request == null ? null : request.note());
+        if (note == null) throw new ConflictException("BFSI clearance requires a compliance note");
+        jdbc.update("""
+                update bfsi.client_onboarding
+                set kyc_status = 'CLEARED', completed_at = now()
+                where tenant_id = ? and id = ?
+                """, tenantId(), id);
+        Map<String, Object> details = Map.of(
+                "onboardingNumber", row.get("onboarding_number"),
+                "previousStatus", row.get("kyc_status"),
+                "riskRating", row.get("risk_rating"),
+                "screeningsCleared", number(screening.get("cleared")));
+        audit.recordWithReason("BFSI_ONBOARDING_CLEAR", "BFSI_ONBOARDING", id,
+                "Cleared BFSI onboarding " + row.get("onboarding_number"), note, details);
+        outbox.write("bfsi_onboarding", id, "bfsi.onboarding.cleared", details);
+        return new ActionResult(id, "bfsi", "CLEARED", "BFSI onboarding cleared after screening gate passed.", details);
     }
 
     private Map<String, Object> one(String sql, UUID id, String missingMessage) {

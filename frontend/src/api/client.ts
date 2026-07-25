@@ -967,4 +967,26 @@ export const api = {
   acknowledgeMobileSync(id: string): Promise<WorkspaceActionResult> {
     return request<WorkspaceActionResult>("POST", `/workspaces/mobile/${encodeURIComponent(id)}/sync`);
   },
+
+  activateContract(id: string, signedDocumentRef: string): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/contracts/${encodeURIComponent(id)}/activate`, { signedDocumentRef });
+  },
+
+  completeCampaign(id: string, outcome: string): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/campaigns/${encodeURIComponent(id)}/complete`, { outcome });
+  },
+
+  activatePartner(id: string): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/partners/${encodeURIComponent(id)}/activate`);
+  },
+
+  acceptCopilotRecommendation(id: string, note?: string): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/copilot/${encodeURIComponent(id)}/accept`, {
+      note: note?.trim() || null,
+    });
+  },
+
+  clearBfsiOnboarding(id: string, note: string): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/bfsi/${encodeURIComponent(id)}/clear`, { note });
+  },
 };
