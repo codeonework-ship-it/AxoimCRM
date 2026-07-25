@@ -43,7 +43,7 @@ export function AppShell() {
         return;
       }
       if (goPrefix) {
-        const routes: Record<string, string> = { h: "/", p: "/pipeline", a: "/accounts", l: "/leads", r: "/reference-data", t: "/reports", u: "/admin" };
+        const routes: Record<string, string> = { h: "/", p: "/pipeline", a: "/accounts", l: "/leads", e: "/activities", r: "/reference-data", t: "/reports", u: "/admin" };
         const route = routes[event.key.toLowerCase()];
         goPrefix = false;
         if (route) navigate(route);

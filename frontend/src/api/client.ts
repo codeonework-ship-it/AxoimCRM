@@ -293,6 +293,52 @@ export interface DispatchResult {
   message: string;
 }
 
+export interface ActivityRow {
+  id: string;
+  activityType: "TASK" | "EVENT" | "CALL" | "EMAIL_LOG" | "NOTE" | string;
+  subject: string;
+  body: string | null;
+  status: "OPEN" | "COMPLETED" | "CANCELLED" | string;
+  priority: "LOW" | "NORMAL" | "HIGH" | "URGENT" | string;
+  relatedEntityType: "ACCOUNT" | "CONTACT" | "LEAD" | "OPPORTUNITY" | string;
+  relatedEntityId: string;
+  relatedLabel: string | null;
+  ownerId: string;
+  ownerName: string;
+  dueAt: string | null;
+  reminderAt: string | null;
+  occurredAt: string;
+  completedAt: string | null;
+  outcome: string | null;
+  direction: "INBOUND" | "OUTBOUND" | string | null;
+  durationMinutes: number | null;
+  disposition: string | null;
+  participantCount: number;
+}
+
+export interface ActivitySummary {
+  openCount: number;
+  overdueCount: number;
+  completedLast7Days: number;
+  lastContactedAt: string | null;
+  daysSinceLastActivity: number | null;
+}
+
+export interface ActivityRequest {
+  activityType: string;
+  subject: string;
+  body?: string;
+  priority?: string;
+  relatedEntityType: string;
+  relatedEntityId: string;
+  dueAt?: string | null;
+  reminderAt?: string | null;
+  occurredAt?: string | null;
+  direction?: string | null;
+  durationMinutes?: number | null;
+  disposition?: string | null;
+}
+
 /* ------------------------------------------------------------------ */
 /* Errors                                                              */
 /* ------------------------------------------------------------------ */
@@ -643,5 +689,28 @@ export const api = {
 
   sendReportAlert(id: string): Promise<DispatchResult> {
     return request<DispatchResult>("POST", `/alerts/reports/${encodeURIComponent(id)}/send`);
+  },
+
+  activities(params?: ListParams & { type?: string; status?: string; relatedEntityType?: string; relatedEntityId?: string }): Promise<PageResult<ActivityRow>> {
+    return request<PageResult<ActivityRow>>("GET", `/activities${queryString({
+      page: params?.page ?? 0,
+      search: params?.search,
+      type: params?.type,
+      status: params?.status,
+      relatedEntityType: params?.relatedEntityType,
+      relatedEntityId: params?.relatedEntityId,
+    })}`);
+  },
+
+  activitySummary(): Promise<ActivitySummary> {
+    return request<ActivitySummary>("GET", "/activities/summary");
+  },
+
+  createActivity(req: ActivityRequest): Promise<ActivityRow> {
+    return request<ActivityRow>("POST", "/activities", req);
+  },
+
+  completeActivity(id: string, outcome: string): Promise<ActivityRow> {
+    return request<ActivityRow>("PATCH", `/activities/${encodeURIComponent(id)}/complete`, { outcome });
   },
 };

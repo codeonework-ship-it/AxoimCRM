@@ -14,7 +14,7 @@ _Last updated: 2026-07-25_
 | E04 | Accounts, contacts, hierarchy and buying groups | 🟡 | R1 | Tenant-scoped account/contact schema and read-only Accounts preview exist; hierarchy, buying-group workspace, record detail and acceptance coverage remain open |
 | E05 | Lead capture, qualification and routing | 🟡 | R1 | Lead→opportunity vertical-slice skeleton: `lead` table, seed data and the beginnings of the capture/convert API path in `backend/` |
 | E06 | Opportunity and pipeline management | 🟡 | R1 | Pipeline board, optimistic drag plus keyboard/touch Move control, server stage gate, and outbox events exist for the walking slice; full opportunity lifecycle remains open |
-| E07 | Activity, email and calendar engagement | ⛔ | R2 | |
+| E07 | Activity, email and calendar engagement | 🟡 | R2 | First-party tasks, events, calls, notes, manual email logs and unified activity timeline are implemented. Microsoft/Google/telephony connector capture remains intentionally pending |
 | E08 | Products, price books, quotes and CPQ | ⛔ | R2 | |
 | E09 | Contracts, orders, subscriptions and renewals | ⛔ | R3 | |
 | E10 | Forecasting and revenue intelligence | ⛔ | R2 | |
@@ -32,7 +32,7 @@ _Last updated: 2026-07-25_
 | E22 | BFSI vertical pack | ⛔ | R4 | Gated on the pack framework proving out against a stable core |
 | E23 | Commodity trading vertical pack | ⛔ | R4 | Origination only; CTRM connector contract per [system design §11](architecture/system-design.md#11-integration-architecture-and-the-ctrm-connector) |
 
-**0 / 23 epics completed · 4 partial (walking vertical slice) · 19 not started.**
+**0 / 23 epics completed · 9 partial (walking vertical slice) · 14 not started.**
 
 ## 2026-07-25 implementation increment
 
@@ -44,6 +44,8 @@ The current runnable slice now includes these additional partial deliveries:
 - **E17:** API CORS is locked to explicit configured origins and exposes only the headers needed by the frontend. Vendor and third-party integrations remain intentionally pending.
 - **Database architecture:** physical module schemas now separate `platform`, `identity`, `crm`, `sales`, `engagement`, `governance`, `integration`, and `reference` tables. Tenant-consistent composite foreign keys and module catalog tables are in place.
 - **E03 reference data:** governed value-set tables, seeded lead/status governance values, reference-data API, and Reference Data UI workspace are implemented for the preview.
+- **E02/E15/E19:** RBAC screen policies, user-management cockpit, trial/company/billing administration, Jasper report downloads, email/report alert configuration and a standalone reporting project boundary are implemented. External delivery providers remain pending.
+- **E07:** first-party activity timeline is implemented with tenant-scoped tasks, events, calls, notes and manual email logs; activity creation/completion writes audit/outbox events and reminder notifications.
 
 ## Skeleton work in detail
 

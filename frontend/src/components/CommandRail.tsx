@@ -3,6 +3,7 @@ import { useAuth } from "../auth/AuthContext";
 import { initials } from "../lib/format";
 import {
   AccountsIcon,
+  BellIcon,
   HomeIcon,
   LeadsIcon,
   LogoutIcon,
@@ -16,6 +17,7 @@ const NAV = [
   { to: "/pipeline", label: "Pipeline", icon: PipelineIcon, end: false },
   { to: "/accounts", label: "Accounts", icon: AccountsIcon, end: false },
   { to: "/leads", label: "Leads", icon: LeadsIcon, end: false },
+  { to: "/activities", label: "Activities", icon: BellIcon, end: false },
   { to: "/reference-data", label: "Reference Data", icon: ReferenceIcon, end: false },
   { to: "/reports", label: "Reports", icon: SparkIcon, end: false },
   { to: "/admin", label: "Admin", icon: ReferenceIcon, end: false },

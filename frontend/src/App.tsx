@@ -9,6 +9,7 @@ import { LeadsPage } from "./pages/LeadsPage";
 import { ReferenceDataPage } from "./pages/ReferenceDataPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { AdminPage } from "./pages/AdminPage";
+import { ActivitiesPage } from "./pages/ActivitiesPage";
 
 export function App() {
   return (
@@ -25,6 +26,7 @@ export function App() {
         <Route path="/pipeline" element={<PipelinePage />} />
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/leads" element={<LeadsPage />} />
+        <Route path="/activities" element={<ActivitiesPage />} />
         <Route path="/reference-data" element={<ReferenceDataPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/admin/*" element={<AdminPage />} />

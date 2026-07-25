@@ -12,6 +12,7 @@ const SHORTCUTS = [
   ["G then P", "Go to Pipeline"],
   ["G then A", "Go to Accounts"],
   ["G then L", "Go to Leads"],
+  ["G then E", "Go to Activities"],
   ["G then R", "Go to Reference Data"],
   ["G then T", "Go to Reports"],
   ["G then U", "Go to Administration"],
@@ -102,15 +103,16 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
               <li><span>01</span><div><strong>Scan Home</strong><p>Review revenue posture and intervention signals.</p></div></li>
               <li><span>02</span><div><strong>Qualify leads</strong><p>Convert qualified demand into an account, contact, and deal.</p></div></li>
               <li><span>03</span><div><strong>Advance deals</strong><p>Drag cards only after stage requirements are satisfied.</p></div></li>
+              <li><span>04</span><div><strong>Capture engagement</strong><p>Use Activities to log tasks, events, calls, notes and manual email summaries against CRM records.</p></div></li>
             </ol>
           </section>
 
           <section className="guide-section">
             <span className="eyebrow">Admin modules</span>
             <ol className="guide-steps">
-              <li><span>04</span><div><strong>RBAC first</strong><p>Review role policies before changing users, trials, company status, billing or alerts.</p></div></li>
-              <li><span>05</span><div><strong>Reports</strong><p>Use Reports for Jasper-generated PDF, Excel and Word downloads for the selected workspace.</p></div></li>
-              <li><span>06</span><div><strong>Alert queues</strong><p>Email and report alerts are validated and queued internally until third-party delivery is connected.</p></div></li>
+              <li><span>05</span><div><strong>RBAC first</strong><p>Review role policies before changing users, trials, company status, billing or alerts.</p></div></li>
+              <li><span>06</span><div><strong>Reports</strong><p>Use Reports for Jasper-generated PDF, Excel and Word downloads for the selected workspace.</p></div></li>
+              <li><span>07</span><div><strong>Alert queues</strong><p>Email and report alerts are validated and queued internally until third-party delivery is connected.</p></div></li>
             </ol>
           </section>
 

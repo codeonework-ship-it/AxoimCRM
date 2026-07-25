@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AccountsIcon,
+  BellIcon,
   HomeIcon,
   LeadsIcon,
   PipelineIcon,
@@ -21,6 +22,7 @@ const COMMANDS = [
   { label: "Opportunity pipeline", hint: "Inspect and advance deals", to: "/pipeline", icon: PipelineIcon },
   { label: "Account intelligence", hint: "Organizations and ownership", to: "/accounts", icon: AccountsIcon },
   { label: "Lead operations", hint: "Qualify and convert demand", to: "/leads", icon: LeadsIcon },
+  { label: "Activities", hint: "Tasks, calls, meetings, notes and manual email logs", to: "/activities", icon: BellIcon },
   { label: "Reference data", hint: "Governed value sets and codes", to: "/reference-data", icon: ReferenceIcon },
   { label: "Reports", hint: "Jasper PDF, Excel and Word downloads", to: "/reports", icon: SparkIcon },
   { label: "Administration", hint: "Users, RBAC, trials, billing and alerts", to: "/admin", icon: ReferenceIcon },
