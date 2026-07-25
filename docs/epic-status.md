@@ -59,6 +59,7 @@ The current runnable slice now includes these additional partial deliveries:
 - **E09/E11/E13/E16/E22:** the same governed command layer now covers Contract Activate, Campaign Complete, Partner Activate, Copilot Recommendation Accept and BFSI Onboarding Clear actions. Each action is first-party only, validates transition preconditions, captures business evidence, writes audit history and emits outbox events without relying on vendor integrations.
 - **E15/E17/E19/E20/E23:** the third governed command wave now covers Dashboard Refresh, Integration Contract Verify, Sandbox Refresh, Audit Evidence Pack Export and Commodity Offer. Each command enforces module-specific gates, writes immutable audit evidence, emits outbox events and leaves external vendor/CTRM execution intentionally pending.
 - **E02/E03/E04/E05/E07/E08/E15/E19/E20:** governed grid utilities are now part of the Data Grid frame itself across Accounts, Leads, Activities, CPQ, Reports, Reference Data, Administration and all epic workspaces. Group, Audit, Export Excel, Export Word, Export PDF and Full size/Restore stay in the sticky grid header in both normal and expanded views.
+- **Cross-screen UX:** action buttons now use a universal geometry contract across the User Manual, Data Grids, Reports, Administration, notifications, menus and row actions so button width/height and touch targets remain consistent across screens and breakpoints.
 
 ## Skeleton work in detail
 

@@ -2669,3 +2669,121 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
   gap: 8px;
   min-width: 128px;
 }
+
+/* ============================================================================
+   UNIVERSAL BUTTON GEOMETRY CONTRACT
+
+   Motora loads after this file, so these selectors intentionally carry higher
+   specificity. The aim is boring in the best enterprise way: every action
+   button presents the same touch target and visual rhythm across the manual
+   drawer, Data Grids, reports, admin screens, menus and tables.
+
+   Navigation rows and the manual resize grip are excluded because they are not
+   action buttons; they have their own geometry.
+   ========================================================================== */
+:root body {
+  --control-height: 36px;
+  --control-sm-height: 32px;
+  --control-icon-size: 40px;
+  --control-width: 132px;
+  --control-narrow-width: 92px;
+}
+
+:root body .btn,
+:root body .btn.btn-primary,
+:root body .btn-primary,
+:root body .btn-danger,
+:root body .manual-button,
+:root body .locale-trigger,
+:root body .user-trigger,
+:root body .admin-tabs button,
+:root body .notif-tabs button,
+:root body .theme-option,
+:root body .user-signout,
+:root body .command-item,
+:root body .command-footer button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--control-width);
+  height: var(--control-height);
+  min-height: var(--control-height);
+  padding-block: 0;
+  text-align: center;
+  white-space: nowrap;
+  line-height: 1;
+}
+
+:root body .btn-sm,
+:root body .btn.btn-sm,
+:root body .btn-primary.btn-sm,
+:root body .data-grid-toolbar .btn,
+:root body .master-toolbar .btn,
+:root body .report-actions .btn,
+:root body .page-controls .btn,
+:root body .drawer-actions .btn {
+  min-width: var(--control-width);
+  height: var(--control-sm-height);
+  min-height: var(--control-sm-height);
+  padding-block: 0;
+}
+
+:root body .icon-btn,
+:root body .topbar .icon-btn,
+:root body .drawer-head .icon-btn,
+:root body .theme-switch > .icon-btn {
+  width: var(--control-icon-size);
+  min-width: var(--control-icon-size);
+  height: var(--control-icon-size);
+  min-height: var(--control-icon-size);
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 var(--control-icon-size);
+}
+
+:root body .link-btn,
+:root body .quote-doc-actions .link-btn,
+:root body .table-action .link-btn,
+:root body .notif-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--control-narrow-width);
+  height: 28px;
+  min-height: 28px;
+  padding: 0 8px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+:root body .data-grid-toolbar,
+:root body .master-toolbar,
+:root body .report-actions,
+:root body .quote-doc-actions,
+:root body .page-controls > div,
+:root body .drawer-actions,
+:root body .company-actions {
+  align-items: center;
+}
+
+:root body .data-grid-toolbar .toolbar-divider,
+:root body .master-toolbar .toolbar-divider {
+  height: var(--control-sm-height);
+}
+
+@media (max-width: 680px) {
+  :root body {
+    --control-width: 116px;
+    --control-narrow-width: 82px;
+  }
+  :root body .manual-button {
+    width: var(--control-icon-size);
+    min-width: var(--control-icon-size);
+  }
+  :root body .master-toolbar .btn,
+  :root body .data-grid-toolbar .btn {
+    flex: 1 1 var(--control-width);
+  }
+}

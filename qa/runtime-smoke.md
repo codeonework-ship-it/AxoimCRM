@@ -145,4 +145,9 @@ The canonical Compose file builds the Spring Boot API and React web application 
 - Reports now show grid-level Export Excel, Export Word, Export PDF, Audit, Group and Full size/Restore in the catalogue frame while keeping Jasper PDF/XLSX/DOCX downloads on each report card.
 - Screens without a dedicated backend export endpoint use a current-view client export fallback so the utility is still available from the Data Grid in normal and full-size views; screens with governed backend exports continue to use those server routes.
 
+## 2026-07-26 universal button geometry verification
+
+- Frontend `npm run build` passed after adding the cross-screen button sizing contract.
+- The User Manual drawer, Data Grid toolbars, report cards, admin tabs, notification controls, menus, icon buttons and row actions now share fixed height/min-width tokens for consistent button geometry across normal and responsive layouts.
+
 Docker Hub pulls were blocked on this workstation by Docker Desktop's internal HTTPS proxy. Local runtime images plus PostgreSQL 16 and Kafka 3.7 were used for this workstation's live verification only; that private recovery override is deliberately not part of the repository. The canonical, reproducible Compose definition and version targets remain unchanged and are the CI/release contract.
