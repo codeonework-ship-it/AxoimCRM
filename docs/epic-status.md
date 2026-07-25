@@ -15,7 +15,7 @@ _Last updated: 2026-07-25_
 | E05 | Lead capture, qualification and routing | 🟡 | R1 | Lead capture now includes duplicate handling, scoring, routing, SLA clocks, qualification framework, conversion/disqualification support and seeded lead operations data |
 | E06 | Opportunity and pipeline management | 🟡 | R1 | Opportunity lifecycle now includes multi-pipeline metadata, stage gates, line items, revenue splits, risk signals, slippage/movement, closure reasons and movement history foundations |
 | E07 | Activity, email and calendar engagement | 🟡 | R2 | First-party tasks, events, calls, notes, manual email logs and unified activity timeline are implemented. Microsoft/Google/telephony connector capture remains intentionally pending |
-| E08 | Products, price books, quotes and CPQ | 🟡 | R2 | CPQ database foundation is implemented: product catalogue, bundles, configuration rules, price books, pricing methods, contracted prices, approvals, quote versioning, quote lines, document/e-sign hand-off state and seeded governed values. API/UI workflow remains open |
+| E08 | Products, price books, quotes and CPQ | 🟡 | R2 | CPQ database foundation, tenant seed data, read-side product/price-book/quote APIs, server-side search/filtering/100-row pagination, quote summary metrics and React commerce workspaces are implemented. Quote authoring, generated document lifecycle and external e-sign vendor integrations remain intentionally pending |
 | E09 | Contracts, orders, subscriptions and renewals | ⛔ | R3 | |
 | E10 | Forecasting and revenue intelligence | ⛔ | R2 | |
 | E11 | Campaigns, segments and marketing alignment | ⛔ | R3 | |
@@ -47,7 +47,7 @@ The current runnable slice now includes these additional partial deliveries:
 - **E02/E15/E19:** RBAC screen policies, user-management cockpit, trial/company/billing administration, Jasper report downloads, email/report alert configuration and a standalone reporting project boundary are implemented. External delivery providers remain pending.
 - **E07:** first-party activity timeline is implemented with tenant-scoped tasks, events, calls, notes and manual email logs; activity creation/completion writes audit/outbox events and reminder notifications.
 - **E01/E02/E03/E04/E05/E06/E17/E20:** scanned and integrated the larger security, identity, org-data, account, lead, pipeline, audit/compliance and observability implementation set; compilation blockers, consent-DSR service wiring, migration constraints and runtime actuator exposure were hardened.
-- **E08:** CPQ product/price-book/quote schema foundation and governed CPQ reference values are implemented through `V90`; quote/e-sign vendor integrations remain intentionally pending.
+- **E08:** CPQ product/price-book/quote schema foundation and governed CPQ reference values are implemented through `V90`; `V91` seeds product catalogue, active price books, quote transactions, approvals, templates and guided selling prompts. `/api/v1/cpq/products`, `/api/v1/cpq/price-books`, `/api/v1/cpq/quotes` and `/api/v1/cpq/quotes/summary` now back the `/products`, `/price-books` and `/quotes` workspaces with 100-row server pagination. Quote authoring and quote/e-sign vendor integrations remain intentionally pending.
 
 ## Skeleton work in detail
 

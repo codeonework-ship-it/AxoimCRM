@@ -108,8 +108,9 @@ export const MODULE_GROUPS: ModuleGroup[] = [
     label: "Quote to cash",
     labelKey: "nav.group.commerce",
     items: [
-      { label: "Products", labelKey: "nav.module.products", to: "/products", icon: ProductIcon, epic: "E08", status: "planned" },
-      { label: "Quotes & CPQ", labelKey: "nav.module.quotes", to: "/quotes", icon: QuoteIcon, epic: "E08", status: "planned" },
+      { label: "Products", labelKey: "nav.module.products", to: "/products", icon: ProductIcon, epic: "E08", status: "partial" },
+      { label: "Price Books", labelKey: "nav.module.priceBooks", to: "/price-books", icon: ProductIcon, epic: "E08", status: "partial" },
+      { label: "Quotes & CPQ", labelKey: "nav.module.quotes", to: "/quotes", icon: QuoteIcon, epic: "E08", status: "partial" },
       { label: "Contracts", labelKey: "nav.module.contracts", to: "/contracts", icon: ContractIcon, epic: "E09", status: "planned" },
     ],
   },

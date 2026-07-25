@@ -1906,6 +1906,93 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   color:var(--slate);
 }
 
+/* ---- CPQ commerce workspace ---------------------------------------------- */
+
+.cpq-head p { max-width:760px; }
+
+.cpq-tabs {
+  display:flex;
+  gap:2px;
+  margin:-4px 0 14px;
+  overflow-x:auto;
+  border-bottom:1px solid var(--line);
+}
+
+.cpq-tabs a {
+  position:relative;
+  flex:0 0 auto;
+  padding:10px 16px 9px;
+  color:var(--slate);
+  font-size:10.5px;
+  font-weight:750;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  text-decoration:none;
+}
+
+.cpq-tabs a:hover { color:var(--ink-soft); background:color-mix(in srgb,var(--paper-sunk) 70%,transparent); }
+.cpq-tabs a.active { color:var(--ion-600); background:color-mix(in srgb,var(--ion-100) 54%,transparent); }
+.cpq-tabs a.active::after {
+  content:"";
+  position:absolute;
+  left:0;
+  right:0;
+  bottom:0;
+  height:2px;
+  background:var(--ion-600);
+  box-shadow:var(--glow);
+}
+
+.cpq-kpis { margin-bottom:16px; }
+.cpq-note {
+  color:var(--slate);
+  font-size:10px;
+  font-weight:750;
+  letter-spacing:.11em;
+  text-transform:uppercase;
+}
+
+.cpq-table td { vertical-align:top; }
+.cpq-table .mono {
+  font-family:var(--font-mono);
+  font-size:11px;
+  color:var(--ion-600);
+}
+.cpq-table small {
+  display:block;
+  margin-top:3px;
+  color:var(--slate);
+  font-size:10.5px;
+}
+.cpq-table .chip + .chip { margin-left:6px; }
+.cpq-mini {
+  margin-left:6px;
+  color:var(--slate);
+  border-color:var(--line);
+  background:transparent;
+}
+
+.chip-draft { color:var(--slate); }
+.chip-active,
+.chip-sent,
+.chip-accepted,
+.chip-ordered {
+  color:var(--ion-600);
+  border-color:var(--ion-600);
+  background:var(--ion-100);
+}
+.chip-in_approval {
+  color:var(--warn);
+  border-color:var(--warn);
+  background:transparent;
+}
+.chip-rejected,
+.chip-expired,
+.chip-archived {
+  color:var(--slate);
+  border-color:var(--line-strong);
+}
+
 @media (max-width:1180px) {
   .activity-form-grid {
     grid-template-columns:repeat(3,minmax(150px,1fr));

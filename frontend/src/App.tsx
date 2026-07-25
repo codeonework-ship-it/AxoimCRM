@@ -10,6 +10,7 @@ import { ReferenceDataPage } from "./pages/ReferenceDataPage";
 import { ReportsPage } from "./pages/ReportsPage";
 import { AdminPage } from "./pages/AdminPage";
 import { ActivitiesPage } from "./pages/ActivitiesPage";
+import { CpqPage } from "./pages/CpqPage";
 
 export function App() {
   return (
@@ -27,6 +28,9 @@ export function App() {
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/activities" element={<ActivitiesPage />} />
+        <Route path="/products" element={<CpqPage section="products" />} />
+        <Route path="/price-books" element={<CpqPage section="price-books" />} />
+        <Route path="/quotes" element={<CpqPage section="quotes" />} />
         {/* Bare /reference-data still resolves; the page redirects it onto the
             first master's canonical /reference-data/:setCode path. */}
         <Route path="/reference-data" element={<ReferenceDataPage />} />

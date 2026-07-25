@@ -350,6 +350,63 @@ export interface ActivityRequest {
   disposition?: string | null;
 }
 
+export interface CpqProduct {
+  id: string;
+  code: string;
+  name: string;
+  productFamily: string | null;
+  category: string | null;
+  unitOfMeasure: string;
+  active: boolean;
+  bundle: boolean;
+  subscription: boolean;
+  defaultCost: number | null;
+  activePriceCount: number;
+}
+
+export interface CpqPriceBook {
+  id: string;
+  code: string;
+  name: string;
+  currencyCode: string;
+  businessUnitCode: string | null;
+  customerSegment: string | null;
+  versionNumber: number;
+  status: string;
+  defaultBook: boolean;
+  activatedAt: string | null;
+  entryCount: number;
+}
+
+export interface CpqQuote {
+  id: string;
+  quoteNumber: string;
+  name: string;
+  versionNumber: number;
+  status: string;
+  approvalStatus: string;
+  accountName: string;
+  opportunityName: string | null;
+  ownerName: string | null;
+  currencyCode: string;
+  subtotal: number;
+  discountTotal: number;
+  grandTotal: number;
+  marginPct: number | null;
+  validFrom: string | null;
+  expiresAt: string | null;
+}
+
+export interface CpqQuoteSummary {
+  totalQuotes: number;
+  draftQuotes: number;
+  approvalQuotes: number;
+  sentQuotes: number;
+  acceptedQuotes: number;
+  netPipeline: number;
+  acceptedRevenue: number;
+}
+
 /* ------------------------------------------------------------------ */
 /* Errors                                                              */
 /* ------------------------------------------------------------------ */
@@ -742,5 +799,33 @@ export const api = {
 
   completeActivity(id: string, outcome: string): Promise<ActivityRow> {
     return request<ActivityRow>("PATCH", `/activities/${encodeURIComponent(id)}/complete`, { outcome });
+  },
+
+  cpqProducts(params?: ListParams & { category?: string }): Promise<PageResult<CpqProduct>> {
+    return request<PageResult<CpqProduct>>("GET", `/cpq/products${queryString({
+      page: params?.page ?? 0,
+      search: params?.search,
+      category: params?.category ?? params?.filter,
+    })}`);
+  },
+
+  cpqPriceBooks(params?: ListParams & { status?: string }): Promise<PageResult<CpqPriceBook>> {
+    return request<PageResult<CpqPriceBook>>("GET", `/cpq/price-books${queryString({
+      page: params?.page ?? 0,
+      search: params?.search,
+      status: params?.status ?? params?.filter,
+    })}`);
+  },
+
+  cpqQuotes(params?: ListParams & { status?: string }): Promise<PageResult<CpqQuote>> {
+    return request<PageResult<CpqQuote>>("GET", `/cpq/quotes${queryString({
+      page: params?.page ?? 0,
+      search: params?.search,
+      status: params?.status ?? params?.filter,
+    })}`);
+  },
+
+  cpqQuoteSummary(): Promise<CpqQuoteSummary> {
+    return request<CpqQuoteSummary>("GET", "/cpq/quotes/summary");
   },
 };
