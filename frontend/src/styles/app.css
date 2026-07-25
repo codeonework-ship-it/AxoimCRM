@@ -2687,6 +2687,7 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
   --control-icon-size: 40px;
   --control-width: 132px;
   --control-narrow-width: 92px;
+  --control-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ion-600) 28%, transparent);
 }
 
 :root body .btn,
@@ -2702,16 +2703,26 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
 :root body .user-signout,
 :root body .command-item,
 :root body .command-footer button {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: var(--control-width);
-  height: var(--control-height);
-  min-height: var(--control-height);
+  inline-size: auto;
+  min-inline-size: var(--control-width);
+  block-size: var(--control-height);
+  min-block-size: var(--control-height);
   padding-block: 0;
   text-align: center;
   white-space: nowrap;
   line-height: 1;
+  vertical-align: middle;
+  --bs-btn-padding-y: 0;
+  --bs-btn-padding-x: 14px;
+  --bs-btn-font-size: 11.5px;
+  --bs-btn-font-weight: 700;
+  --bs-btn-line-height: 1;
+  --bs-btn-border-radius: 0;
+  --bs-btn-focus-box-shadow: var(--control-focus-ring);
 }
 
 :root body .btn-sm,
@@ -2722,20 +2733,22 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
 :root body .report-actions .btn,
 :root body .page-controls .btn,
 :root body .drawer-actions .btn {
-  min-width: var(--control-width);
-  height: var(--control-sm-height);
-  min-height: var(--control-sm-height);
+  min-inline-size: var(--control-width);
+  block-size: var(--control-sm-height);
+  min-block-size: var(--control-sm-height);
   padding-block: 0;
+  --bs-btn-padding-y: 0;
+  --bs-btn-padding-x: 11px;
 }
 
 :root body .icon-btn,
 :root body .topbar .icon-btn,
 :root body .drawer-head .icon-btn,
 :root body .theme-switch > .icon-btn {
-  width: var(--control-icon-size);
-  min-width: var(--control-icon-size);
-  height: var(--control-icon-size);
-  min-height: var(--control-icon-size);
+  inline-size: var(--control-icon-size);
+  min-inline-size: var(--control-icon-size);
+  block-size: var(--control-icon-size);
+  min-block-size: var(--control-icon-size);
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -2743,19 +2756,54 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
   flex: 0 0 var(--control-icon-size);
 }
 
+:root body .drawer-actions .icon-btn {
+  inline-size: var(--control-width);
+  min-inline-size: var(--control-width);
+  block-size: var(--control-sm-height);
+  min-block-size: var(--control-sm-height);
+  flex: 0 0 var(--control-width);
+}
+
 :root body .link-btn,
 :root body .quote-doc-actions .link-btn,
 :root body .table-action .link-btn,
 :root body .notif-toggle {
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: var(--control-narrow-width);
-  height: 28px;
-  min-height: 28px;
+  min-inline-size: var(--control-narrow-width);
+  block-size: 28px;
+  min-block-size: 28px;
   padding: 0 8px;
   text-align: center;
   white-space: nowrap;
+}
+
+:root body .btn:focus-visible,
+:root body .btn-primary:focus-visible,
+:root body .manual-button:focus-visible,
+:root body .locale-trigger:focus-visible,
+:root body .user-trigger:focus-visible,
+:root body .admin-tabs button:focus-visible,
+:root body .notif-tabs button:focus-visible,
+:root body .theme-option:focus-visible,
+:root body .user-signout:focus-visible,
+:root body .command-item:focus-visible,
+:root body .command-footer button:focus-visible,
+:root body .icon-btn:focus-visible,
+:root body .link-btn:focus-visible,
+:root body .notif-toggle:focus-visible {
+  outline: none;
+  box-shadow: var(--control-focus-ring);
+}
+
+:root body .btn:disabled,
+:root body .btn-primary:disabled,
+:root body .link-btn:disabled,
+:root body .icon-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 :root body .data-grid-toolbar,
@@ -2779,11 +2827,19 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
     --control-narrow-width: 82px;
   }
   :root body .manual-button {
-    width: var(--control-icon-size);
-    min-width: var(--control-icon-size);
+    inline-size: var(--control-icon-size);
+    min-inline-size: var(--control-icon-size);
   }
   :root body .master-toolbar .btn,
   :root body .data-grid-toolbar .btn {
     flex: 1 1 var(--control-width);
+  }
+}
+
+@media (pointer: coarse) {
+  :root body {
+    --control-height: 44px;
+    --control-sm-height: 40px;
+    --control-icon-size: 44px;
   }
 }

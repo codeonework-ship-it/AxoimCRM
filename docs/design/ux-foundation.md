@@ -154,7 +154,17 @@ Pipeline columns retain horizontal scrolling because stage order is meaningful. 
 
 The current foundation uses shared shell components (`CommandRail`, `TopBar`, `CommandPalette`, `HelpDrawer`, notifications and toasts). Before the next broad feature wave, extract stable primitives for Button, IconButton, Badge, Panel, Dialog, Drawer, EmptyState, Skeleton, and DataTable. Product pages should compose these primitives rather than grow page-specific CSS indefinitely.
 
-## 10. Release gates
+## 10. CSS and Bootstrap standards
+
+- Bootstrap is the foundation and utility layer only. Product identity, component geometry and theme behavior live in Axiom CSS tokens and component rules.
+- Styles load in this order: Bootstrap, `tokens.css`, `app.css`, then `motora.css`. Later skin files may refine color and motion, but shared sizing contracts must remain token-driven and consistent.
+- Buttons use one universal geometry contract: common action buttons share width/height tokens, compact grid buttons share compact tokens, icon buttons are square, and drawer action icons use the same action-button width as their neighboring text buttons.
+- Bootstrap button variables such as `--bs-btn-padding-*`, `--bs-btn-font-*`, `--bs-btn-line-height`, `--bs-btn-border-radius` and `--bs-btn-focus-box-shadow` are mapped to Axiom tokens rather than ignored.
+- Use logical dimensions (`inline-size`, `block-size`, `min-inline-size`, `min-block-size`) for reusable controls so RTL and responsive layouts remain predictable.
+- Every actionable element needs a visible `:focus-visible` state, a disabled state, and a touch target that increases on coarse-pointer devices.
+- Avoid page-specific button dimensions. If a page needs a new control pattern, promote it into the shared control contract or a reusable component.
+
+## 11. Release gates
 
 Before calling this design system production-ready:
 
