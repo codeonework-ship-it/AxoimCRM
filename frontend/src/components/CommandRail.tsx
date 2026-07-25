@@ -67,7 +67,7 @@ export function CommandRail({ open, onNavigate }: { open: boolean; onNavigate: (
     <nav className={`rail${open ? " rail-open" : ""}`} aria-label="Primary">
       <div className="rail-brand">
         <img className="rail-logo" src="/axiom.svg" alt="" />
-        <span><strong>AXIOM</strong><small>Revenue OS</small></span>
+        <span><strong>AXIOM</strong><small>CRM 1.0</small></span>
       </div>
 
       <div className="rail-scroll">

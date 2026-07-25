@@ -1,5 +1,5 @@
 /**
- * Axiom CRM — typed API client.
+ * Axiom — typed API client.
  *
  * This is the ONLY module that knows the backend's URL layout and payload
  * shapes. If the backend shape shifts, fix it here.

@@ -2,7 +2,7 @@
 
 ## Purpose and evidence rule
 
-This plan governs business acceptance of Axiom CRM. A capability is accepted only
+This plan governs business acceptance of Axiom. A capability is accepted only
 when a named business persona completes the scenario in a release-like environment
 and the evidence is attached to the release record. Product specifications describe
 the target; [epic status](../epic-status.md) identifies what is available to test.

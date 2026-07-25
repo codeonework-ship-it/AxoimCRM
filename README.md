@@ -11,7 +11,7 @@ Axiom's one-paragraph pitch: enterprise governance without enterprise lock-in. S
 | Product definition (scope → FRD → catalogue → backlog → tests) | ✅ Baselined — 287 requirements, 373 features, 23 epics / 183 stories / 1,352 points |
 | Architecture (system design + ADR-001…008) | ✅ Baselined (ADR-005 technology choice is a recommendation pending ratification) |
 | Backend walking slice | 🟡 Runs and is release-smoke verified: JWT auth, Postgres RLS tenancy, transactional outbox → Kafka relay, lead→opportunity flow, stage gate, dashboard reads, and recipient-scoped notifications |
-| Frontend (`frontend/`) | 🟡 Runnable AEGIS // Kinetic Alloy preview: responsive command shell, Home, Pipeline, Accounts, Leads, command palette, help, and server-backed notification centre |
+| Frontend (`frontend/`) | 🟡 Runnable Axiom 1.0 preview: responsive command shell, Home, Pipeline, Accounts, Leads, command palette, help, and server-backed notification centre |
 | Desktop shell (`electron-client/`) | 🟡 Runnable Electron shell with native-notification bridge; packaging/signing remain open |
 | QA suite (`qa/`) | 🟡 Master plan, UAT plan, automation scenarios, five notification tests, and live-stack/browser smoke evidence; broader regression automation remains open |
 

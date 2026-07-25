@@ -1,4 +1,4 @@
-/** Minimal inline icon set — 1.5px strokes, squared joints, AEGIS style. */
+/** Minimal inline icon set — 1.5px strokes, squared joints, Axiom style. */
 
 interface IconProps {
   size?: number;

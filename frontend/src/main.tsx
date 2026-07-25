@@ -25,7 +25,7 @@ import "./styles/app.css";
 import "./styles/motora.css";
 
 /*
- * Theme resolution. AEGIS dark is the flagship, so it is also the DEFAULT:
+ * Theme resolution. Axiom dark is the flagship, so it is also the DEFAULT:
  * a first-run user gets the cinematic console, not whatever the OS happens
  * to prefer. An explicit choice via the TopBar toggle always wins and is
  * remembered; "light" remains a first-class daylight-ops mode.

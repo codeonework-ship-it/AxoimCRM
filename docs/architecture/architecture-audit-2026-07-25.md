@@ -1,8 +1,8 @@
-# Axiom CRM Architecture Audit — 2026-07-25
+# Axiom Architecture Audit — 2026-07-25
 
 ## Current architecture posture
 
-Axiom CRM is a modular monolith with PostgreSQL-enforced tenant isolation, Kafka
+Axiom is a modular monolith with PostgreSQL-enforced tenant isolation, Kafka
 outbox messaging, a React/Vite web client and an Electron desktop wrapper. The
 codebase now has explicit database schemas for platform, identity, CRM, sales,
 engagement, governance, reference, billing, reporting and integration concerns.

@@ -1,0 +1,9 @@
+Axiom Desktop 1.0 - Windows
+
+Channel: Windows x64 desktop client
+Package source: electron-client
+Build command: npm run package
+
+This development manifest is served from the Axiom web login page so operators
+can discover the Windows desktop client channel. Production installer signing
+and release hosting can be attached to this route during the release pipeline.

@@ -1,4 +1,4 @@
-# AEGIS // Kinetic Alloy — UI/UX foundation
+# Axiom 1.0 — UI/UX foundation
 
 **Status:** implemented foundation for the walking preview
 
@@ -15,7 +15,7 @@ Axiom is an exception-first revenue workspace. It should help a seller or manage
 
 The interface uses an original cinematic mechanical language: graphite structure, precise seams, chamfered landmarks, and short “locking” confirmations. The inspiration is transformation of information into action—not characters, faction marks, licensed logos, vehicle likenesses, franchise language, or copied entertainment assets.
 
-The system name is **AEGIS // Kinetic Alloy**. “Aegis” describes protection and governance; “Kinetic Alloy” describes a workspace whose information reorganizes around the operator’s task.
+The system name is **Axiom 1.0**. The experience language describes a protected revenue command workspace whose information reorganizes around the operator’s task without relying on licensed or copied entertainment assets.
 
 ## 2. Experience principles
 

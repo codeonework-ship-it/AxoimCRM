@@ -1,0 +1,9 @@
+Axiom Desktop 1.0 - Linux
+
+Channel: Linux desktop client
+Package source: electron-client
+Build command: npm run package
+
+This development manifest is served from the Axiom web login page so operators
+can discover the Linux desktop client channel. Production AppImage packaging and
+release hosting can be attached to this route during the release pipeline.

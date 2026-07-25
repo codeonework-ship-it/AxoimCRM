@@ -1,0 +1,10 @@
+Axiom Desktop 1.0 - macOS
+
+Channel: macOS desktop client
+Package source: electron-client
+Build command: npm run package
+
+This development manifest is served from the Axiom web login page so operators
+can discover the macOS desktop client channel. Production universal DMG packaging,
+notarization and release hosting can be attached to this route during the release
+pipeline.

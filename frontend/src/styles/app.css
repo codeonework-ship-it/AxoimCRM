@@ -1,5 +1,5 @@
 /* ============================================================
-   AEGIS application styles — Axiom CRM
+   Axiom application styles — Axiom
    ============================================================ */
 
 *,
@@ -852,12 +852,13 @@ button {
 /* ---- Login ----------------------------------------------------------- */
 
 .login {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(420px, 0.92fr);
   min-height: 100%;
+  background: #02060a;
 }
 
 .login-brand {
-  flex: 1.1;
   position: relative;
   display: flex;
   flex-direction: column;
@@ -872,13 +873,16 @@ button {
   content: "";
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(
-    0deg,
-    rgba(255, 255, 255, 0.028) 0px,
-    rgba(255, 255, 255, 0.028) 1px,
-    transparent 1px,
-    transparent 4px
-  );
+  background:
+    radial-gradient(circle at 78% 18%, rgba(99, 240, 255, 0.16), transparent 28%),
+    linear-gradient(90deg, rgba(99, 240, 255, 0.08), transparent 42%),
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.028) 0px,
+      rgba(255, 255, 255, 0.028) 1px,
+      transparent 1px,
+      transparent 4px
+    );
   pointer-events: none;
 }
 
@@ -892,13 +896,30 @@ button {
   text-transform: uppercase;
 }
 
+.login-brand .wordmark span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  color: var(--ion-500);
+  letter-spacing: 0.16em;
+  border: 1px solid rgba(99, 240, 255, 0.46);
+  background: rgba(99, 240, 255, 0.08);
+}
+
+.login-product-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 760px;
+}
+
 .login-headline {
-  font-size: clamp(32px, 4.4vw, 54px);
+  font-size: clamp(38px, 5.5vw, 72px);
   font-weight: 700;
-  line-height: 1.08;
+  line-height: 0.98;
   letter-spacing: -0.01em;
-  max-width: 12em;
-  margin: 0;
+  max-width: 10.8em;
+  margin: 10px 0 0;
 }
 
 .login-headline .gold {
@@ -909,7 +930,51 @@ button {
   color: #f5b83d; /* headline sits on dark steel in both themes */
 }
 
+.login-story {
+  max-width: 720px;
+  margin: 22px 0 0;
+  color: #b8c7dc;
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.login-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  max-width: 760px;
+  margin-top: 30px;
+}
+
+.login-proof-grid div {
+  min-height: 116px;
+  padding: 16px;
+  border: 1px solid rgba(99, 240, 255, 0.34);
+  background:
+    linear-gradient(135deg, rgba(99, 240, 255, 0.09), transparent 48%),
+    rgba(2, 9, 16, 0.54);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.login-proof-grid strong {
+  display: block;
+  color: #f7fbff;
+  font-family: var(--font-mono);
+  font-size: 24px;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+}
+
+.login-proof-grid span {
+  display: block;
+  color: #9eb1c8;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .login-footline {
+  position: relative;
+  z-index: 1;
   font-size: 12px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -917,7 +982,6 @@ button {
 }
 
 .login-form-side {
-  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -926,12 +990,13 @@ button {
 
 .login-card {
   width: 100%;
-  max-width: 380px;
+  max-width: 444px;
+  padding: 2px;
 }
 
-.login-card h1 {
+.login-card h2 {
   margin: 0 0 4px;
-  font-size: 20px;
+  font-size: 24px;
 }
 
 .login-card .sub {
@@ -976,9 +1041,103 @@ button {
   background: var(--paper-raised);
 }
 
-@media (max-width: 860px) {
+.login-downloads {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.login-downloads strong {
+  display: block;
+  margin-top: 6px;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.login-downloads p {
+  margin: 6px 0 0;
+  color: var(--slate);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.download-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.download-card {
+  display: grid;
+  align-content: center;
+  min-height: 68px;
+  padding: 10px;
+  color: var(--ink);
+  text-decoration: none;
+  border: 1px solid var(--line-strong);
+  background:
+    linear-gradient(135deg, rgba(99, 240, 255, 0.1), transparent 58%),
+    var(--paper-raised);
+  transition:
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.download-card:hover,
+.download-card:focus-visible {
+  color: var(--ink);
+  border-color: var(--ion-500);
+  box-shadow: 0 0 18px rgba(99, 240, 255, 0.18);
+  transform: translateY(-1px);
+}
+
+.download-card span {
+  display: block;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.download-card small {
+  display: block;
+  margin-top: 4px;
+  color: var(--slate);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+@media (max-width: 980px) {
+  .login {
+    display: block;
+    min-height: 100vh;
+  }
+
   .login-brand {
-    display: none;
+    min-height: auto;
+    padding: 32px 24px;
+    gap: 40px;
+  }
+
+  .login-proof-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .login-form-side {
+    padding: 28px 18px 40px;
+  }
+}
+
+@media (max-width: 560px) {
+  .login-headline {
+    font-size: clamp(34px, 13vw, 46px);
+  }
+
+  .download-grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -1152,7 +1311,7 @@ button {
   color: var(--slate);
 }
 
-/* AEGIS // Kinetic Alloy workspace foundation */
+/* Axiom 1.0 workspace foundation */
 .eyebrow { display:block; color:var(--slate); font-size:10px; font-weight:700; letter-spacing:.18em; line-height:1.3; text-transform:uppercase; }
 .shell { height:100dvh; }
 .shell-content { padding:30px 34px 48px; }
@@ -2045,7 +2204,7 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
 }
 
 /* ============================================================================
-   AEGIS — module navigation & cinematic depth
+   Axiom — module navigation & cinematic depth
    Grouped module rail, hazard-marked planned modules, energon edge lighting.
    Appended last so it wins the cascade over the earlier flat-rail rules.
    ========================================================================== */
@@ -2135,7 +2294,7 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   padding: 0 11px;
   color: #9cabc3;
   text-decoration: none;
-  /* Chamfered leading corner — the AEGIS panel cut, at nav scale. */
+  /* Chamfered leading corner — the Axiom panel cut, at nav scale. */
   clip-path: polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px));
   transition: background 140ms ease, color 140ms ease;
 }
@@ -2277,7 +2436,7 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
 }
 
 /* ============================================================================
-   AEGIS contrast correction pass
+   Axiom contrast correction pass
    The first cut of this theme failed on legibility: hard-coded slate greys in
    the rail sat at ~2.5:1 against the steel ground, panels floated on a ground
    only 3% different from them, and a hairline background grid competed with
@@ -2439,7 +2598,7 @@ tbody tr:hover td { background: var(--paper-sunk); }
 }
 
 /* ============================================================================
-   AEGIS CONTROL SYSTEM — buttons, inputs, action links, motion
+   AXIOM CONTROL SYSTEM — buttons, inputs, action links, motion
    The generic control layer was the weakest part of the theme: flat white
    rectangles with grey hairlines read as unstyled defaults next to the
    cinematic rail. This pass gives every interactive element the same
@@ -2609,17 +2768,17 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
 }
 
 /* ---- Motion: rooms light up as you enter them ---------------------------- */
-@keyframes aegis-enter {
+@keyframes axiom-enter {
   from { opacity: 0; transform: translateY(4px); }
   to   { opacity: 1; transform: none; }
 }
-.shell-content > * { animation: aegis-enter 200ms ease both; }
+.shell-content > * { animation: axiom-enter 200ms ease both; }
 
-@keyframes aegis-breathe {
+@keyframes axiom-breathe {
   0%, 100% { box-shadow: 0 0 10px rgba(72, 184, 255, 0.35); }
   50%      { box-shadow: 0 0 22px rgba(72, 184, 255, 0.55); }
 }
-.rail-btn.active::before { animation: aegis-breathe 3.6s ease-in-out infinite; }
+.rail-btn.active::before { animation: axiom-breathe 3.6s ease-in-out infinite; }
 
 /* ---- Chrome polish -------------------------------------------------------- */
 ::selection { background: var(--ion-100); color: var(--ink); }
