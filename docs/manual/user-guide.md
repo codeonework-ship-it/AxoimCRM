@@ -2,7 +2,7 @@
 
 Welcome to Axiom. This guide is for the people who sell, manage and support — not for administrators or developers. It explains how to get your work done, why the product sometimes stops you (it's protecting your data, and we'll show you exactly what it wants), and how to make Axiom quieter, faster and more yours.
 
-> **Walking-preview boundary (2026-07-25).** The runnable preview currently includes local sign-in, Revenue Command, Leads, Accounts, Pipeline, a workspace command palette, contextual operator help, and a tenant/user-scoped server notification feed. Later sections describe the approved target product and are clearly not evidence that SSO/MFA, cross-record search, external notification channels/preferences, activities, quotes, forecasting, AI, administration, or mobile applications have shipped. Delivery truth lives in [`../epic-status.md`](../epic-status.md).
+> **Walking-preview boundary (2026-07-25).** The runnable preview currently includes local sign-in, Revenue Command, Leads, Accounts, Pipeline, Reference Data, a workspace command palette, contextual operator help, and a tenant/user-scoped server notification feed. Later sections describe the approved target product and are clearly not evidence that SSO/MFA, cross-record search, external notification channels/preferences, activities, quotes, forecasting, AI, full administration, or mobile applications have shipped. Delivery truth lives in [`../epic-status.md`](../epic-status.md).
 
 If something here doesn't match what you see on screen, your administrator may have configured things differently for your organization — field names, stages and rules are all tailored per company. The behaviour, though, works the way this guide says.
 
@@ -80,7 +80,7 @@ Platform users can switch active workspace from the top bar. Tenant users stay i
 
 When you sign in, you land on **Home** — not a wall of records, but the things that need you today: leads waiting for a first response, deals with unmet stage requirements, approvals waiting on you, and tasks due. Axiom is built exception-first: it shows you what needs action, why, and when it's due.
 
-Down the left side is the labelled **navigation rail**. The preview contains Revenue Command, Pipeline, Accounts, and Leads. On tablets and phones, use the menu button to open the rail. Role-aware groups and additional workspaces arrive with their underlying features.
+Down the left side is the labelled **navigation rail**. The preview contains Revenue Command, Pipeline, Accounts, Leads, and Reference Data. On tablets and phones, use the menu button to open the rail. Role-aware groups and additional workspaces arrive with their underlying features.
 
 Across the top:
 
@@ -189,6 +189,12 @@ The master toolbar provides:
 - **Download template** and **Bulk upload** for roles allowed to import master data.
 
 Bulk upload uses the downloaded CSV template and validates the full file before writing. If any row fails validation, no records from that file are imported. Deletes are soft deletes only, and records already used by related records are protected with a clear in-use message.
+
+### Reference data
+
+Reference Data is the administrator-facing workspace for governed value sets such as lead statuses, pipeline-stage lifecycle values, and master-delete reasons. Everyone with read access can inspect active and inactive entries. Super admins, tenant admins, and data stewards can add tenant-specific values or deactivate values that should no longer be used.
+
+Reference values are not hard-deleted. Deactivation keeps old records readable and auditable while preventing the value from being used for new configuration.
 
 ### The account 360 timeline
 

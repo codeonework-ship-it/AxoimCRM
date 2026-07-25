@@ -5,6 +5,7 @@ import {
   HomeIcon,
   LeadsIcon,
   PipelineIcon,
+  ReferenceIcon,
   SearchIcon,
 } from "./icons";
 
@@ -19,6 +20,7 @@ const COMMANDS = [
   { label: "Opportunity pipeline", hint: "Inspect and advance deals", to: "/pipeline", icon: PipelineIcon },
   { label: "Account intelligence", hint: "Organizations and ownership", to: "/accounts", icon: AccountsIcon },
   { label: "Lead operations", hint: "Qualify and convert demand", to: "/leads", icon: LeadsIcon },
+  { label: "Reference data", hint: "Governed value sets and codes", to: "/reference-data", icon: ReferenceIcon },
 ];
 
 export function CommandPalette({ open, onClose, onOpenHelp }: CommandPaletteProps) {

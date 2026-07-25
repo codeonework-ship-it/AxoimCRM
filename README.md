@@ -65,6 +65,8 @@ Start with [docs/README.md](docs/README.md) for the recommended reading order. T
 - [system-design.md](docs/architecture/system-design.md) — the forces, the modular monolith, scaling model, request path, event backbone, AI and integration architecture
 - [adr/](docs/architecture/adr) — ADR-001 tenancy isolation · 002 extensibility · 003 event backbone · 004 AI provider abstraction · 005 technology selection (deferred/recommended) · 006 modular monolith · 007 external integration · 008 reporting read model
 
+- [database-module-schemas.md](docs/architecture/database-module-schemas.md) - physical PostgreSQL schemas, table ownership, and tenant-consistent FK rules
+
 ### docs/manual
 
 - [user-guide.md](docs/manual/user-guide.md) — the end-user manual for business users (leads, pipeline, forecasting, AI assistant, notifications, shortcuts, FAQ)

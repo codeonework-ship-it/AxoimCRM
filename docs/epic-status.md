@@ -42,6 +42,8 @@ The current runnable slice now includes these additional partial deliveries:
 - **E03/E20:** account/lead master toolbar, audit drawer, immutable audit events, templates, atomic CSV bulk upload validation, governed Excel/Word/PDF exports, soft delete only, and in-use delete protection.
 - **E04/E05:** account and lead lists use server-side search/filtering and 100-row pagination; grouped display remains available for the current page.
 - **E17:** API CORS is locked to explicit configured origins and exposes only the headers needed by the frontend. Vendor and third-party integrations remain intentionally pending.
+- **Database architecture:** physical module schemas now separate `platform`, `identity`, `crm`, `sales`, `engagement`, `governance`, `integration`, and `reference` tables. Tenant-consistent composite foreign keys and module catalog tables are in place.
+- **E03 reference data:** governed value-set tables, seeded lead/status governance values, reference-data API, and Reference Data UI workspace are implemented for the preview.
 
 ## Skeleton work in detail
 

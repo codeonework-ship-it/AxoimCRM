@@ -55,6 +55,15 @@ export function LeadsIcon({ size }: IconProps) {
   );
 }
 
+export function ReferenceIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M4 5 H20 V10 H4 Z M4 14 H20 V19 H4 Z" />
+      <path d="M8 5 V10 M8 14 V19 M13 7.5 H17 M13 16.5 H17" />
+    </svg>
+  );
+}
+
 export function BellIcon({ size }: IconProps) {
   return (
     <svg {...base(size)}>

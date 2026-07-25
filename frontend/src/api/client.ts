@@ -75,6 +75,35 @@ export interface ListParams {
   filter?: string;
 }
 
+export interface ReferenceValueSet {
+  id: string;
+  apiName: string;
+  label: string;
+  module: string;
+  description: string | null;
+  active: boolean;
+}
+
+export interface ReferenceEntry {
+  id: string;
+  code: string;
+  label: string;
+  sortOrder: number;
+  active: boolean;
+  systemManaged: boolean;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+}
+
+export interface ReferenceEntryMutation {
+  code: string;
+  label: string;
+  sortOrder: number;
+  active: boolean;
+  effectiveFrom?: string | null;
+  effectiveTo?: string | null;
+}
+
 export interface MeResponse {
   user: AuthUser;
   tenant: AuthTenant;
@@ -275,7 +304,7 @@ async function fileRequest(path: string, init?: RequestInit): Promise<Downloaded
   return { blob: await res.blob(), filename };
 }
 
-function queryString(params?: Record<string, string | number | undefined>): string {
+function queryString(params?: Record<string, string | number | boolean | undefined>): string {
   const search = new URLSearchParams();
   Object.entries(params ?? {}).forEach(([key, value]) => {
     if (value !== undefined && `${value}`.trim() !== "") search.set(key, `${value}`);
@@ -332,6 +361,22 @@ export const api = {
 
   deleteMaster(master: string, id: string): Promise<void> {
     return request<void>("DELETE", `/master-data/${encodeURIComponent(master)}/${encodeURIComponent(id)}`);
+  },
+
+  referenceValueSets(): Promise<ReferenceValueSet[]> {
+    return request<ReferenceValueSet[]>("GET", "/reference/value-sets");
+  },
+
+  referenceEntries(apiName: string, includeInactive = true): Promise<ReferenceEntry[]> {
+    return request<ReferenceEntry[]>("GET", `/reference/value-sets/${encodeURIComponent(apiName)}/entries${queryString({ includeInactive })}`);
+  },
+
+  createReferenceEntry(apiName: string, entry: ReferenceEntryMutation): Promise<ReferenceEntry> {
+    return request<ReferenceEntry>("POST", `/reference/value-sets/${encodeURIComponent(apiName)}/entries`, entry);
+  },
+
+  updateReferenceEntry(apiName: string, code: string, entry: ReferenceEntryMutation): Promise<ReferenceEntry> {
+    return request<ReferenceEntry>("PATCH", `/reference/value-sets/${encodeURIComponent(apiName)}/entries/${encodeURIComponent(code)}`, entry);
   },
 
   accounts(params?: ListParams): Promise<PageResult<Account>> {

@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "pipeline_stage")
+@Table(name = "pipeline_stage", schema = "crm")
 public class PipelineStage {
 
     @Id
