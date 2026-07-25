@@ -100,7 +100,7 @@ export const MODULE_GROUPS: ModuleGroup[] = [
       { label: "Leads", labelKey: "nav.module.leads", to: "/leads", icon: LeadsIcon, epic: "E05", status: "partial" },
       { label: "Pipeline", labelKey: "nav.module.pipeline", to: "/pipeline", icon: PipelineIcon, epic: "E06", status: "partial" },
       { label: "Accounts", labelKey: "nav.module.accounts", to: "/accounts", icon: AccountsIcon, epic: "E04", status: "partial" },
-      { label: "Forecast", labelKey: "nav.module.forecast", to: "/forecast", icon: ForecastIcon, epic: "E10", status: "planned" },
+      { label: "Forecast", labelKey: "nav.module.forecast", to: "/forecast", icon: ForecastIcon, epic: "E10", status: "partial" },
     ],
   },
   {
@@ -111,7 +111,7 @@ export const MODULE_GROUPS: ModuleGroup[] = [
       { label: "Products", labelKey: "nav.module.products", to: "/products", icon: ProductIcon, epic: "E08", status: "partial" },
       { label: "Price Books", labelKey: "nav.module.priceBooks", to: "/price-books", icon: ProductIcon, epic: "E08", status: "partial" },
       { label: "Quotes & CPQ", labelKey: "nav.module.quotes", to: "/quotes", icon: QuoteIcon, epic: "E08", status: "partial" },
-      { label: "Contracts", labelKey: "nav.module.contracts", to: "/contracts", icon: ContractIcon, epic: "E09", status: "planned" },
+      { label: "Contracts", labelKey: "nav.module.contracts", to: "/contracts", icon: ContractIcon, epic: "E09", status: "partial" },
     ],
   },
   {
@@ -119,8 +119,8 @@ export const MODULE_GROUPS: ModuleGroup[] = [
     label: "Engage & serve",
     labelKey: "nav.group.engage",
     items: [
-      { label: "Campaigns", labelKey: "nav.module.campaigns", to: "/campaigns", icon: CampaignIcon, epic: "E11", status: "planned" },
-      { label: "Cases", labelKey: "nav.module.cases", to: "/cases", icon: CaseIcon, epic: "E12", status: "planned" },
+      { label: "Campaigns", labelKey: "nav.module.campaigns", to: "/campaigns", icon: CampaignIcon, epic: "E11", status: "partial" },
+      { label: "Cases", labelKey: "nav.module.cases", to: "/cases", icon: CaseIcon, epic: "E12", status: "partial" },
       { label: "Partners", labelKey: "nav.module.partners", to: "/partners", icon: PartnerIcon, epic: "E13", status: "planned" },
     ],
   },
@@ -150,7 +150,7 @@ export const MODULE_GROUPS: ModuleGroup[] = [
       { label: "Reference Data", labelKey: "nav.module.referenceData", to: "/reference-data", icon: ReferenceIcon, epic: "E03", status: "partial", roles: GOVERNANCE_ROLES },
       { label: "Automation", labelKey: "nav.module.automation", to: "/automation", icon: AutomationIcon, epic: "E14", status: "planned", roles: ADMIN_ROLES },
       { label: "Integrations", labelKey: "nav.module.integrations", to: "/integrations", icon: IntegrationIcon, epic: "E17", status: "planned", roles: ADMIN_ROLES },
-      { label: "Migration", labelKey: "nav.module.migration", to: "/migration", icon: MigrationIcon, epic: "E18", status: "planned", roles: ADMIN_ROLES },
+      { label: "Migration", labelKey: "nav.module.migration", to: "/migration", icon: MigrationIcon, epic: "E18", status: "partial", roles: ADMIN_ROLES },
       { label: "Mobile", labelKey: "nav.module.mobile", to: "/mobile", icon: MobileIcon, epic: "E21", status: "planned", roles: ADMIN_ROLES },
     ],
   },

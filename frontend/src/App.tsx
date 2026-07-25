@@ -11,6 +11,7 @@ import { ReportsPage } from "./pages/ReportsPage";
 import { AdminPage } from "./pages/AdminPage";
 import { ActivitiesPage } from "./pages/ActivitiesPage";
 import { CpqPage } from "./pages/CpqPage";
+import { EpicWorkspacePage } from "./pages/EpicWorkspacePage";
 
 export function App() {
   return (
@@ -28,14 +29,19 @@ export function App() {
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/activities" element={<ActivitiesPage />} />
+        <Route path="/forecast" element={<EpicWorkspacePage module="forecast" />} />
         <Route path="/products" element={<CpqPage section="products" />} />
         <Route path="/price-books" element={<CpqPage section="price-books" />} />
         <Route path="/quotes" element={<CpqPage section="quotes" />} />
+        <Route path="/contracts" element={<EpicWorkspacePage module="contracts" />} />
+        <Route path="/campaigns" element={<EpicWorkspacePage module="campaigns" />} />
+        <Route path="/cases" element={<EpicWorkspacePage module="cases" />} />
         {/* Bare /reference-data still resolves; the page redirects it onto the
             first master's canonical /reference-data/:setCode path. */}
         <Route path="/reference-data" element={<ReferenceDataPage />} />
         <Route path="/reference-data/:setCode" element={<ReferenceDataPage />} />
         <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/migration" element={<EpicWorkspacePage module="migration" />} />
         <Route path="/admin/*" element={<AdminPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

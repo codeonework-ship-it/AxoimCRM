@@ -407,6 +407,34 @@ export interface CpqQuoteSummary {
   acceptedRevenue: number;
 }
 
+export interface WorkspaceMetric {
+  label: string;
+  value: string;
+  unit: "money" | "count" | string;
+  tone: "good" | "warn" | "crit" | string;
+}
+
+export interface WorkspaceRow {
+  id: string;
+  code: string;
+  title: string;
+  subtitle: string;
+  status: string;
+  ownerName: string | null;
+  amount: number | null;
+  targetDate: string | null;
+  updatedAt: string | null;
+  metrics: Record<string, unknown>;
+}
+
+export interface WorkspacePage {
+  moduleCode: string;
+  title: string;
+  description: string;
+  summary: WorkspaceMetric[];
+  rows: PageResult<WorkspaceRow>;
+}
+
 /* ------------------------------------------------------------------ */
 /* Errors                                                              */
 /* ------------------------------------------------------------------ */
@@ -827,5 +855,13 @@ export const api = {
 
   cpqQuoteSummary(): Promise<CpqQuoteSummary> {
     return request<CpqQuoteSummary>("GET", "/cpq/quotes/summary");
+  },
+
+  workspace(module: "forecast" | "contracts" | "campaigns" | "cases" | "migration", params?: ListParams & { status?: string }): Promise<WorkspacePage> {
+    return request<WorkspacePage>("GET", `/workspaces/${module}${queryString({
+      page: params?.page ?? 0,
+      search: params?.search,
+      status: params?.status ?? params?.filter,
+    })}`);
   },
 };

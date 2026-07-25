@@ -1965,6 +1965,9 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   font-size:10.5px;
 }
 .cpq-table .chip + .chip { margin-left:6px; }
+.epic-table .chip + .chip { margin:3px 4px 0 0; }
+.epic-head p { max-width:780px; }
+.epic-kpis { margin-bottom:16px; }
 .cpq-mini {
   margin-left:6px;
   color:var(--slate);

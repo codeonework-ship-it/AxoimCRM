@@ -38,4 +38,16 @@ The canonical Compose file builds the Spring Boot API and React web application 
 - Web `/healthz` and `/products` returned HTTP 200.
 - Kafka broker API health command completed successfully.
 
+## 2026-07-25 five-epic workspace verification
+
+- Backend `mvn verify` passed: 128 tests, 0 failures; the existing 8 Docker-gated tenancy integration checks were skipped by their environment gate.
+- Frontend `npm run build` passed: TypeScript and Vite production build.
+- Docker Compose rebuild passed for API and web; PostgreSQL, Kafka, API and web containers are healthy.
+- Flyway `V93__five_epic_operational_workspaces` applied successfully.
+- Seed verification passed: 3 contracts, 3 forecast submissions, 3 campaigns, 3 cases and 3 import batches.
+- Authenticated workspace API smoke passed for `GET /api/v1/workspaces/contracts`, `/forecast`, `/campaigns`, `/cases` and `/migration`; each response uses the shared 100-row server pagination contract. Positive status-filter checks returned seeded rows across all five modules.
+- Web routes `/contracts`, `/forecast`, `/campaigns`, `/cases` and `/migration` returned HTTP 200 through the nginx SPA fallback.
+- CORS preflight for `Origin: http://localhost:4280` returned explicit allow-origin, methods and authorization-header access.
+- Kafka broker API health command completed successfully.
+
 Docker Hub pulls were blocked on this workstation by Docker Desktop's internal HTTPS proxy. Local runtime images plus PostgreSQL 16 and Kafka 3.7 were used for this workstation's live verification only; that private recovery override is deliberately not part of the repository. The canonical, reproducible Compose definition and version targets remain unchanged and are the CI/release contract.

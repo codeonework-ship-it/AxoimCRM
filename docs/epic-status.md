@@ -16,23 +16,23 @@ _Last updated: 2026-07-25_
 | E06 | Opportunity and pipeline management | 🟡 | R1 | Opportunity lifecycle now includes multi-pipeline metadata, stage gates, line items, revenue splits, risk signals, slippage/movement, closure reasons and movement history foundations |
 | E07 | Activity, email and calendar engagement | 🟡 | R2 | First-party tasks, events, calls, notes, manual email logs and unified activity timeline are implemented. Microsoft/Google/telephony connector capture remains intentionally pending |
 | E08 | Products, price books, quotes and CPQ | 🟡 | R2 | CPQ database foundation, tenant seed data, read-side product/price-book/quote APIs, server-side search/filtering/100-row pagination, quote summary metrics and React commerce workspaces are implemented. Quote authoring, generated document lifecycle and external e-sign vendor integrations remain intentionally pending |
-| E09 | Contracts, orders, subscriptions and renewals | ⛔ | R3 | |
-| E10 | Forecasting and revenue intelligence | ⛔ | R2 | |
-| E11 | Campaigns, segments and marketing alignment | ⛔ | R3 | |
-| E12 | Cases, entitlements and SLA management | ⛔ | R3 | |
+| E09 | Contracts, orders, subscriptions and renewals | 🟡 | R3 | Contract/order/subscription schemas, tenant RLS, seed data and the `/contracts` read workspace are implemented with renewal-risk summary metrics |
+| E10 | Forecasting and revenue intelligence | 🟡 | R2 | Forecast periods, submissions, snapshots, tenant seed data and the `/forecast` read workspace are implemented with submitted/weighted/risk metrics |
+| E11 | Campaigns, segments and marketing alignment | 🟡 | R3 | Campaign, segment and member schemas, tenant seed data and the `/campaigns` read workspace are implemented with influenced pipeline, budget and response metrics |
+| E12 | Cases, entitlements and SLA management | 🟡 | R3 | Entitlements, cases, SLA milestones, tenant seed data and the `/cases` read workspace are implemented with open/escalated/missed-SLA metrics |
 | E13 | Partner, channel and territory management | ⛔ | R4 | |
 | E14 | Workflow automation, approvals and rules engine | ⛔ | R1 (partial) | Engine + approvals in R1; visual builder and simulation in R2 |
 | E15 | Reporting, dashboards and analytics | ⛔ | R2 | |
 | E16 | AI copilot and agentic assistance | ⛔ | R2 (P0 slice) | Deliberately after E02 — permission-scoped grounding needs the sharing model first |
 | E17 | Integration platform, APIs, webhooks and events | 🟡 | R2 | Outbox/Kafka relay, OpenAPI document, Prometheus metrics exposure, service credentials and SCIM service-token foundations are implemented. External webhooks/connectors remain pending |
-| E18 | Data migration and onboarding | ⛔ | R2 | |
+| E18 | Data migration and onboarding | 🟡 | R2 | Import templates, batches, validation errors, tenant seed data and the `/migration` read workspace are implemented. Third-party source connectors remain intentionally pending |
 | E19 | Administration, configuration, sandbox and release | ⛔ | R1 (partial) | Custom objects/layouts/import in R1; sandbox + promotion in R2 |
 | E20 | Audit, compliance, observability and governance | 🟡 | R1 (partial) | Tamper-evident audit chain, read/export/authentication audit, field history, retention/legal hold, DSR, consent withdrawal, encryption posture, tenant export, evidence packs, SLI and usage telemetry are implemented |
 | E21 | Mobile and offline field access | ⛔ | R3 | Responsive-UI P0 story lands with R2 |
 | E22 | BFSI vertical pack | ⛔ | R4 | Gated on the pack framework proving out against a stable core |
 | E23 | Commodity trading vertical pack | ⛔ | R4 | Origination only; CTRM connector contract per [system design §11](architecture/system-design.md#11-integration-architecture-and-the-ctrm-connector) |
 
-**0 / 23 epics completed · 12 partial (walking vertical slice) · 11 not started.**
+**0 / 23 epics completed · 17 partial (walking vertical slice) · 6 not started.**
 
 ## 2026-07-25 implementation increment
 
@@ -48,6 +48,7 @@ The current runnable slice now includes these additional partial deliveries:
 - **E07:** first-party activity timeline is implemented with tenant-scoped tasks, events, calls, notes and manual email logs; activity creation/completion writes audit/outbox events and reminder notifications.
 - **E01/E02/E03/E04/E05/E06/E17/E20:** scanned and integrated the larger security, identity, org-data, account, lead, pipeline, audit/compliance and observability implementation set; compilation blockers, consent-DSR service wiring, migration constraints and runtime actuator exposure were hardened.
 - **E08:** CPQ product/price-book/quote schema foundation and governed CPQ reference values are implemented through `V90`; `V91` seeds product catalogue, active price books, quote transactions, approvals, templates and guided selling prompts. `/api/v1/cpq/products`, `/api/v1/cpq/price-books`, `/api/v1/cpq/quotes` and `/api/v1/cpq/quotes/summary` now back the `/products`, `/price-books` and `/quotes` workspaces with 100-row server pagination. Quote authoring and quote/e-sign vendor integrations remain intentionally pending.
+- **E09/E10/E11/E12/E18:** five additional operational workspaces are implemented through `V93` with module schemas, tenant RLS, composite foreign keys, seed data, Spring read APIs, React navigation/routes and 100-row server pagination. `/contracts`, `/forecast`, `/campaigns`, `/cases` and `/migration` now run against live Docker data. Vendor/third-party connectors and write-heavy workflows remain intentionally pending per the current integration boundary.
 
 ## Skeleton work in detail
 
