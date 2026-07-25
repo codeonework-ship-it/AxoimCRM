@@ -91,8 +91,10 @@ export function LeadsPage() {
       </select></label>
       <button className="btn btn-sm" onClick={resetFilters} disabled={!search && !statusFilter}>Reset</button>
     </section>
-    <MasterToolbar master="leads" entityType="LEAD" search={search} filter={statusFilter} grouped={grouped} groupLabel="Status" onToggleGroup={() => setGrouped((value) => !value)} onChanged={() => void leadsQ.refetch()} />
-    <DataViewFrame title="Lead queue">
+    <DataViewFrame
+      title="Lead queue"
+      actions={<MasterToolbar master="leads" entityType="LEAD" search={search} filter={statusFilter} grouped={grouped} groupLabel="Status" onToggleGroup={() => setGrouped((value) => !value)} onChanged={() => void leadsQ.refetch()} />}
+    >
       {leadsQ.isLoading && <GridLoader label="Reading lead queue" rows={6} columns={4} />}
       {leadsQ.isError && <p className="empty-note">Leads failed to load{leadsQ.error instanceof Error ? `: ${leadsQ.error.message}` : "."}</p>}
       {leadsQ.isSuccess && leads.length === 0 && <p className="empty-note">No leads match the current query.</p>}

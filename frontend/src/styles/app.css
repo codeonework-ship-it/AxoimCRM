@@ -1394,6 +1394,19 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   background:color-mix(in srgb,var(--paper-raised) 92%,transparent);
 }
 .master-toolbar .btn.active { border-color:var(--ion-600); color:var(--ion-600); background:var(--ion-100); }
+.data-grid-toolbar {
+  margin:0;
+}
+.data-view-actions .data-grid-toolbar {
+  max-width:100%;
+  padding:0;
+  border:0;
+  background:transparent;
+}
+.data-view-actions .data-grid-toolbar .cpq-note {
+  align-self:center;
+  white-space:nowrap;
+}
 .toolbar-divider { width:1px; height:24px; margin:0 2px; background:var(--line); }
 .table-action { width:92px; text-align:right!important; }
 .danger-link { color:var(--crit)!important; }
@@ -1543,6 +1556,7 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   gap:8px;
   flex-wrap:wrap;
   justify-content:flex-end;
+  min-width:min(740px,100%);
 }
 
 .data-view-body {
@@ -1762,6 +1776,10 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   .data-view-actions {
     width:100%;
     justify-content:flex-start;
+    min-width:0;
+  }
+  .data-view-actions .data-grid-toolbar {
+    width:100%;
   }
   .admin-form,
   .alert-config-grid,

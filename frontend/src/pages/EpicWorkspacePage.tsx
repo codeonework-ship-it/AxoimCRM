@@ -1,6 +1,7 @@
 import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isUnreachable, type DownloadedFile, type WorkspaceRow } from "../api/client";
+import { AuditDrawer } from "../components/AuditDrawer";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataViewFrame } from "../components/DataViewFrame";
 import { GridLoader } from "../components/Loaders";
@@ -69,6 +70,7 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [grouped, setGrouped] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
   const toasts = useToasts();
   const queryClient = useQueryClient();
   const workspaceQ = useQuery({
@@ -147,17 +149,20 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
       <button className="btn btn-sm" onClick={() => { setSearch(""); setStatus(""); setPage(0); }} disabled={!search && !status}>Reset</button>
     </section>
 
-    <div className="master-toolbar" role="toolbar" aria-label={`${titleFromModule(module)} data tools`}>
-      <button className={`btn btn-sm${grouped ? " active" : ""}`} aria-pressed={grouped} onClick={() => setGrouped((value) => !value)}>
-        Group: {grouped ? "Status" : "Off"}
-      </button>
-      <span className="toolbar-divider" aria-hidden />
-      <button className="btn btn-sm" onClick={() => void download("XLSX", "Excel export")}>Export Excel</button>
-      <button className="btn btn-sm" onClick={() => void download("DOCX", "Word export")}>Export Word</button>
-      <button className="btn btn-sm" onClick={() => void download("PDF", "PDF export")}>Export PDF</button>
-    </div>
-
-    <DataViewFrame title={`${workspace?.title ?? titleFromModule(module)} register`} actions={<span className="cpq-note">100 rows/page - tenant/RLS governed</span>}>
+    <DataViewFrame
+      title={`${workspace?.title ?? titleFromModule(module)} register`}
+      actions={<div className="master-toolbar data-grid-toolbar" role="toolbar" aria-label={`${titleFromModule(module)} data tools`}>
+        <button className={`btn btn-sm${grouped ? " active" : ""}`} aria-pressed={grouped} onClick={() => setGrouped((value) => !value)}>
+          Group: {grouped ? "Status" : "Off"}
+        </button>
+        <button className="btn btn-sm" onClick={() => setAuditOpen(true)}>Audit</button>
+        <span className="toolbar-divider" aria-hidden />
+        <button className="btn btn-sm" onClick={() => void download("XLSX", "Export Excel")}>Export Excel</button>
+        <button className="btn btn-sm" onClick={() => void download("DOCX", "Export Word")}>Export Word</button>
+        <button className="btn btn-sm" onClick={() => void download("PDF", "Export PDF")}>Export PDF</button>
+        <span className="cpq-note">100 rows/page - tenant/RLS governed</span>
+      </div>}
+    >
       {workspaceQ.isLoading && <GridLoader label="Reading operational workspace" rows={6} columns={6} />}
       {workspaceQ.isError && <p className="empty-note">Workspace failed to load{workspaceQ.error instanceof Error ? `: ${workspaceQ.error.message}` : "."}</p>}
       {workspaceQ.isSuccess && <WorkspaceTable rows={visibleRows} grouped={grouped} module={module} busyId={actionMutation.variables?.id} onAction={(row) => actionMutation.mutate(row)} />}
@@ -170,6 +175,13 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
         </div>
       </footer>}
     </DataViewFrame>
+    <AuditDrawer
+      open={auditOpen}
+      entityType={auditEntityFor(module)}
+      title={`${titleFromModule(module)} audit`}
+      emptyLabel="No audited actions for this workspace yet."
+      onClose={() => setAuditOpen(false)}
+    />
   </>;
 }
 
@@ -295,6 +307,27 @@ function titleFromModule(module: WorkspaceModule): string {
   if (module === "sandbox") return "Sandbox & Release";
   if (module === "audit") return "Audit & Compliance";
   return module === "forecast" ? "Forecast" : module === "migration" ? "Migration" : module.charAt(0).toUpperCase() + module.slice(1);
+}
+
+function auditEntityFor(module: WorkspaceModule): string {
+  const map: Record<WorkspaceModule, string> = {
+    forecast: "FORECAST_SUBMISSION",
+    contracts: "CONTRACT",
+    campaigns: "CAMPAIGN",
+    cases: "CASE",
+    migration: "IMPORT_BATCH",
+    partners: "PARTNER_ACCOUNT",
+    automation: "AUTOMATION_RULE",
+    analytics: "ANALYTICS_DASHBOARD",
+    copilot: "COPILOT_RECOMMENDATION",
+    mobile: "DEVICE_SESSION",
+    integrations: "INTEGRATION_CONTRACT",
+    sandbox: "SANDBOX",
+    audit: "AUDIT_EVIDENCE_PACK",
+    bfsi: "BFSI_ONBOARDING",
+    commodity: "COMMODITY_ENQUIRY",
+  };
+  return map[module];
 }
 
 function statusClass(status: string): string {

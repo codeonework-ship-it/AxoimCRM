@@ -70,8 +70,10 @@ export function AccountsPage() {
       <label><span>Industry filter</span><input value={industryFilter} onChange={(event) => updateIndustry(event.target.value)} placeholder="Exact industry" /></label>
       <button className="btn btn-sm" onClick={resetFilters} disabled={!search && !industryFilter}>Reset</button>
     </section>
-    <MasterToolbar master="accounts" entityType="ACCOUNT" search={search} filter={industryFilter} grouped={grouped} groupLabel="Industry" onToggleGroup={() => setGrouped((value) => !value)} onChanged={() => void accountsQ.refetch()} />
-    <DataViewFrame title="Accounts results">
+    <DataViewFrame
+      title="Accounts results"
+      actions={<MasterToolbar master="accounts" entityType="ACCOUNT" search={search} filter={industryFilter} grouped={grouped} groupLabel="Industry" onToggleGroup={() => setGrouped((value) => !value)} onChanged={() => void accountsQ.refetch()} />}
+    >
       {accountsQ.isLoading && <GridLoader label="Reading client register" rows={6} columns={4} />}
       {accountsQ.isError && <p className="empty-note">Accounts failed to load{accountsQ.error instanceof Error ? `: ${accountsQ.error.message}` : "."}</p>}
       {accountsQ.isSuccess && <div className="table-wrap"><table className="data-table"><thead><tr><th>Name</th><th>Industry</th><th>Owner</th><th className="table-action">Action</th></tr></thead>

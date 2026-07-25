@@ -133,4 +133,10 @@ The canonical Compose file builds the Spring Boot API and React web application 
   - `POST /workspaces/audit/{id}/export` returned `EXPORTED` and marked the evidence pack for secure download.
   - `POST /workspaces/commodity/{id}/offer` returned `OFFERED` after credit exposure and approved term-sheet validation passed.
 
+## 2026-07-25 Data Grid utility-frame verification
+
+- Frontend `npm run build` passed after moving Group, Audit, Export Excel, Export Word and Export PDF controls into the Data Grid frame header for Accounts, Leads and all epic workspaces.
+- The grid Full size/Restore control remains in the same sticky header, so users retain the whole utility set while reviewing expanded tables.
+- Audit drawers now use a shared reusable component and are scoped by the active grid entity type, keeping master and workspace evidence access consistent.
+
 Docker Hub pulls were blocked on this workstation by Docker Desktop's internal HTTPS proxy. Local runtime images plus PostgreSQL 16 and Kafka 3.7 were used for this workstation's live verification only; that private recovery override is deliberately not part of the repository. The canonical, reproducible Compose definition and version targets remain unchanged and are the CI/release contract.
