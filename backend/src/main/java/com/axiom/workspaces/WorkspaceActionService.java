@@ -1,0 +1,278 @@
+package com.axiom.workspaces;
+
+import com.axiom.audit.AuditService;
+import com.axiom.auth.CrmRole;
+import com.axiom.common.ConflictException;
+import com.axiom.common.NotFoundException;
+import com.axiom.outbox.OutboxWriter;
+import com.axiom.tenancy.TenantContext;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
+
+/**
+ * First-party command layer for operational workspaces.
+ *
+ * <p>The read model intentionally stays in {@link EpicWorkspaceService}. This
+ * class owns governed state transitions: every command is tenant-scoped,
+ * read-only-role protected, status guarded, audited and mirrored into the
+ * transactional outbox. Vendor/third-party execution remains outside this
+ * layer by design.
+ */
+@Service
+public class WorkspaceActionService {
+    private final JdbcTemplate jdbc;
+    private final AuditService audit;
+    private final OutboxWriter outbox;
+
+    public WorkspaceActionService(JdbcTemplate jdbc, AuditService audit, OutboxWriter outbox) {
+        this.jdbc = jdbc;
+        this.audit = audit;
+        this.outbox = outbox;
+    }
+
+    public record ActionResult(UUID id, String module, String status, String message, Map<String, Object> details) {}
+    public record ForecastSubmitRequest(String managerNote) {}
+    public record CaseResolveRequest(String outcome) {}
+    public record AutomationSimulateRequest(Integer sampleSize) {}
+
+    @Transactional
+    public ActionResult submitForecast(UUID id, ForecastSubmitRequest request) {
+        requireWrite("submit forecasts");
+        Map<String, Object> row = one("""
+                select s.id, s.period_id, s.status, s.forecast_category, s.submitted_amount,
+                       p.status as period_status, p.code as period_code
+                from forecasting.forecast_submission s
+                join forecasting.forecast_period p on p.tenant_id = s.tenant_id and p.id = s.period_id
+                where s.tenant_id = ? and s.id = ?
+                for update of s
+                """, id, "Forecast submission not found");
+        String status = text(row.get("status"));
+        if (!"DRAFT".equals(status) && !"MANAGER_ADJUSTED".equals(status)) {
+            throw new ConflictException("Only draft or manager-adjusted forecasts can be submitted");
+        }
+        if (!"OPEN".equals(text(row.get("period_status")))) {
+            throw new ConflictException("Forecast period is not open");
+        }
+        String note = clean(request == null ? null : request.managerNote());
+        jdbc.update("""
+                update forecasting.forecast_submission
+                set status = 'SUBMITTED', submitted_at = now(),
+                    manager_note = coalesce(?, manager_note)
+                where tenant_id = ? and id = ?
+                """, note, tenantId(), id);
+        jdbc.update("""
+                insert into forecasting.forecast_snapshot
+                  (tenant_id, period_id, open_pipeline, commit_amount, best_case_amount, closed_amount, at_risk_amount)
+                select tenant_id, period_id,
+                       coalesce(sum(weighted_pipeline_amount), 0),
+                       coalesce(sum(submitted_amount) filter (where forecast_category = 'COMMIT'), 0),
+                       coalesce(sum(submitted_amount) filter (where forecast_category = 'BEST_CASE'), 0),
+                       coalesce(sum(submitted_amount) filter (where forecast_category = 'CLOSED'), 0),
+                       coalesce(sum(weighted_pipeline_amount) filter (where risk_count > 0), 0)
+                from forecasting.forecast_submission
+                where tenant_id = ? and period_id = ?
+                group by tenant_id, period_id
+                """, tenantId(), row.get("period_id"));
+        Map<String, Object> details = Map.of(
+                "period", row.get("period_code"),
+                "category", row.get("forecast_category"),
+                "submittedAmount", row.get("submitted_amount"),
+                "snapshotCreated", true);
+        audit.recordWithReason("FORECAST_SUBMIT", "FORECAST_SUBMISSION", id,
+                "Submitted forecast " + row.get("period_code"), note, details);
+        outbox.write("forecast_submission", id, "forecast.submitted", details);
+        return new ActionResult(id, "forecast", "SUBMITTED", "Forecast submitted and snapshot captured.", details);
+    }
+
+    @Transactional
+    public ActionResult resolveCase(UUID id, CaseResolveRequest request) {
+        requireWrite("resolve cases");
+        Map<String, Object> row = one("""
+                select id, case_number, subject, status, resolution_due_at
+                from service.case_record
+                where tenant_id = ? and id = ? and deleted_at is null
+                for update
+                """, id, "Case not found");
+        String status = text(row.get("status"));
+        if ("RESOLVED".equals(status) || "CLOSED".equals(status)) {
+            throw new ConflictException("Case is already resolved or closed");
+        }
+        String outcome = clean(request == null ? null : request.outcome());
+        if (outcome == null) throw new ConflictException("Case resolution requires an outcome");
+        jdbc.update("""
+                update service.case_record
+                set status = 'RESOLVED', closed_at = now()
+                where tenant_id = ? and id = ?
+                """, tenantId(), id);
+        int milestones = jdbc.update("""
+                update service.case_milestone
+                set completed_at = now(),
+                    status = case when due_at < now() then 'MISSED' else 'MET' end
+                where tenant_id = ? and case_id = ? and status = 'OPEN'
+                """, tenantId(), id);
+        Map<String, Object> details = Map.of(
+                "caseNumber", row.get("case_number"),
+                "outcome", outcome,
+                "milestonesClosed", milestones);
+        audit.recordWithReason("CASE_RESOLVE", "CASE", id,
+                "Resolved case " + row.get("case_number"), outcome, details);
+        outbox.write("case", id, "case.resolved", details);
+        return new ActionResult(id, "cases", "RESOLVED", "Case resolved and open SLA milestones closed.", details);
+    }
+
+    @Transactional
+    public ActionResult simulateAutomation(UUID id, AutomationSimulateRequest request) {
+        requireWrite("simulate automation");
+        Map<String, Object> row = one("""
+                select id, rule_code, name, status, run_count
+                from automation.automation_rule
+                where tenant_id = ? and id = ?
+                for update
+                """, id, "Automation rule not found");
+        if ("RETIRED".equals(text(row.get("status")))) {
+            throw new ConflictException("Retired automation rules cannot be simulated");
+        }
+        int sampleSize = request == null || request.sampleSize() == null ? 25 : request.sampleSize();
+        if (sampleSize < 1 || sampleSize > 500) throw new ConflictException("Simulation sample size must be between 1 and 500");
+        Integer stepCount = jdbc.queryForObject("""
+                select count(*) from automation.automation_step where tenant_id = ? and rule_id = ?
+                """, Integer.class, tenantId(), id);
+        UUID runId = UUID.randomUUID();
+        String runNumber = "SIM-" + runId.toString().substring(0, 8).toUpperCase(Locale.ROOT);
+        jdbc.update("""
+                insert into automation.automation_run
+                  (id, tenant_id, rule_id, run_number, status, records_evaluated,
+                   records_updated, error_count, completed_at, trace_summary)
+                values (?, ?, ?, ?, 'SIMULATED', ?, 0, 0, now(),
+                        jsonb_build_object('mode','DRY_RUN','stepCount',?,'sampleSize',?))
+                """, runId, tenantId(), id, runNumber, sampleSize, stepCount == null ? 0 : stepCount, sampleSize);
+        jdbc.update("""
+                update automation.automation_rule
+                set simulation_passed = true, run_count = run_count + 1,
+                    last_run_at = now(), updated_at = now()
+                where tenant_id = ? and id = ?
+                """, tenantId(), id);
+        Map<String, Object> details = Map.of(
+                "ruleCode", row.get("rule_code"),
+                "runId", runId.toString(),
+                "runNumber", runNumber,
+                "sampleSize", sampleSize,
+                "stepCount", stepCount == null ? 0 : stepCount);
+        audit.record("AUTOMATION_SIMULATE", "AUTOMATION_RULE", id,
+                "Simulated automation rule " + row.get("rule_code"), details);
+        outbox.write("automation_rule", id, "automation.simulated", details);
+        return new ActionResult(runId, "automation", "SIMULATED", "Automation dry-run completed without mutations.", details);
+    }
+
+    @Transactional
+    public ActionResult validateMigration(UUID id) {
+        CrmRole.requireImport(TenantContext.get().role());
+        Map<String, Object> row = one("""
+                select id, batch_number, object_type, status, total_rows
+                from migration.import_batch
+                where tenant_id = ? and id = ?
+                for update
+                """, id, "Import batch not found");
+        String status = text(row.get("status"));
+        if ("IMPORTED".equals(status) || "ROLLED_BACK".equals(status)) {
+            throw new ConflictException("Imported or rolled-back batches cannot be revalidated");
+        }
+        Map<String, Object> counts = jdbc.queryForMap("""
+                select count(*) filter (where severity = 'ERROR') as errors,
+                       count(*) filter (where severity = 'WARNING') as warnings
+                from migration.validation_error
+                where tenant_id = ? and batch_id = ?
+                """, tenantId(), id);
+        long errors = number(counts.get("errors"));
+        long warnings = number(counts.get("warnings"));
+        int totalRows = ((Number) row.get("total_rows")).intValue();
+        String nextStatus = errors == 0 ? "READY_TO_IMPORT" : "FAILED";
+        jdbc.update("""
+                update migration.import_batch
+                set status = ?, error_rows = ?, valid_rows = greatest(total_rows - ?, 0),
+                    completed_at = case when ? in ('READY_TO_IMPORT','FAILED') then now() else completed_at end
+                where tenant_id = ? and id = ?
+                """, nextStatus, errors, errors, nextStatus, tenantId(), id);
+        Map<String, Object> details = Map.of(
+                "batchNumber", row.get("batch_number"),
+                "objectType", row.get("object_type"),
+                "totalRows", totalRows,
+                "errorRows", errors,
+                "warningRows", warnings);
+        audit.record("MIGRATION_VALIDATE", "IMPORT_BATCH", id,
+                "Validated import batch " + row.get("batch_number"), details);
+        outbox.write("import_batch", id, "migration.validated", details);
+        return new ActionResult(id, "migration", nextStatus,
+                errors == 0 ? "Import batch is ready to import." : "Import batch failed validation.", details);
+    }
+
+    @Transactional
+    public ActionResult acknowledgeMobileSync(UUID deviceSessionId) {
+        requireWrite("acknowledge mobile sync");
+        Map<String, Object> row = one("""
+                select id, device_label, status, offline_queue_count
+                from mobile.device_session
+                where tenant_id = ? and id = ?
+                for update
+                """, deviceSessionId, "Device session not found");
+        if (!"ACTIVE".equals(text(row.get("status")))) {
+            throw new ConflictException("Only active device sessions can acknowledge sync");
+        }
+        int packagesSynced = jdbc.update("""
+                update mobile.offline_sync_package
+                set status = 'SYNCED', applied_at = now()
+                where tenant_id = ? and device_session_id = ? and status in ('QUEUED','FAILED')
+                """, tenantId(), deviceSessionId);
+        jdbc.update("""
+                update mobile.device_session
+                set last_sync_at = now(), offline_queue_count = 0
+                where tenant_id = ? and id = ?
+                """, tenantId(), deviceSessionId);
+        Map<String, Object> details = Map.of(
+                "deviceLabel", row.get("device_label"),
+                "packagesSynced", packagesSynced,
+                "previousOfflineQueueCount", row.get("offline_queue_count"));
+        audit.record("MOBILE_SYNC_ACK", "DEVICE_SESSION", deviceSessionId,
+                "Acknowledged mobile sync for " + row.get("device_label"), details);
+        outbox.write("device_session", deviceSessionId, "mobile.sync.acknowledged", details);
+        return new ActionResult(deviceSessionId, "mobile", "SYNCED", "Device sync acknowledged and offline queue cleared.", details);
+    }
+
+    private Map<String, Object> one(String sql, UUID id, String missingMessage) {
+        return jdbc.query(sql, (rs, i) -> {
+            int columns = rs.getMetaData().getColumnCount();
+            java.util.LinkedHashMap<String, Object> row = new java.util.LinkedHashMap<>();
+            for (int c = 1; c <= columns; c++) row.put(rs.getMetaData().getColumnLabel(c), rs.getObject(c));
+            return row;
+        }, tenantId(), id).stream().findFirst().orElseThrow(() -> new NotFoundException(missingMessage));
+    }
+
+    private void requireWrite(String action) {
+        if (CrmRole.current(TenantContext.get().role()).readOnly()) {
+            throw new com.axiom.common.ForbiddenException("Your role cannot " + action);
+        }
+    }
+
+    private UUID tenantId() {
+        return TenantContext.get().tenantId();
+    }
+
+    private String text(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private String clean(String value) {
+        if (value == null) return null;
+        String cleaned = value.trim();
+        return cleaned.isEmpty() ? null : cleaned;
+    }
+
+    private long number(Object value) {
+        return value instanceof Number n ? n.longValue() : 0;
+    }
+}

@@ -95,4 +95,17 @@ The canonical Compose file builds the Spring Boot API and React web application 
 - Lead disqualification smoke passed: `POST /api/v1/leads/{id}/disqualify` accepted governed reason `NOT_A_FIT`, wrote a future recycle date of `2026-08-15`, and returned status `DISQUALIFIED`.
 - CPQ quote document smoke passed: `GET /api/v1/cpq/quotes/{id}/download?format=PDF`, `DOCX` and `XLSX` each returned HTTP 200 with non-zero payloads and the expected attachment content types.
 
+## 2026-07-25 workspace command action verification
+
+- Backend `mvn verify` passed after adding the shared workspace command layer.
+- Frontend `npm run build` passed after adding row-level action controls to the shared operational workspace page.
+- Canonical `docker compose build --pull=false api web` was attempted, but Docker Desktop again failed while resolving Docker Hub base image metadata through its local HTTPS proxy. The patched API and web images were rebuilt locally from the previous runtime images by copying in the freshly verified Spring Boot JAR and Vite `dist` bundle.
+- PostgreSQL 17, Kafka 3.7, patched API and patched web containers are healthy.
+- Authenticated same-origin action smoke passed through `http://localhost:4280/api/v1`:
+  - `POST /workspaces/forecast/{id}/submit` returned `SUBMITTED` and captured a forecast snapshot.
+  - `POST /workspaces/cases/{id}/resolve` returned `RESOLVED` and closed open SLA milestones.
+  - `POST /workspaces/automation/{id}/simulate` returned `SIMULATED` and created a dry-run trace.
+  - `POST /workspaces/migration/{id}/validate` returned validation status based on recorded validation errors.
+  - `POST /workspaces/mobile/{id}/sync` returned `SYNCED` and cleared the offline queue.
+
 Docker Hub pulls were blocked on this workstation by Docker Desktop's internal HTTPS proxy. Local runtime images plus PostgreSQL 16 and Kafka 3.7 were used for this workstation's live verification only; that private recovery override is deliberately not part of the repository. The canonical, reproducible Compose definition and version targets remain unchanged and are the CI/release contract.

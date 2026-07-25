@@ -1,5 +1,5 @@
 import { Fragment, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isUnreachable, type DownloadedFile, type WorkspaceRow } from "../api/client";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataViewFrame } from "../components/DataViewFrame";
@@ -70,10 +70,20 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
   const [status, setStatus] = useState("");
   const [grouped, setGrouped] = useState(false);
   const toasts = useToasts();
+  const queryClient = useQueryClient();
   const workspaceQ = useQuery({
     queryKey: ["workspace", module, page, search, status],
     queryFn: () => api.workspace(module, { page, search, status }),
     retry: 1,
+  });
+  const actionMutation = useMutation({
+    mutationFn: (row: WorkspaceRow) => runWorkspaceAction(module, row),
+    onSuccess: (result) => {
+      toasts.push("info", "Workspace action complete", result.message);
+      void queryClient.invalidateQueries({ queryKey: ["workspace", module] });
+      void queryClient.invalidateQueries({ queryKey: ["audit"] });
+    },
+    onError: (error) => toasts.push("error", "Workspace action failed", error instanceof Error ? error.message : "Action failed."),
   });
 
   if (isUnreachable(workspaceQ.error)) {
@@ -150,7 +160,7 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
     <DataViewFrame title={`${workspace?.title ?? titleFromModule(module)} register`} actions={<span className="cpq-note">100 rows/page - tenant/RLS governed</span>}>
       {workspaceQ.isLoading && <GridLoader label="Reading operational workspace" rows={6} columns={6} />}
       {workspaceQ.isError && <p className="empty-note">Workspace failed to load{workspaceQ.error instanceof Error ? `: ${workspaceQ.error.message}` : "."}</p>}
-      {workspaceQ.isSuccess && <WorkspaceTable rows={visibleRows} grouped={grouped} />}
+      {workspaceQ.isSuccess && <WorkspaceTable rows={visibleRows} grouped={grouped} module={module} busyId={actionMutation.variables?.id} onAction={(row) => actionMutation.mutate(row)} />}
       {workspaceQ.isSuccess && <footer className="page-controls" aria-label="Workspace pagination">
         <span>Showing {visibleRows.length} of {total} records - 100 rows per page</span>
         <div>
@@ -163,16 +173,17 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
   </>;
 }
 
-function WorkspaceTable({ rows, grouped }: { rows: WorkspaceRow[]; grouped: boolean }) {
+function WorkspaceTable({ rows, grouped, module, busyId, onAction }: { rows: WorkspaceRow[]; grouped: boolean; module: WorkspaceModule; busyId?: string; onAction: (row: WorkspaceRow) => void }) {
   let previousStatus = "";
   return <div className="table-wrap"><table className="data-table cpq-table epic-table">
-    <thead><tr><th>Code</th><th>Record</th><th>Owner</th><th>Amount</th><th>Target</th><th>Status</th><th>Signals</th></tr></thead>
+    <thead><tr><th>Code</th><th>Record</th><th>Owner</th><th>Amount</th><th>Target</th><th>Status</th><th>Signals</th><th>Action</th></tr></thead>
     <tbody>
       {rows.map((row) => {
         const showGroup = grouped && row.status !== previousStatus;
         previousStatus = row.status;
+        const action = actionFor(module, row);
         return <Fragment key={row.id}>
-          {showGroup && <tr className="group-row"><th colSpan={7}>{row.status}</th></tr>}
+          {showGroup && <tr className="group-row"><th colSpan={8}>{row.status}</th></tr>}
           <tr>
             <td className="mono">{row.code}</td>
             <td>{row.title}<small>{row.subtitle}</small></td>
@@ -181,12 +192,45 @@ function WorkspaceTable({ rows, grouped }: { rows: WorkspaceRow[]; grouped: bool
             <td>{formatDate(row.targetDate)}</td>
             <td><span className={`chip ${statusClass(row.status)}`}>{row.status}</span><small>Updated {formatDate(row.updatedAt)}</small></td>
             <td>{Object.entries(row.metrics ?? {}).slice(0, 3).map(([key, value]) => <span className="chip cpq-mini" key={key}>{humanize(key)}: {String(value)}</span>)}</td>
+            <td className="table-action">{action
+              ? <button className="btn btn-sm" disabled={busyId === row.id} onClick={() => onAction(row)}>{busyId === row.id ? "Working..." : action}</button>
+              : <span className="empty-note">No action</span>}</td>
           </tr>
         </Fragment>;
       })}
-      {rows.length === 0 && <tr><td colSpan={7} className="empty-note">No records match the current query.</td></tr>}
+      {rows.length === 0 && <tr><td colSpan={8} className="empty-note">No records match the current query.</td></tr>}
     </tbody>
   </table></div>;
+}
+
+function actionFor(module: WorkspaceModule, row: WorkspaceRow): string | null {
+  if (module === "forecast" && ["DRAFT", "MANAGER_ADJUSTED"].includes(row.status)) return "Submit";
+  if (module === "cases" && !["RESOLVED", "CLOSED"].includes(row.status)) return "Resolve";
+  if (module === "automation" && row.status !== "RETIRED") return "Simulate";
+  if (module === "migration" && !["IMPORTED", "ROLLED_BACK"].includes(row.status)) return "Validate";
+  if (module === "mobile" && row.status === "ACTIVE") return "Ack sync";
+  return null;
+}
+
+async function runWorkspaceAction(module: WorkspaceModule, row: WorkspaceRow) {
+  if (module === "forecast") {
+    const note = window.prompt(`Submit forecast ${row.code}? Optional manager note`, "");
+    return api.submitForecast(row.id, note ?? undefined);
+  }
+  if (module === "cases") {
+    const outcome = window.prompt(`Resolve case ${row.code}. Outcome`, "Resolved after operator review.");
+    if (!outcome) throw new Error("Case resolution outcome is required.");
+    return api.resolveCase(row.id, outcome);
+  }
+  if (module === "automation") {
+    const raw = window.prompt(`Simulation sample size for ${row.code}`, "25");
+    const sampleSize = Number(raw || 25);
+    if (!Number.isFinite(sampleSize)) throw new Error("Simulation sample size must be numeric.");
+    return api.simulateAutomation(row.id, sampleSize);
+  }
+  if (module === "migration") return api.validateMigration(row.id);
+  if (module === "mobile") return api.acknowledgeMobileSync(row.id);
+  throw new Error("No governed action is available for this workspace.");
 }
 
 function saveFile(file: DownloadedFile) {

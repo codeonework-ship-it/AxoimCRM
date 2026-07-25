@@ -483,6 +483,14 @@ export interface WorkspacePage {
   rows: PageResult<WorkspaceRow>;
 }
 
+export interface WorkspaceActionResult {
+  id: string;
+  module: string;
+  status: string;
+  message: string;
+  details: Record<string, unknown>;
+}
+
 /* ------------------------------------------------------------------ */
 /* Errors                                                              */
 /* ------------------------------------------------------------------ */
@@ -936,5 +944,27 @@ export const api = {
       search: params?.search,
       status: params?.status ?? params?.filter,
     })}`);
+  },
+
+  submitForecast(id: string, managerNote?: string): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/forecast/${encodeURIComponent(id)}/submit`, {
+      managerNote: managerNote?.trim() || null,
+    });
+  },
+
+  resolveCase(id: string, outcome: string): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/cases/${encodeURIComponent(id)}/resolve`, { outcome });
+  },
+
+  simulateAutomation(id: string, sampleSize = 25): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/automation/${encodeURIComponent(id)}/simulate`, { sampleSize });
+  },
+
+  validateMigration(id: string): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/migration/${encodeURIComponent(id)}/validate`);
+  },
+
+  acknowledgeMobileSync(id: string): Promise<WorkspaceActionResult> {
+    return request<WorkspaceActionResult>("POST", `/workspaces/mobile/${encodeURIComponent(id)}/sync`);
   },
 };

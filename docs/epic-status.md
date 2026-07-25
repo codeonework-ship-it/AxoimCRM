@@ -55,6 +55,7 @@ The current runnable slice now includes these additional partial deliveries:
 - **E19/E21:** the Electron desktop shell now has a reproducible local publish pipeline that packages the current React production build into a portable Windows desktop folder and zip. Signing/store release remains pending because it requires external certificates and vendor accounts.
 - **Cross-workspace UX:** all epic workspace grids now include status grouping plus the existing full-size/restore data view control, so large-page reviews can expand without breaking the surrounding shell.
 - **E04/E05/E08/E15/E20:** Account 360 is now exposed through tenant-scoped detail and hierarchy APIs with a right-side drawer in `/accounts`; leads can be disqualified only with a governed reason and optional future recycle date; quotes can be downloaded as PDF, Word or Excel directly from `/quotes`; both lead disqualification and quote document download write immutable audit evidence/outbox events where applicable.
+- **E10/E12/E14/E18/E21:** the operational workspace command layer now adds governed Forecast Submit, Case Resolve, Automation Simulate, Migration Validate and Mobile Sync Acknowledge actions. Each command is tenant-scoped, blocks read-only roles, validates status transitions, writes immutable audit evidence and emits a transactional outbox event.
 
 ## Skeleton work in detail
 

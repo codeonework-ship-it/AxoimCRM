@@ -5,19 +5,26 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/workspaces")
 public class EpicWorkspaceController {
     private final EpicWorkspaceService workspaces;
     private final WorkspaceExportService exports;
+    private final WorkspaceActionService actions;
 
-    public EpicWorkspaceController(EpicWorkspaceService workspaces, WorkspaceExportService exports) {
+    public EpicWorkspaceController(EpicWorkspaceService workspaces, WorkspaceExportService exports,
+                                   WorkspaceActionService actions) {
         this.workspaces = workspaces;
         this.exports = exports;
+        this.actions = actions;
     }
 
     @GetMapping("/forecast")
@@ -136,5 +143,36 @@ public class EpicWorkspaceController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.filename() + "\"")
                 .contentType(MediaType.parseMediaType(file.contentType()))
                 .body(file.bytes());
+    }
+
+    @PostMapping("/forecast/{id}/submit")
+    public WorkspaceActionService.ActionResult submitForecast(
+            @PathVariable UUID id,
+            @RequestBody(required = false) WorkspaceActionService.ForecastSubmitRequest request) {
+        return actions.submitForecast(id, request);
+    }
+
+    @PostMapping("/cases/{id}/resolve")
+    public WorkspaceActionService.ActionResult resolveCase(
+            @PathVariable UUID id,
+            @RequestBody WorkspaceActionService.CaseResolveRequest request) {
+        return actions.resolveCase(id, request);
+    }
+
+    @PostMapping("/automation/{id}/simulate")
+    public WorkspaceActionService.ActionResult simulateAutomation(
+            @PathVariable UUID id,
+            @RequestBody(required = false) WorkspaceActionService.AutomationSimulateRequest request) {
+        return actions.simulateAutomation(id, request);
+    }
+
+    @PostMapping("/migration/{id}/validate")
+    public WorkspaceActionService.ActionResult validateMigration(@PathVariable UUID id) {
+        return actions.validateMigration(id);
+    }
+
+    @PostMapping("/mobile/{id}/sync")
+    public WorkspaceActionService.ActionResult acknowledgeMobileSync(@PathVariable UUID id) {
+        return actions.acknowledgeMobileSync(id);
     }
 }
