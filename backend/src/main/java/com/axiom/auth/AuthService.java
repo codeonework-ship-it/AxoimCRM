@@ -50,7 +50,7 @@ public class AuthService {
         try {
             user = jdbc.queryForMap(
                     "select id, email, password_hash, display_name, role "
-                            + "from app_user where tenant_id = ? and lower(email) = lower(?)",
+                            + "from app_user where tenant_id = ? and lower(email) = lower(?) and active = true",
                     tenantId, email);
         } catch (EmptyResultDataAccessException e) {
             throw new UnauthorizedException("Invalid credentials");

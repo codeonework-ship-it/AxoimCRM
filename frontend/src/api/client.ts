@@ -185,6 +185,114 @@ export interface NotificationItem {
   occurredAt: string;
 }
 
+export interface RoleDescriptor {
+  code: string;
+  scope: string;
+  description: string;
+  readOnly: boolean;
+  exportAllowed: boolean;
+  importAllowed: boolean;
+  masterAdmin: boolean;
+}
+
+export interface ScreenPolicy {
+  roleCode: string;
+  screenCode: string;
+  moduleCode: string;
+  route: string;
+  displayName: string;
+  description: string;
+  canRead: boolean;
+  canWrite: boolean;
+  canExport: boolean;
+  canAdmin: boolean;
+  scope: string;
+}
+
+export interface AdminUser {
+  id: string;
+  tenantSlug: string;
+  tenantName: string;
+  displayName: string;
+  email: string;
+  role: string;
+  active: boolean;
+  platformUser: boolean;
+}
+
+export interface CompanyAccount {
+  tenantId: string;
+  tenantSlug: string;
+  tenantName: string;
+  legalName: string;
+  accountStatus: string;
+  trialStartAt: string | null;
+  trialEndsAt: string | null;
+  trialExtensionCount: number;
+  maxTrialExtensionDays: number;
+  inactiveReason: string | null;
+  inactiveAt: string | null;
+}
+
+export interface BillingRow {
+  tenantId: string;
+  tenantSlug: string;
+  tenantName: string;
+  planCode: string;
+  paymentStatus: string;
+  billingEmail: string;
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+  invoiceNumber: string | null;
+  amount: number | null;
+  currency: string | null;
+  invoiceStatus: string | null;
+  dueAt: string | null;
+}
+
+export interface ReportDefinition {
+  id: string;
+  code: string;
+  label: string;
+  description: string;
+  allowedFormats: Array<"PDF" | "XLSX" | "DOCX" | string>;
+  active: boolean;
+}
+
+export interface EmailAlert {
+  id: string;
+  name: string;
+  subject: string;
+  bodyHtml: string;
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  attachmentOptional: boolean;
+  active: boolean;
+  createdAt: string;
+}
+
+export interface ReportAlert {
+  id: string;
+  reportDefinitionId: string;
+  reportLabel: string;
+  name: string;
+  subject: string;
+  bodyHtml: string;
+  to: string[];
+  cc: string[];
+  bcc: string[];
+  formats: string[];
+  active: boolean;
+  createdAt: string;
+}
+
+export interface DispatchResult {
+  dispatchId: string;
+  status: string;
+  message: string;
+}
+
 /* ------------------------------------------------------------------ */
 /* Errors                                                              */
 /* ------------------------------------------------------------------ */
@@ -463,5 +571,77 @@ export const api = {
 
   markAllNotificationsRead(): Promise<{ updated: number }> {
     return request<{ updated: number }>("POST", "/notifications/read-all");
+  },
+
+  roles(): Promise<RoleDescriptor[]> {
+    return request<RoleDescriptor[]>("GET", "/rbac/roles");
+  },
+
+  rbacPolicies(role?: string): Promise<ScreenPolicy[]> {
+    return request<ScreenPolicy[]>("GET", `/rbac/policies${queryString({ role })}`);
+  },
+
+  adminUsers(): Promise<AdminUser[]> {
+    return request<AdminUser[]>("GET", "/admin/users");
+  },
+
+  createAdminUser(req: { displayName: string; email: string; role: string; password: string }): Promise<AdminUser> {
+    return request<AdminUser>("POST", "/admin/users", req);
+  },
+
+  setAdminUserActive(id: string, active: boolean): Promise<void> {
+    return request<void>("PATCH", `/admin/users/${encodeURIComponent(id)}/active`, { active });
+  },
+
+  companies(): Promise<CompanyAccount[]> {
+    return request<CompanyAccount[]>("GET", "/admin/companies");
+  },
+
+  extendTrial(tenantId: string, req: { days: number; months: number; note?: string }): Promise<CompanyAccount> {
+    return request<CompanyAccount>("POST", `/admin/trials/${encodeURIComponent(tenantId)}/extend`, req);
+  },
+
+  setCompanyStatus(tenantId: string, req: { status: string; reason?: string }): Promise<CompanyAccount> {
+    return request<CompanyAccount>("PATCH", `/admin/companies/${encodeURIComponent(tenantId)}/status`, req);
+  },
+
+  billing(): Promise<BillingRow[]> {
+    return request<BillingRow[]>("GET", "/admin/billing");
+  },
+
+  reports(): Promise<ReportDefinition[]> {
+    return request<ReportDefinition[]>("GET", "/reports");
+  },
+
+  downloadReport(code: string, format: "PDF" | "XLSX" | "DOCX"): Promise<DownloadedFile> {
+    return fileRequest(`/reports/${encodeURIComponent(code)}/download${queryString({ format })}`);
+  },
+
+  emailAlerts(): Promise<EmailAlert[]> {
+    return request<EmailAlert[]>("GET", "/alerts/email");
+  },
+
+  createEmailAlert(req: {
+    name: string; subject: string; bodyHtml: string; to: string[]; cc: string[]; bcc: string[]; attachmentOptional: boolean;
+  }): Promise<EmailAlert> {
+    return request<EmailAlert>("POST", "/alerts/email", req);
+  },
+
+  sendEmailAlert(id: string): Promise<DispatchResult> {
+    return request<DispatchResult>("POST", `/alerts/email/${encodeURIComponent(id)}/send`);
+  },
+
+  reportAlerts(): Promise<ReportAlert[]> {
+    return request<ReportAlert[]>("GET", "/alerts/reports");
+  },
+
+  createReportAlert(req: {
+    name: string; subject: string; bodyHtml: string; to: string[]; cc: string[]; bcc: string[]; formats: string[]; reportDefinitionId?: string;
+  }): Promise<ReportAlert> {
+    return request<ReportAlert>("POST", "/alerts/reports", req);
+  },
+
+  sendReportAlert(id: string): Promise<DispatchResult> {
+    return request<DispatchResult>("POST", `/alerts/reports/${encodeURIComponent(id)}/send`);
   },
 };

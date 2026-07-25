@@ -32,10 +32,10 @@ public class GlobalExceptionHandler {
                 .body(new ApiError("VALIDATION_FAILED", "Request validation failed", details, correlationId()));
     }
 
-    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class})
+    @ExceptionHandler({HttpMessageNotReadableException.class, MethodArgumentTypeMismatchException.class, IllegalArgumentException.class})
     public ResponseEntity<ApiError> badRequest(Exception ex) {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiError.of("BAD_REQUEST", "Malformed request", correlationId()));
+                .body(ApiError.of("BAD_REQUEST", ex instanceof IllegalArgumentException ? ex.getMessage() : "Malformed request", correlationId()));
     }
 
     @ExceptionHandler(UnauthorizedException.class)

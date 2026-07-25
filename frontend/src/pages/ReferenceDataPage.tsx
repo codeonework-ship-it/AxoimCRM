@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isUnreachable, type ReferenceEntry, type ReferenceValueSet } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ApiUnreachable } from "../components/ApiUnreachable";
+import { DataViewFrame } from "../components/DataViewFrame";
 import { canManageMasters } from "../components/MasterToolbar";
 import { useToasts } from "../components/Toasts";
 
@@ -76,7 +77,7 @@ export function ReferenceDataPage() {
 
     {setsQ.isLoading && <p className="loading-note">Loading reference data...</p>}
     {setsQ.isError && <p className="empty-note">Reference data failed to load{setsQ.error instanceof Error ? `: ${setsQ.error.message}` : "."}</p>}
-    {setsQ.isSuccess && <div className="reference-layout">
+    {setsQ.isSuccess && <DataViewFrame title="Reference value-set console"><div className="reference-layout">
       <aside className="reference-sets" aria-label="Value sets">
         {setsQ.data.map((set: ReferenceValueSet) => <button
           className={set.apiName === selectedApiName ? "active" : ""}
@@ -107,6 +108,6 @@ export function ReferenceDataPage() {
           {entriesQ.data.length === 0 && <tr><td colSpan={canManage ? 5 : 4} className="empty-note">No entries in this value set.</td></tr>}</tbody>
         </table></div>}
       </section>
-    </div>}
+    </div></DataViewFrame>}
   </>;
 }

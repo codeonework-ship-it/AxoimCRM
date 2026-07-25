@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
+              name="tenant-summary" pageWidth="595" pageHeight="842" columnWidth="515"
+              leftMargin="40" rightMargin="40" topMargin="36" bottomMargin="36"
+              uuid="3e4fa774-6c03-4013-ae65-13ca34e61941">
+    <parameter name="REPORT_TITLE" class="java.lang.String"/>
+    <parameter name="GENERATED_AT" class="java.lang.String"/>
+    <field name="metric" class="java.lang.String"/>
+    <field name="value" class="java.lang.String"/>
+    <field name="detail" class="java.lang.String"/>
+    <title>
+        <band height="74">
+            <staticText>
+                <reportElement x="0" y="0" width="515" height="20"/>
+                <textElement><font size="10" isBold="true"/></textElement>
+                <text><![CDATA[AXIOM CRM]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="0" y="24" width="515" height="26"/>
+                <textElement><font size="18" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA[$P{REPORT_TITLE}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement x="0" y="54" width="515" height="16"/>
+                <textElement><font size="8"/></textElement>
+                <textFieldExpression><![CDATA["Generated " + $P{GENERATED_AT}]]></textFieldExpression>
+            </textField>
+        </band>
+    </title>
+    <columnHeader>
+        <band height="28">
+            <staticText><reportElement mode="Opaque" backcolor="#E2E7F0" x="0" y="0" width="170" height="24"/><textElement><font size="9" isBold="true"/></textElement><text><![CDATA[Metric]]></text></staticText>
+            <staticText><reportElement mode="Opaque" backcolor="#E2E7F0" x="170" y="0" width="130" height="24"/><textElement><font size="9" isBold="true"/></textElement><text><![CDATA[Value]]></text></staticText>
+            <staticText><reportElement mode="Opaque" backcolor="#E2E7F0" x="300" y="0" width="215" height="24"/><textElement><font size="9" isBold="true"/></textElement><text><![CDATA[Detail]]></text></staticText>
+        </band>
+    </columnHeader>
+    <detail>
+        <band height="24">
+            <textField><reportElement x="0" y="0" width="170" height="20"/><textElement><font size="9"/></textElement><textFieldExpression><![CDATA[$F{metric}]]></textFieldExpression></textField>
+            <textField><reportElement x="170" y="0" width="130" height="20"/><textElement><font size="9" isBold="true"/></textElement><textFieldExpression><![CDATA[$F{value}]]></textFieldExpression></textField>
+            <textField><reportElement x="300" y="0" width="215" height="20"/><textElement><font size="9"/></textElement><textFieldExpression><![CDATA[$F{detail}]]></textFieldExpression></textField>
+        </band>
+    </detail>
+</jasperReport>

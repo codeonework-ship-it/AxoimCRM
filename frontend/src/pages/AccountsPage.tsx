@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isUnreachable, type Account } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ApiUnreachable } from "../components/ApiUnreachable";
+import { DataViewFrame } from "../components/DataViewFrame";
 import { MasterToolbar, canManageMasters } from "../components/MasterToolbar";
 import { useToasts } from "../components/Toasts";
 
@@ -56,9 +57,10 @@ export function AccountsPage() {
       <button className="btn btn-sm" onClick={resetFilters} disabled={!search && !industryFilter}>Reset</button>
     </section>
     <MasterToolbar master="accounts" entityType="ACCOUNT" search={search} filter={industryFilter} grouped={grouped} groupLabel="Industry" onToggleGroup={() => setGrouped((value) => !value)} onChanged={() => void accountsQ.refetch()} />
-    {accountsQ.isLoading && <p className="loading-note">Loading accounts...</p>}
-    {accountsQ.isError && <p className="empty-note">Accounts failed to load{accountsQ.error instanceof Error ? `: ${accountsQ.error.message}` : "."}</p>}
-    {accountsQ.isSuccess && <div className="table-wrap"><table className="data-table"><thead><tr><th>Name</th><th>Industry</th><th>Owner</th>{canManageMasters(user?.role) && <th className="table-action">Action</th>}</tr></thead>
+    <DataViewFrame title="Accounts results">
+      {accountsQ.isLoading && <p className="loading-note">Loading accounts...</p>}
+      {accountsQ.isError && <p className="empty-note">Accounts failed to load{accountsQ.error instanceof Error ? `: ${accountsQ.error.message}` : "."}</p>}
+      {accountsQ.isSuccess && <div className="table-wrap"><table className="data-table"><thead><tr><th>Name</th><th>Industry</th><th>Owner</th>{canManageMasters(user?.role) && <th className="table-action">Action</th>}</tr></thead>
       <tbody>{accounts.map((account) => {
         const group = account.industry ?? "Unclassified";
         const showGroup = grouped && group !== previousGroup; previousGroup = group;
@@ -67,13 +69,14 @@ export function AccountsPage() {
             {canManageMasters(user?.role) && <td className="table-action"><button className="link-btn danger-link" disabled={deleteMutation.isPending} onClick={() => remove(account)}>Delete</button></td>}</tr></Fragment>;
       })}{accounts.length === 0 && <tr><td colSpan={canManageMasters(user?.role) ? 4 : 3} className="empty-note">No accounts match the current query.</td></tr>}</tbody>
     </table></div>}
-    {accountsQ.isSuccess && <footer className="page-controls" aria-label="Account pagination">
-      <span>Showing {accounts.length} of {total} records - 100 rows per page</span>
-      <div>
-        <button className="btn btn-sm" disabled={page === 0 || accountsQ.isFetching} onClick={() => setPage((value) => Math.max(value - 1, 0))}>Previous</button>
-        <strong>Page {totalPages === 0 ? 0 : page + 1} of {totalPages}</strong>
-        <button className="btn btn-sm" disabled={page + 1 >= totalPages || accountsQ.isFetching} onClick={() => setPage((value) => value + 1)}>Next</button>
-      </div>
-    </footer>}
+      {accountsQ.isSuccess && <footer className="page-controls" aria-label="Account pagination">
+        <span>Showing {accounts.length} of {total} records - 100 rows per page</span>
+        <div>
+          <button className="btn btn-sm" disabled={page === 0 || accountsQ.isFetching} onClick={() => setPage((value) => Math.max(value - 1, 0))}>Previous</button>
+          <strong>Page {totalPages === 0 ? 0 : page + 1} of {totalPages}</strong>
+          <button className="btn btn-sm" disabled={page + 1 >= totalPages || accountsQ.isFetching} onClick={() => setPage((value) => value + 1)}>Next</button>
+        </div>
+      </footer>}
+    </DataViewFrame>
   </>;
 }

@@ -1481,3 +1481,274 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   .reference-layout { grid-template-columns:1fr; }
   .reference-entry-form { grid-template-columns:1fr; }
 }
+
+/* ---- Full-size data workspaces, reporting and admin cockpit ---- */
+
+.data-view-frame {
+  position:relative;
+  min-width:0;
+  margin-top:14px;
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  background:color-mix(in srgb,var(--paper-raised) 92%,transparent);
+}
+
+.data-view-head {
+  position:sticky;
+  top:0;
+  z-index:2;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:12px 14px;
+  border-bottom:1px solid var(--line);
+  background:var(--paper-raised);
+}
+
+.data-view-head h2 {
+  margin:2px 0 0;
+  font-size:16px;
+}
+
+.data-view-actions {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex-wrap:wrap;
+  justify-content:flex-end;
+}
+
+.data-view-body {
+  min-width:0;
+  padding:14px;
+}
+
+.data-view-full {
+  position:fixed;
+  inset:10px;
+  z-index:96;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+  box-shadow:0 22px 90px rgba(0,0,0,.48);
+}
+
+.data-view-full .data-view-body {
+  flex:1;
+  overflow:auto;
+}
+
+.data-view-full .table-wrap {
+  max-height:none;
+}
+
+.report-grid,
+.role-card-grid,
+.alert-config-grid {
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr));
+  gap:12px;
+}
+
+.report-card,
+.role-card,
+.config-card {
+  min-width:0;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  background:var(--paper-raised);
+}
+
+.report-card h2,
+.config-card h2 {
+  margin:4px 0 7px;
+  font-size:16px;
+}
+
+.report-card p,
+.role-card p {
+  color:var(--slate);
+  font-size:12px;
+}
+
+.report-actions,
+.company-actions {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+
+.admin-tabs {
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  margin:-8px 0 12px;
+  padding:8px;
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  background:var(--paper-raised);
+}
+
+.admin-tabs button {
+  padding:7px 12px;
+  border:1px solid transparent;
+  border-radius:var(--radius-sm);
+  background:transparent;
+  color:var(--ink-soft);
+  font-size:11px;
+  font-weight:750;
+  letter-spacing:.1em;
+  text-transform:uppercase;
+}
+
+.admin-tabs button:hover,
+.admin-tabs button.active {
+  border-color:var(--ion-600);
+  color:var(--ion-600);
+  background:var(--ion-100);
+}
+
+.admin-form,
+.config-card {
+  display:grid;
+  gap:8px;
+}
+
+.admin-form {
+  grid-template-columns:repeat(4,minmax(140px,1fr)) auto;
+  margin-bottom:12px;
+}
+
+.admin-form input,
+.admin-form select,
+.config-card input,
+.config-card select {
+  min-height:36px;
+  border:1px solid var(--line);
+  border-radius:var(--radius-sm);
+  background:var(--paper);
+  color:var(--ink);
+  padding:0 10px;
+  font:inherit;
+}
+
+.rich-editor {
+  min-height:104px;
+  max-height:240px;
+  overflow:auto;
+  padding:10px;
+  border:1px solid var(--line);
+  border-radius:var(--radius-sm);
+  background:var(--paper);
+  color:var(--ink);
+}
+
+.check-line {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:var(--slate);
+  font-size:12px;
+}
+
+.role-card strong {
+  display:block;
+  font-size:12px;
+}
+
+.role-card span {
+  color:var(--ion-600);
+  font-size:10px;
+  font-weight:750;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+
+.drawer-actions {
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+.dock-scrim {
+  justify-content:flex-end;
+  pointer-events:none;
+  background:transparent;
+  backdrop-filter:none;
+}
+
+.help-drawer {
+  pointer-events:auto;
+  position:relative;
+  width:min(480px,100vw);
+  max-width:calc(100vw - 12px);
+  min-width:min(320px,100vw);
+}
+
+.help-drawer-full {
+  width:100vw!important;
+  max-width:100vw;
+}
+
+.dock-resizer {
+  position:absolute;
+  top:0;
+  bottom:0;
+  left:-6px;
+  z-index:3;
+  width:12px;
+  border:0;
+  background:transparent;
+  cursor:ew-resize;
+}
+
+.dock-resizer::after {
+  content:"";
+  position:absolute;
+  top:44%;
+  left:5px;
+  width:2px;
+  height:48px;
+  background:var(--line-strong);
+  border-radius:999px;
+}
+
+.help-drawer-full .dock-resizer {
+  display:none;
+}
+
+@media (max-width:900px) {
+  .admin-form {
+    grid-template-columns:1fr 1fr;
+  }
+}
+
+@media (max-width:680px) {
+  .data-view-full {
+    inset:0;
+  }
+  .data-view-head {
+    align-items:flex-start;
+    flex-direction:column;
+  }
+  .data-view-actions {
+    width:100%;
+    justify-content:flex-start;
+  }
+  .admin-form,
+  .alert-config-grid,
+  .report-grid,
+  .role-card-grid {
+    grid-template-columns:1fr;
+  }
+  .help-drawer,
+  .help-drawer-full {
+    width:100vw!important;
+    max-width:100vw;
+  }
+  .dock-resizer {
+    display:none;
+  }
+}

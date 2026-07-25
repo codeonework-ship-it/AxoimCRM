@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isUnreachable, type Lead } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ApiUnreachable } from "../components/ApiUnreachable";
+import { DataViewFrame } from "../components/DataViewFrame";
 import { MasterToolbar, canManageMasters } from "../components/MasterToolbar";
 import { useToasts } from "../components/Toasts";
 
@@ -67,22 +68,24 @@ export function LeadsPage() {
       <button className="btn btn-sm" onClick={resetFilters} disabled={!search && !statusFilter}>Reset</button>
     </section>
     <MasterToolbar master="leads" entityType="LEAD" search={search} filter={statusFilter} grouped={grouped} groupLabel="Status" onToggleGroup={() => setGrouped((value) => !value)} onChanged={() => void leadsQ.refetch()} />
-    {leadsQ.isLoading && <p className="loading-note">Loading leads...</p>}
-    {leadsQ.isError && <p className="empty-note">Leads failed to load{leadsQ.error instanceof Error ? `: ${leadsQ.error.message}` : "."}</p>}
-    {leadsQ.isSuccess && leads.length === 0 && <p className="empty-note">No leads match the current query.</p>}
-    {leads.map((lead) => { const showGroup = grouped && lead.status !== previousGroup; previousGroup = lead.status; return <Fragment key={lead.id}>
-      {showGroup && <div className="lead-group">{lead.status}</div>}<div className="lead-row"><div><div className="lead-name">{lead.name}</div><div className="lead-meta">{[lead.company, lead.email, lead.ownerName].filter(Boolean).join(" - ") || "-"}</div></div>
-      <span className={`chip chip-${lead.status.toLowerCase()}`} style={{ marginLeft: "auto" }}>{lead.status}</span>
-      {CONVERTIBLE.has(lead.status) && <button className="btn btn-sm" onClick={() => convert(lead)} disabled={convertMutation.isPending && convertMutation.variables === lead.id}>{convertMutation.isPending && convertMutation.variables === lead.id ? "Converting..." : "Convert"}</button>}
-      {canManageMasters(user?.role) && <button className="link-btn danger-link" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm(`Delete ${lead.name}? Converted or in-use records will be protected.`)) deleteMutation.mutate(lead.id); }}>Delete</button>}
-    </div></Fragment>; })}
-    {leadsQ.isSuccess && <footer className="page-controls" aria-label="Lead pagination">
-      <span>Showing {leads.length} of {total} records - 100 rows per page</span>
-      <div>
-        <button className="btn btn-sm" disabled={page === 0 || leadsQ.isFetching} onClick={() => setPage((value) => Math.max(value - 1, 0))}>Previous</button>
-        <strong>Page {totalPages === 0 ? 0 : page + 1} of {totalPages}</strong>
-        <button className="btn btn-sm" disabled={page + 1 >= totalPages || leadsQ.isFetching} onClick={() => setPage((value) => value + 1)}>Next</button>
-      </div>
-    </footer>}
+    <DataViewFrame title="Lead queue">
+      {leadsQ.isLoading && <p className="loading-note">Loading leads...</p>}
+      {leadsQ.isError && <p className="empty-note">Leads failed to load{leadsQ.error instanceof Error ? `: ${leadsQ.error.message}` : "."}</p>}
+      {leadsQ.isSuccess && leads.length === 0 && <p className="empty-note">No leads match the current query.</p>}
+      {leads.map((lead) => { const showGroup = grouped && lead.status !== previousGroup; previousGroup = lead.status; return <Fragment key={lead.id}>
+        {showGroup && <div className="lead-group">{lead.status}</div>}<div className="lead-row"><div><div className="lead-name">{lead.name}</div><div className="lead-meta">{[lead.company, lead.email, lead.ownerName].filter(Boolean).join(" - ") || "-"}</div></div>
+        <span className={`chip chip-${lead.status.toLowerCase()}`} style={{ marginLeft: "auto" }}>{lead.status}</span>
+        {CONVERTIBLE.has(lead.status) && <button className="btn btn-sm" onClick={() => convert(lead)} disabled={convertMutation.isPending && convertMutation.variables === lead.id}>{convertMutation.isPending && convertMutation.variables === lead.id ? "Converting..." : "Convert"}</button>}
+        {canManageMasters(user?.role) && <button className="link-btn danger-link" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm(`Delete ${lead.name}? Converted or in-use records will be protected.`)) deleteMutation.mutate(lead.id); }}>Delete</button>}
+      </div></Fragment>; })}
+      {leadsQ.isSuccess && <footer className="page-controls" aria-label="Lead pagination">
+        <span>Showing {leads.length} of {total} records - 100 rows per page</span>
+        <div>
+          <button className="btn btn-sm" disabled={page === 0 || leadsQ.isFetching} onClick={() => setPage((value) => Math.max(value - 1, 0))}>Previous</button>
+          <strong>Page {totalPages === 0 ? 0 : page + 1} of {totalPages}</strong>
+          <button className="btn btn-sm" disabled={page + 1 >= totalPages || leadsQ.isFetching} onClick={() => setPage((value) => value + 1)}>Next</button>
+        </div>
+      </footer>}
+    </DataViewFrame>
   </>;
 }

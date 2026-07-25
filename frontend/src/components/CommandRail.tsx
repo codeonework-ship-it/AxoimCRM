@@ -8,6 +8,7 @@ import {
   LogoutIcon,
   PipelineIcon,
   ReferenceIcon,
+  SparkIcon,
 } from "./icons";
 
 const NAV = [
@@ -16,6 +17,8 @@ const NAV = [
   { to: "/accounts", label: "Accounts", icon: AccountsIcon, end: false },
   { to: "/leads", label: "Leads", icon: LeadsIcon, end: false },
   { to: "/reference-data", label: "Reference Data", icon: ReferenceIcon, end: false },
+  { to: "/reports", label: "Reports", icon: SparkIcon, end: false },
+  { to: "/admin", label: "Admin", icon: ReferenceIcon, end: false },
 ];
 
 export function CommandRail({ open, onNavigate }: { open: boolean; onNavigate: () => void }) {
