@@ -27,7 +27,10 @@ export function App() {
         <Route path="/accounts" element={<AccountsPage />} />
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/activities" element={<ActivitiesPage />} />
+        {/* Bare /reference-data still resolves; the page redirects it onto the
+            first master's canonical /reference-data/:setCode path. */}
         <Route path="/reference-data" element={<ReferenceDataPage />} />
+        <Route path="/reference-data/:setCode" element={<ReferenceDataPage />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/admin/*" element={<AdminPage />} />
       </Route>

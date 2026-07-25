@@ -30,7 +30,7 @@ class MasterDataServiceTest {
     @BeforeEach void setUp() {
         jdbc = mock(JdbcTemplate.class);
         audit = mock(AuditService.class);
-        service = new MasterDataService(jdbc, audit);
+        service = new MasterDataService(jdbc, audit, mock(com.axiom.identity.StepUpService.class));
         TenantContext.set(new TenantContext.Principal(UUID.randomUUID(), UUID.randomUUID(),
                 "TENANT_ADMIN", "Admin", "admin@example.com"));
     }

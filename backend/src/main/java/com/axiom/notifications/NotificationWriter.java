@@ -17,12 +17,26 @@ public class NotificationWriter {
     public void notifyCurrentUser(String kind, String priority, String title, String body,
                                   String href, String reason, boolean actionRequired) {
         TenantContext.Principal principal = TenantContext.get();
+        notifyUser(principal.tenantId(), principal.userId(), kind, priority, title, body,
+                href, reason, actionRequired);
+    }
+
+    /**
+     * Writes a notification for a named recipient rather than the caller.
+     *
+     * <p>Needed by controls that must tell someone <em>other</em> than the actor
+     * what happened — break-glass access notifies the tenant's administrators
+     * (FR-TEN-012), and the actor there is deliberately not one of them.
+     */
+    public void notifyUser(java.util.UUID tenantId, java.util.UUID recipientUserId, String kind,
+                          String priority, String title, String body, String href, String reason,
+                          boolean actionRequired) {
         jdbc.update("""
                         insert into notification
                           (tenant_id, recipient_user_id, kind, priority, title, body, href, reason, action_required)
                         values (?, ?, ?, ?, ?, ?, ?, ?, ?)
                         """,
-                principal.tenantId(), principal.userId(), kind, priority, title, body,
+                tenantId, recipientUserId, kind, priority, title, body,
                 href, reason, actionRequired);
     }
 }

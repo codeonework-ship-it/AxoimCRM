@@ -24,13 +24,13 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Subtle 56px engineering grid on the page ground */
+/* The page ground is a flat, calm surface.
+   A visible engineering grid lived here and was a mistake: at 1px hairlines it
+   fought every table row and panel edge on the page, so the eye had to filter
+   it out before it could read the data. Texture belongs where it carries
+   meaning, not under a data grid. */
 .app-ground {
   background-color: var(--paper);
-  background-image: linear-gradient(var(--line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--line) 1px, transparent 1px);
-  background-size: var(--grid-size) var(--grid-size);
-  background-position: -1px -1px;
 }
 
 :focus-visible {
@@ -1414,25 +1414,45 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
 .page-controls>div { display:flex; align-items:center; gap:10px; }
 .page-controls strong { color:var(--ink); font-size:12px; white-space:nowrap; }
 
-.reference-layout {
-  display:grid; grid-template-columns:minmax(220px,280px) minmax(0,1fr); gap:16px; align-items:start;
+/* ---- Master workspace tab strip ------------------------------------------
+   One tab per master entity. The strip is the only thing that scrolls when
+   the viewport is narrow, so the page itself never scrolls sideways. */
+
+.master-tabs {
+  display:flex; gap:2px; min-width:0; margin:0 0 14px;
+  overflow-x:auto; overflow-y:hidden; -webkit-overflow-scrolling:touch;
+  border-bottom:1px solid var(--line);
 }
-.reference-sets {
-  display:flex; flex-direction:column; gap:6px; padding:8px; border:1px solid var(--line);
-  border-radius:var(--radius); background:color-mix(in srgb,var(--paper-raised) 90%,transparent);
+/* Bleed the strip to the frame edges so its hairline reads as a real rule. */
+.data-view-body>.master-tabs { margin:-14px -14px 14px; padding:0 14px; }
+.master-tab {
+  position:relative; flex:0 0 auto; display:flex; align-items:baseline; gap:8px;
+  padding:10px 16px 9px; border:0; background:transparent; color:var(--slate);
+  font-size:10.5px; font-weight:750; letter-spacing:.12em; text-transform:uppercase;
+  white-space:nowrap; cursor:pointer;
 }
-.reference-sets button {
-  display:flex; flex-direction:column; gap:3px; text-align:left; padding:10px 12px;
-  border:1px solid transparent; border-radius:var(--radius-sm); background:transparent;
-  color:var(--ink); cursor:pointer;
+/* Chamfered top corners drawn on a backing layer so the focus ring is never clipped. */
+.master-tab::before {
+  content:""; position:absolute; inset:0; pointer-events:none; background:transparent;
+  clip-path:polygon(10px 0,calc(100% - 10px) 0,100% 10px,100% 100%,0 100%,0 10px);
+  transition:background 140ms ease;
 }
-.reference-sets button:hover,.reference-sets button.active {
-  border-color:var(--ion-600); background:var(--ion-100);
+.master-tab:hover { color:var(--ink-soft); }
+.master-tab:hover::before { background:color-mix(in srgb,var(--paper-sunk) 70%,transparent); }
+.master-tab:focus-visible { outline:2px solid var(--ion-600); outline-offset:-3px; }
+.master-tab[aria-selected="true"] { color:var(--ion-600); }
+.master-tab[aria-selected="true"]::before { background:color-mix(in srgb,var(--ion-100) 60%,transparent); }
+.master-tab[aria-selected="true"]::after {
+  content:""; position:absolute; left:0; right:0; bottom:0; height:2px;
+  background:var(--ion-600); box-shadow:var(--glow);
 }
-.reference-sets strong { font-size:12px; }
-.reference-sets span {
-  color:var(--slate); font-size:10px; font-weight:750; letter-spacing:.12em; text-transform:uppercase;
+.master-tab-label { position:relative; }
+.master-tab-count {
+  position:relative; color:var(--slate-faint); font-size:10px; font-weight:700;
+  font-style:normal; letter-spacing:.04em; font-variant-numeric:tabular-nums;
 }
+.master-tab[aria-selected="true"] .master-tab-count { color:var(--ion-600); }
+
 .reference-panel {
   min-width:0; border:1px solid var(--line); border-radius:var(--radius);
   background:color-mix(in srgb,var(--paper-raised) 92%,transparent); overflow:hidden;
@@ -1478,8 +1498,14 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   .toolbar-divider { display:none; }
   .page-controls { align-items:flex-start; flex-direction:column; }
   .page-controls>div { width:100%; justify-content:space-between; }
-  .reference-layout { grid-template-columns:1fr; }
   .reference-entry-form { grid-template-columns:1fr; }
+}
+
+/* Narrow viewports: the tab strip stays a single scrollable row rather than
+   wrapping or pushing the page wider than the viewport. */
+@media (max-width:700px) {
+  .master-tabs { gap:0; margin:-2px 0 12px; }
+  .master-tab { padding:9px 12px 8px; font-size:10px; letter-spacing:.08em; }
 }
 
 /* ---- Full-size data workspaces, reporting and admin cockpit ---- */
@@ -1896,4 +1922,594 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
     align-items:flex-start;
     flex-direction:column;
   }
+}
+
+/* ============================================================================
+   AEGIS — module navigation & cinematic depth
+   Grouped module rail, hazard-marked planned modules, energon edge lighting.
+   Appended last so it wins the cascade over the earlier flat-rail rules.
+   ========================================================================== */
+
+.rail {
+  position: relative;
+  align-items: stretch;
+  padding: 18px 0 12px;
+  gap: 0;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(72, 184, 255, .07), transparent 22%),
+    linear-gradient(180deg, var(--steel-900), var(--paper-sunk) 150%);
+}
+
+/* Faint vertical circuit trace along the rail's inner edge. */
+.rail::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: 1px;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    rgba(72, 184, 255, .55) 12%,
+    rgba(72, 184, 255, .12) 45%,
+    rgba(72, 184, 255, .55) 78%,
+    transparent
+  );
+  pointer-events: none;
+}
+
+.rail-brand { padding: 0 14px; margin-bottom: 18px; }
+
+/* The scrollable module map, with the brand and identity pinned. */
+.rail-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 8px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(72, 184, 255, .32) transparent;
+}
+.rail-scroll::-webkit-scrollbar { width: 6px; }
+.rail-scroll::-webkit-scrollbar-thumb {
+  background: rgba(72, 184, 255, .28);
+  border-radius: 3px;
+}
+
+.rail-group { margin-bottom: 6px; }
+
+/* Group headers double as collapse controls. */
+.rail-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 9px 10px 6px;
+  border: none;
+  background: none;
+  color: #6d7f9c;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+.rail-section:hover { color: var(--ion-500); }
+.rail-section svg {
+  flex: 0 0 12px;
+  transform: rotate(90deg);
+  transition: transform 160ms ease;
+  opacity: .75;
+}
+.rail-section.is-collapsed svg { transform: rotate(0deg); }
+
+.rail-group-items { display: flex; flex-direction: column; gap: 2px; }
+
+.rail-btn {
+  width: 100%;
+  height: 38px;
+  justify-content: flex-start;
+  gap: 11px;
+  padding: 0 11px;
+  color: #9cabc3;
+  text-decoration: none;
+  /* Chamfered leading corner — the AEGIS panel cut, at nav scale. */
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+  transition: background 140ms ease, color 140ms ease;
+}
+.rail-btn > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: .03em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rail-btn svg { flex: 0 0 18px; }
+
+.rail-btn.active {
+  color: #eaf5ff;
+  background: linear-gradient(90deg, rgba(72, 184, 255, .18), rgba(72, 184, 255, .02));
+}
+.rail-btn.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 6px;
+  bottom: 6px;
+  width: 2px;
+  background: var(--ion-600);
+  box-shadow: var(--glow);
+}
+
+/* Planned modules: present, legible, and unmistakably not clickable. */
+.rail-btn.is-planned {
+  color: #5b6a83;
+  cursor: not-allowed;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 7px,
+    rgba(120, 140, 170, .05) 7px 14px
+  );
+}
+.rail-btn.is-planned:hover { background: repeating-linear-gradient(
+    -45deg, transparent 0 7px, rgba(120, 140, 170, .05) 7px 14px); }
+.rail-btn.is-planned svg { opacity: .5; }
+
+.rail-flag {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: 1px solid rgba(120, 140, 170, .3);
+  border-radius: 2px;
+  color: #6f7f98;
+  font-size: 8px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+.rail-flag.is-partial {
+  border-color: rgba(232, 160, 32, .45);
+  color: var(--gold-500, #e8a020);
+}
+
+.rail-foot {
+  padding: 10px 8px 0;
+  margin-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+}
+.rail-identity { margin-top: 6px; padding: 10px 3px 0; border-top: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-section svg, .rail-btn { transition: none; }
+}
+
+/* ----------------------------------------------------------------------------
+   Collapsed rail = icon rail, not a hidden rail.
+   Collapsing to width:0 removed navigation entirely, which loses orientation
+   and the active-module indicator. Collapsing to a 62px icon strip keeps every
+   module reachable in one click, keeps the active marker visible, and still
+   returns ~170px of width to the workspace. Labels come back via the native
+   tooltip already on each control.
+   -------------------------------------------------------------------------- */
+@media (min-width: 901px) {
+  .shell.rail-collapsed .rail {
+    /* Match the base rule s shorthand form: .rail sets `flex: 0 0 var(--rail-w)`,
+       so only a later shorthand reliably replaces the basis. */
+    flex: 0 0 var(--rail-w-collapsed, 62px);
+    width: var(--rail-w-collapsed, 62px);
+    padding-left: 0;
+    padding-right: 0;
+    overflow: visible;
+    box-shadow: inset -1px 0 0 var(--ion-600);
+  }
+
+  /* Hide text, keep glyphs. */
+  .shell.rail-collapsed .rail-btn > span,
+  .shell.rail-collapsed .rail-flag,
+  .shell.rail-collapsed .rail-brand > span,
+  .shell.rail-collapsed .rail-identity > span { display: none; }
+
+  .shell.rail-collapsed .rail-scroll { padding: 0 6px; }
+  .shell.rail-collapsed .rail-brand { justify-content: center; padding: 0; }
+  .shell.rail-collapsed .rail-foot { padding: 10px 6px 0; }
+  .shell.rail-collapsed .rail-identity { justify-content: center; padding-top: 10px; }
+
+  .shell.rail-collapsed .rail-btn {
+    justify-content: center;
+    gap: 0;
+    padding: 0;
+    clip-path: none;
+  }
+
+  /* Group headers become a hairline separator: the grouping still reads,
+     without a label there is no room for. */
+  .shell.rail-collapsed .rail-section {
+    height: 1px;
+    padding: 0;
+    margin: 7px 8px;
+    overflow: hidden;
+    background: rgba(120, 140, 170, .22);
+    color: transparent;
+    pointer-events: none;
+  }
+  .shell.rail-collapsed .rail-section svg { display: none; }
+
+  /* A collapsed group would otherwise hide its icons with no way to reopen. */
+  .shell.rail-collapsed .rail-group-items[hidden] { display: flex !important; }
+
+  .shell.rail-collapsed .rail-btn.active::before { top: 4px; bottom: 4px; }
+}
+
+/* Collapse must not animate layout properties.
+   Transitioning `width`/`flex-basis` here left the rail stuck at its expanded
+   width: the class change also flips the child labels to `display:none`, and
+   the resulting same-frame reflow can leave the flex-basis interpolation
+   parked at its start value, so the rail never actually narrowed. Layout
+   transitions are also the expensive kind. `transform` still animates for the
+   mobile slide-in, which is a compositor-only property and safe. */
+@media (min-width: 901px) {
+  .shell .rail { transition: transform 180ms ease; }
+}
+
+/* ============================================================================
+   AEGIS contrast correction pass
+   The first cut of this theme failed on legibility: hard-coded slate greys in
+   the rail sat at ~2.5:1 against the steel ground, panels floated on a ground
+   only 3% different from them, and a hairline background grid competed with
+   every table rule on the page. Everything below is a contrast fix, not a
+   restyle — the visual language is unchanged.
+   ========================================================================== */
+
+/* ---- Command rail: legible at every state ------------------------------- */
+
+/* Base rail ground, slightly deeper so light text has something to sit on. */
+.rail {
+  background: linear-gradient(180deg, #0d1728 0%, #0a1220 100%);
+  box-shadow: inset -1px 0 0 rgba(72, 184, 255, 0.34);
+}
+
+.rail-brand strong { color: #f4f8ff; }
+.rail-brand small  { color: #9fb0c9; }
+
+/* Group headers were #6d7f9c on near-black: 3.2:1. Now 5.6:1. */
+.rail-section { color: #93a6c0; }
+.rail-section:hover { color: #cfe4ff; }
+
+/* Idle module labels: was #9cabc3 (~5.1:1), now 8.9:1 — these are 12px, so
+   they need more headroom than a large-text threshold would suggest. */
+.rail-btn { color: #c3d0e2; }
+.rail-btn:hover { color: #ffffff; background: rgba(72, 184, 255, 0.12); }
+.rail-btn.active {
+  color: #ffffff;
+  background: linear-gradient(90deg, rgba(72, 184, 255, 0.26), rgba(72, 184, 255, 0.05));
+}
+
+/* Planned modules were #5b6a83 on #0f1a2f — about 2.4:1, effectively invisible,
+   which is what the screenshot showed. They must read as unavailable, not as
+   absent. Hazard striping is dropped: it added noise at this size and did the
+   legibility no favours. */
+.rail-btn.is-planned {
+  color: #8c9bb2;              /* 5.2:1 — clearly readable, clearly secondary */
+  background: none;
+  cursor: default;
+}
+.rail-btn.is-planned:hover { background: none; }
+.rail-btn.is-planned svg { opacity: 0.65; }
+
+.rail-flag {
+  border-color: rgba(160, 176, 200, 0.42);
+  color: #a8b6cc;
+}
+.rail-flag.is-partial {
+  border-color: rgba(232, 160, 32, 0.6);
+  color: #f0b644;
+}
+
+/* Sign out was fading into the ground. */
+.rail-foot { border-top-color: rgba(255, 255, 255, 0.14); }
+.rail-identity strong { color: #eef4ff; }
+.rail-identity small  { color: #9fb0c9; }
+
+/* ---- Panels: actually raised ------------------------------------------- */
+
+.panel,
+.card {
+  background: var(--paper-raised);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(10, 16, 32, 0.06), 0 6px 18px rgba(10, 16, 32, 0.05);
+}
+
+:root[data-theme="dark"] .panel,
+:root[data-theme="dark"] .card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 26px rgba(0, 0, 0, 0.4);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .panel,
+  :root:not([data-theme="light"]) .card {
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5), 0 10px 26px rgba(0, 0, 0, 0.4);
+  }
+}
+
+/* ---- Page heading: a title, not a whisper ------------------------------- */
+
+.page-head h1 {
+  color: var(--ink);
+  font-size: 21px;
+  font-weight: 750;
+  letter-spacing: 0.06em;   /* was .12em — wide tracking thinned it out */
+}
+.page-head .count { color: var(--ink-soft); font-weight: 600; }
+.page-head p { color: var(--ink-soft); }
+
+/* Section eyebrows stay quiet but must clear AA. */
+.eyebrow,
+.card-head h3 { color: var(--ink-soft); }
+
+/* ---- Table legibility --------------------------------------------------- */
+
+thead th {
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--line-strong);
+}
+tbody td { color: var(--ink); }
+tbody tr + tr td { border-top: 1px solid var(--line); }
+tbody tr:hover td { background: var(--paper-sunk); }
+
+/* Status words carried meaning but not contrast. */
+.is-inactive, .status-inactive { color: var(--slate); }
+.is-active, .status-active { color: var(--ion-600); font-weight: 600; }
+
+/* ---- Locale switcher ---------------------------------------------------- */
+/* Same vocabulary as .manual-button (hairline, uppercase micro-label) and
+   .notif-pop (raised surface, hairline-strong border, ion accent on the active
+   row). No new colours: --line, --line-strong, --ion-600 and the paper tokens
+   only. */
+
+.locale-switch { position:relative; }
+
+.locale-trigger {
+  display:flex; align-items:center; gap:6px;
+  min-height:36px; padding:0 9px;
+  border:1px solid var(--line); border-radius:var(--radius);
+  background:var(--paper-raised); color:var(--ink-soft);
+}
+.locale-trigger:hover { border-color:var(--ion-600); color:var(--ion-600); }
+.locale-trigger[aria-expanded="true"] { border-color:var(--ion-600); color:var(--ion-600); }
+.locale-code {
+  font-size:10px; font-weight:750; letter-spacing:.14em; text-transform:uppercase;
+}
+
+.locale-pop {
+  position:absolute; top:44px; right:0; z-index:60;
+  min-width:172px; padding:6px;
+  background:var(--paper-raised);
+  border:1px solid var(--line-strong); border-top:2px solid var(--ion-600);
+  border-radius:var(--radius);
+  box-shadow:0 8px 24px rgba(2,6,16,.28);
+}
+.locale-pop-head {
+  margin:0; padding:6px 8px 8px;
+  color:var(--slate); font-size:9px; font-weight:750; letter-spacing:.18em;
+  text-transform:uppercase;
+}
+.locale-option {
+  width:100%; display:flex; align-items:center; gap:10px;
+  min-height:34px; padding:0 8px;
+  border:1px solid transparent; border-radius:var(--radius);
+  background:transparent; color:var(--ink); text-align:left;
+}
+.locale-option:hover { background:var(--paper-sunk); }
+.locale-option-code {
+  min-width:22px; color:var(--slate);
+  font-family:var(--font-mono); font-size:10px; font-weight:700; text-transform:uppercase;
+}
+.locale-option-name { font-size:12px; font-weight:600; }
+.locale-option.is-active { color:var(--ion-600); }
+.locale-option.is-active .locale-option-code { color:var(--ion-600); }
+.locale-option.is-active .locale-option-name { font-weight:750; }
+
+@media (max-width:760px) {
+  .locale-trigger { min-height:40px; padding:0 7px; }
+  .locale-code { display:none; }
+}
+
+/* ============================================================================
+   AEGIS CONTROL SYSTEM — buttons, inputs, action links, motion
+   The generic control layer was the weakest part of the theme: flat white
+   rectangles with grey hairlines read as unstyled defaults next to the
+   cinematic rail. This pass gives every interactive element the same
+   machined-console character: chamfered energy keys, sweep highlights,
+   deliberate press states, and a visible focus ring everywhere.
+   Appended last on purpose — it must win the cascade over the base .btn rules.
+   ========================================================================== */
+
+/* ---- Secondary buttons: machined console keys --------------------------- */
+.btn {
+  height: 34px;
+  padding: 0 14px;
+  gap: 7px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-raised);
+  color: var(--ink-soft);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease,
+    transform 120ms ease, box-shadow 120ms ease;
+}
+.btn:hover {
+  border-color: var(--ion-600);
+  color: var(--ink);
+  background: var(--paper-raised);
+  box-shadow: inset 0 0 0 1px var(--ion-600), 0 2px 8px rgba(10, 16, 32, 0.10);
+  transform: translateY(-1px);
+}
+.btn:active { transform: translateY(0); background: var(--paper-sunk); }
+.btn:disabled { transform: none; box-shadow: none; }
+
+/* ---- Primary: the energon key ------------------------------------------- */
+.btn-primary,
+.btn.btn-primary {
+  position: relative;
+  overflow: hidden;
+  height: 36px;
+  padding: 0 18px;
+  border: none;
+  background: linear-gradient(180deg, var(--ion-500), var(--ion-600));
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  clip-path: var(--chamfer);
+  box-shadow: 0 2px 12px rgba(11, 95, 190, 0.35);
+}
+.btn-primary:hover {
+  background: linear-gradient(180deg, var(--ion-500), var(--ion-600));
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 18px rgba(11, 95, 190, 0.45);
+}
+.btn-primary:active { transform: translateY(0); filter: brightness(0.97); }
+/* Travelling light sweep — the "dynamic" in the suite. Reduced-motion users
+   get an instant (invisible) transition via the global cap. */
+.btn-primary::after {
+  content: "";
+  position: absolute;
+  top: -40%;
+  bottom: -40%;
+  left: -60%;
+  width: 38%;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  transform: skewX(-18deg);
+  transition: left 480ms ease;
+  pointer-events: none;
+}
+.btn-primary:hover::after { left: 130%; }
+.btn-primary:disabled {
+  background: var(--line-strong);
+  color: var(--paper-raised);
+  box-shadow: none;
+  filter: none;
+}
+
+/* Destructive twin of the primary key. */
+.btn-danger {
+  border: none;
+  background: linear-gradient(180deg, #e25757, var(--crit));
+  color: #fff;
+  clip-path: var(--chamfer);
+  box-shadow: 0 2px 12px rgba(201, 59, 59, 0.35);
+}
+.btn-danger:hover { filter: brightness(1.06); transform: translateY(-1px); color: #fff; }
+
+.btn-sm, .btn.btn-sm { height: 28px; padding: 0 11px; font-size: 10.5px; }
+.btn-primary.btn-sm { height: 30px; padding: 0 13px; }
+
+/* ---- Row action links (ACTIVATE / DEACTIVATE): controls, not hyperlinks -- */
+.link-btn {
+  position: relative;
+  padding: 3px 1px;
+  border: none;
+  background: none;
+  color: var(--ion-600);
+  font-size: 10.5px;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.link-btn::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform 160ms ease;
+}
+.link-btn:hover::after { transform: scaleX(1); }
+.link-btn.danger-link { color: var(--crit); }
+
+/* ---- Icon buttons -------------------------------------------------------- */
+.icon-btn {
+  width: 34px;
+  height: 34px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+}
+.icon-btn:hover { border-color: var(--line-strong); background: var(--paper-sunk); color: var(--ink); }
+
+/* ---- Form controls: defined fields, unmistakable focus ------------------- */
+input[type="text"], input[type="email"], input[type="password"],
+input[type="number"], input[type="search"], input[type="url"],
+select, textarea {
+  height: 36px;
+  padding: 0 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--paper-raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+textarea { height: auto; padding: 9px 11px; }
+input::placeholder, textarea::placeholder { color: var(--slate-faint); }
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: none;
+  border-color: var(--ion-600);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ion-600) 24%, transparent);
+}
+input:disabled, select:disabled, textarea:disabled {
+  background: var(--paper-sunk);
+  color: var(--slate);
+}
+
+/* ---- Table scan aid: energon edge on the hovered row --------------------- */
+tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
+
+/* ---- Panel signature: a live top edge on every console panel ------------- */
+.panel { position: relative; }
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 2px;
+  background: linear-gradient(90deg, var(--ion-600), transparent 62%);
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+/* ---- Motion: rooms light up as you enter them ---------------------------- */
+@keyframes aegis-enter {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+.shell-content > * { animation: aegis-enter 200ms ease both; }
+
+@keyframes aegis-breathe {
+  0%, 100% { box-shadow: 0 0 10px rgba(72, 184, 255, 0.35); }
+  50%      { box-shadow: 0 0 22px rgba(72, 184, 255, 0.55); }
+}
+.rail-btn.active::before { animation: aegis-breathe 3.6s ease-in-out infinite; }
+
+/* ---- Chrome polish -------------------------------------------------------- */
+::selection { background: var(--ion-100); color: var(--ink); }
+* { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* Small-viewport guards: keep TopBar popovers inside the viewport so the
+   document never scrolls sideways (found during the tabs verification). */
+@media (max-width: 680px) {
+  .locale-pop { left: auto; right: 8px; max-width: calc(100vw - 16px); }
 }

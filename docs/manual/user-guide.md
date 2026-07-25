@@ -13,6 +13,7 @@ If something here doesn't match what you see on screen, your administrator may h
 1. [Getting started](#getting-started)
    - [Signing in](#signing-in)
    - [A tour of your workspace](#a-tour-of-your-workspace)
+   - [The navigation rail: every module explained](#the-navigation-rail-every-module-explained)
    - [Global search](#global-search)
    - [The notification bell](#the-notification-bell)
 2. [Working leads](#working-leads)
@@ -80,13 +81,96 @@ Platform users can switch active workspace from the top bar. Tenant users stay i
 
 When you sign in, you land on **Home** — not a wall of records, but the things that need you today: leads waiting for a first response, deals with unmet stage requirements, approvals waiting on you, and tasks due. Axiom is built exception-first: it shows you what needs action, why, and when it's due.
 
-Down the left side is the labelled **navigation rail**. The preview contains Revenue Command, Pipeline, Accounts, Leads, and Reference Data. On tablets and phones, use the menu button to open the rail. Role-aware groups and additional workspaces arrive with their underlying features.
+Down the left side is the **navigation rail** — your map of the whole product. It is described in full in [The navigation rail: every module explained](#the-navigation-rail-every-module-explained) below.
 
 Across the top:
 
 - **Command center** — the magnifying glass, or press **⌘K** (Mac) / **Ctrl+K** (Windows), to jump among implemented workspaces. Cross-record search is planned but not part of this preview.
 - **The notification bell** — everything that needs your attention, in one place.
 - **Your avatar** — profile, preferences, theme, connected email and calendar, and sign out.
+
+### The navigation rail: every module explained
+
+The rail lists **every part of Axiom**, arranged the way a working day is arranged rather than in any internal order. Think of it as the floor plan of a building: even the rooms you never enter are worth seeing on the map.
+
+Modules are gathered into eight groups. Click a group heading to fold it away if you never use it; it stays folded next time you sign in.
+
+#### Workspace — where your day starts
+
+| Module | In plain terms |
+|---|---|
+| **Home** | Your morning briefing. The handful of things that genuinely need a decision today, each with the reason it's flagged. |
+| **Activities** | Every call, meeting, email and task, on one timeline. Your record of who spoke to whom, and when. |
+
+#### Sell — the core sales motion
+
+| Module | In plain terms |
+|---|---|
+| **Leads** | People who might become customers but aren't yet. You qualify them here, then convert the good ones. |
+| **Pipeline** | Your live deals on a board, one column per stage. Drag a deal rightwards as it progresses. |
+| **Accounts** | The companies you sell to, and the people inside them. The customer's permanent file. |
+| **Forecast** | Your prediction of what will actually close this quarter, and the ability to show your working. |
+
+#### Quote to cash — turning a deal into money
+
+| Module | In plain terms |
+|---|---|
+| **Products** | Your catalogue: what you sell, and the official price of each item. |
+| **Quotes & CPQ** | The priced proposal you send a customer. CPQ means the system helps you configure the right bundle, price it correctly, and route discounts for approval. |
+| **Contracts** | The signed agreement, its dates, and what has to be renewed when. |
+
+#### Engage & serve — before and after the sale
+
+| Module | In plain terms |
+|---|---|
+| **Campaigns** | Marketing activity — a webinar, a mailshot — and which deals it actually produced. |
+| **Cases** | Customer problems and questions after they've bought, with a clock against the response time you promised. |
+| **Partners** | Resellers and referral partners who sell on your behalf, and the deals they register. |
+
+#### Intelligence — making sense of the numbers
+
+| Module | In plain terms |
+|---|---|
+| **Reports** | Build your own tables and charts from your data, and schedule them to arrive by email. |
+| **AI Copilot** | The assistant. It drafts, summarises and suggests — and always shows which records it read to reach its conclusion. |
+
+#### Vertical packs — industry-specific add-ons
+
+| Module | In plain terms |
+|---|---|
+| **BFSI** | Extras for banking, financial services and insurance: client onboarding checks, product holdings, suitability records. |
+| **Commodity** | Extras for physical commodity trading: counterparties, master agreements, tenders and cargo enquiries. |
+
+#### Platform — the machinery underneath
+
+| Module | In plain terms |
+|---|---|
+| **Reference Data** | The official lists everything else picks from — industries, countries, currencies, stages. Change it once, it changes everywhere. |
+| **Automation** | Rules that act for you: "when a deal passes £50,000, ask the director to approve it." |
+| **Integrations** | The connections to your other systems — email, calendar, accounting, phones. |
+| **Migration** | Bringing your data across from Salesforce, Zoho or HubSpot, with a rehearsal run before anything is written. |
+| **Mobile** | The phone and tablet experience, including working with no signal. |
+
+#### Governance — control and proof
+
+| Module | In plain terms |
+|---|---|
+| **Administration** | Who works here, what they're allowed to see, and how the system is configured. |
+| **Audit & Compliance** | The permanent record of who did what, when, and on whose authority. Used when someone has to prove it. |
+
+#### Why some modules look greyed out
+
+Modules marked **Planned** are specified and on the roadmap, but not built yet. They appear deliberately rather than being hidden — so you can see the shape of the whole product and know that a missing feature is scheduled, not lost. They can't be clicked.
+
+Modules marked **Beta** work, but not every part of them is finished yet. Use them; just expect some gaps.
+
+You'll also only see what your role permits. An account executive doesn't see Administration; that's not a fault.
+
+#### Making the rail narrower
+
+Click the menu button in the top bar to **collapse** the rail. It shrinks to a narrow strip of icons — every module is still one click away, and the highlight still shows where you are — giving you back most of the width for your actual work. Hover any icon to see its name. Click the button again to bring the labels back.
+
+On a phone or tablet the same button slides the full rail in over the page; tap anywhere outside it to dismiss.
 
 ### Global search
 

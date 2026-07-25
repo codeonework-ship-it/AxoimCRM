@@ -3,7 +3,10 @@ import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useAuth } from "../auth/AuthContext";
 import { api } from "../api/client";
+import { useT } from "../i18n/I18nProvider";
+import { LocaleSwitcher } from "../i18n/LocaleSwitcher";
 import { useNotifications } from "./notifications";
+import { UserMenu } from "./UserMenu";
 import { BellIcon, MenuIcon, SearchIcon, SunMoonIcon } from "./icons";
 
 function toggleTheme(): "light" | "dark" {
@@ -26,6 +29,7 @@ interface TopBarProps {
 
 export function TopBar({ onOpenCommand, onOpenHelp, onToggleNav, navExpanded }: TopBarProps) {
   const navigate = useNavigate();
+  const t = useT();
   const { user, tenant, switchTenant } = useAuth();
   const tenantsQ = useQuery({
     queryKey: ["auth", "tenants"],
@@ -77,7 +81,13 @@ export function TopBar({ onOpenCommand, onOpenHelp, onToggleNav, navExpanded }: 
 
   return (
     <header className="topbar">
-      <button className="icon-btn mobile-menu" aria-label="Toggle sidebar" aria-expanded={navExpanded} title="Toggle sidebar" onClick={onToggleNav}><MenuIcon /></button>
+      <button
+        className="icon-btn mobile-menu"
+        aria-label={t("shell.toggleSidebar", "Toggle sidebar")}
+        aria-expanded={navExpanded}
+        title={t("shell.toggleSidebar", "Toggle sidebar")}
+        onClick={onToggleNav}
+      ><MenuIcon /></button>
       <div className="topbar-context">
         <span className="topbar-title">Revenue operations</span>
         {user?.platformUser && tenantsQ.data ? (
@@ -89,9 +99,9 @@ export function TopBar({ onOpenCommand, onOpenHelp, onToggleNav, navExpanded }: 
         ) : <span className="topbar-tenant">{tenant?.name ?? "—"} · Live workspace</span>}
       </div>
 
-      <button className="search-box" onClick={onOpenCommand} aria-label="Open search and command center">
+      <button className="search-box" onClick={onOpenCommand} aria-label={t("shell.search", "Search or run a command")}>
         <SearchIcon size={16} />
-        <span>Search or run a command</span>
+        <span>{t("shell.search", "Search or run a command")}</span>
         <span className="search-kbd">{isMac ? "⌘K" : "Ctrl K"}</span>
       </button>
 
@@ -99,7 +109,13 @@ export function TopBar({ onOpenCommand, onOpenHelp, onToggleNav, navExpanded }: 
         <button
           ref={bellButtonRef}
           className="icon-btn"
-          aria-label={`Notifications${unreadCount ? ` (${unreadCount} unread)` : ""}`}
+          // "label: count" rather than "count label". Russian declines the noun
+          // after a numeral (1 непрочитанное / 2 непрочитанных / 5
+          // непрочитанных), and this layer has no plural-rule machinery. A
+          // labelled count sidesteps agreement entirely and reads correctly in
+          // all three languages.
+          aria-label={`${t("shell.notifications", "Notifications")}${unreadCount ? ` (${t("shell.unread", "unread")}: ${unreadCount})` : ""}`}
+          title={t("shell.notifications", "Notifications")}
           aria-expanded={panelOpen}
           onClick={() => setPanelOpen((o) => !o)}
         >
@@ -109,7 +125,7 @@ export function TopBar({ onOpenCommand, onOpenHelp, onToggleNav, navExpanded }: 
         </button>
 
         {panelOpen && (
-          <div className="notif-pop" role="dialog" aria-label="Notifications">
+          <div className="notif-pop" role="dialog" aria-label={t("shell.notifications", "Notifications")}>
             <div className="notif-head">
               <span><span className="eyebrow">Signal center</span><strong>Notifications</strong></span>
               {unreadCount > 0 && (
@@ -162,19 +178,30 @@ export function TopBar({ onOpenCommand, onOpenHelp, onToggleNav, navExpanded }: 
         )}
       </div>
 
-      <button className="manual-button help-button" aria-label="Open User Manual" title="User Manual (Ctrl+/)" onClick={onOpenHelp}>
-        User Manual
+      <button
+        className="manual-button help-button"
+        aria-label={t("shell.manual", "User Manual")}
+        title={`${t("shell.manual", "User Manual")} (Ctrl+/)`}
+        onClick={onOpenHelp}
+      >
+        {t("shell.manual", "User Manual")}
       </button>
+
+      <LocaleSwitcher />
 
       <button
         className="icon-btn"
-        aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+        aria-label={t("shell.theme", "Toggle theme")}
         aria-pressed={theme === "dark"}
-        title="Toggle theme"
+        title={t("shell.theme", "Toggle theme")}
         onClick={() => setTheme(toggleTheme())}
       >
         <SunMoonIcon />
       </button>
+
+      {/* Identity and sign-out live top-right — the conventional place, and
+          visible even when the rail is collapsed to icons. */}
+      <UserMenu />
     </header>
   );
 }

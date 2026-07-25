@@ -3,6 +3,7 @@ package com.axiom.admin;
 import com.axiom.auth.CrmRole;
 import com.axiom.common.ForbiddenException;
 import com.axiom.common.NotFoundException;
+import com.axiom.tenancy.PlatformSession;
 import com.axiom.tenancy.TenantContext;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
@@ -22,10 +23,21 @@ import java.util.UUID;
 @Service
 public class AdminService {
     private final JdbcTemplate jdbc;
+    private final PlatformSession platformSession;
+    private final com.axiom.identity.StepUpService stepUp;
+    private final com.axiom.identity.SessionService sessions;
+    private final com.axiom.identity.PasswordPolicyService passwordPolicy;
     private final BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder();
 
-    public AdminService(JdbcTemplate jdbc) {
+    public AdminService(JdbcTemplate jdbc, PlatformSession platformSession,
+                        com.axiom.identity.StepUpService stepUp,
+                        com.axiom.identity.SessionService sessions,
+                        com.axiom.identity.PasswordPolicyService passwordPolicy) {
         this.jdbc = jdbc;
+        this.platformSession = platformSession;
+        this.stepUp = stepUp;
+        this.sessions = sessions;
+        this.passwordPolicy = passwordPolicy;
     }
 
     public record UserRow(UUID id, String tenantSlug, String tenantName, String displayName,
@@ -91,13 +103,25 @@ public class AdminService {
         }
         CrmRole requestedRole = CrmRole.current(request.role().trim().toUpperCase());
         if (requestedRole.platform()) throw new ForbiddenException("Platform roles are managed outside tenant user creation");
+        // Granting a role is a controlled action (FR-TEN-009), and an impersonating
+        // operator must not be able to grant anything at all (FR-TEN-011).
+        com.axiom.identity.ImpersonationService.assertNotImpersonating("Creating a user and granting a role");
+        stepUp.requireStepUp("Creating a user with the " + requestedRole.name() + " role");
+        // The tenant's own password policy applies to a credential an administrator
+        // sets on someone else's behalf, not only to self-service changes.
+        passwordPolicy.validate(TenantContext.get().tenantId(), null,
+                request.email().trim().toLowerCase(), request.password());
 
         UUID id = UUID.randomUUID();
+        String hash = bcrypt.encode(request.password());
         jdbc.update("""
                 insert into identity.app_user(id, tenant_id, email, password_hash, display_name, role, active)
                 values (?, ?, ?, ?, ?, ?, true)
                 """, id, TenantContext.get().tenantId(), request.email().trim().toLowerCase(),
-                bcrypt.encode(request.password()), request.displayName().trim(), requestedRole.name());
+                hash, request.displayName().trim(), requestedRole.name());
+        jdbc.update("""
+                insert into identity.password_history(tenant_id, user_id, password_hash) values (?, ?, ?)
+                """, TenantContext.get().tenantId(), id, hash);
         return users().stream().filter(row -> row.id().equals(id)).findFirst()
                 .orElseThrow(() -> new NotFoundException("Created user was not found"));
     }
@@ -108,16 +132,24 @@ public class AdminService {
         if (!CrmRole.SUPER_ADMIN.name().equals(actorRole) && !CrmRole.TENANT_ADMIN.name().equals(actorRole)) {
             throw new ForbiddenException("User management requires Super Admin or Tenant Admin");
         }
+        com.axiom.identity.ImpersonationService.assertNotImpersonating("Enabling or disabling a user");
+        stepUp.requireStepUp(active ? "Re-enabling a user" : "Disabling a user");
         int updated = jdbc.update("""
                 update identity.app_user set active = ?, updated_at = now()
                 where tenant_id = ? and id = ?
                 """, active, TenantContext.get().tenantId(), id);
         if (updated == 0) throw new NotFoundException("User not found");
+        if (!active) {
+            // Deactivation without session revocation leaves a live token working
+            // until it expires, which makes "disabled" mean "disabled tomorrow".
+            sessions.revokeAllForUserSystem(TenantContext.get().tenantId(), id,
+                    "Account disabled by an administrator");
+        }
     }
 
     @Transactional(readOnly = true)
     public List<CompanyAccountRow> companies() {
-        CrmRole.requirePlatform(TenantContext.get().role());
+        platformSession.requirePlatformAndGrant();
         return jdbc.query("""
                 select t.id as tenant_id, t.slug, t.name as tenant_name, ca.legal_name, ca.account_status,
                        ca.trial_start_at, ca.trial_ends_at, ca.trial_extension_count,
@@ -142,7 +174,9 @@ public class AdminService {
 
     @Transactional
     public CompanyAccountRow extendTrial(UUID tenantId, TrialExtensionRequest request) {
-        CrmRole.requirePlatform(TenantContext.get().role());
+        platformSession.requirePlatformAndGrant();
+        com.axiom.identity.ImpersonationService.assertNotImpersonating("Extending a trial");
+        stepUp.requireStepUp("Extending a customer trial");
         int days = request.days() + (request.months() * 30);
         if (days <= 0) throw new ForbiddenException("Trial extension must add at least one day");
         int updated = jdbc.update("""
@@ -168,7 +202,9 @@ public class AdminService {
 
     @Transactional
     public CompanyAccountRow setCompanyStatus(UUID tenantId, CompanyStatusRequest request) {
-        CrmRole.requirePlatform(TenantContext.get().role());
+        platformSession.requirePlatformAndGrant();
+        com.axiom.identity.ImpersonationService.assertNotImpersonating("Changing a company account status");
+        stepUp.requireStepUp("Changing a company account status");
         String status = request.status().trim().toUpperCase();
         if (!List.of("TRIAL", "ACTIVE", "PAST_DUE", "INACTIVE", "SUSPENDED").contains(status)) {
             throw new ForbiddenException("Unsupported company status");
@@ -194,7 +230,7 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public List<BillingRow> billing() {
-        CrmRole.requirePlatform(TenantContext.get().role());
+        platformSession.requirePlatformAndGrant();
         return jdbc.query("""
                 select t.id as tenant_id, t.slug, t.name as tenant_name, ba.plan_code, ba.payment_status,
                        ba.billing_email, ba.current_period_start, ba.current_period_end,

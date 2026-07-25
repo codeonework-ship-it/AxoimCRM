@@ -1,121 +1,132 @@
-/* ============================================================
-   AEGIS design tokens — Axiom CRM cinematic ops theme.
-   Light is the base; dark is the flagship look.
-   Dark applies via prefers-color-scheme OR [data-theme="dark"]
-   on <html>; [data-theme="light"] forces light back.
-   ============================================================ */
+/* ============================================================================
+   AXIOM // COMMAND DECK — MOTORA theme port.
+   Cinematic tactical console: carbon black, gunmetal panels, electric-cyan
+   telemetry, amber command accents. Angular geometry, corner-bracket HUD
+   frames, scanline sweeps, mono readouts.
+
+   Ported from E:/Anand/Projects/Automobiles/motora/src/theme.css. Motora is a
+   single-world dark aesthetic and is treated as such: DARK IS THE PRODUCT.
+   A light variant is retained because the CRM ships a theme toggle and removing
+   a working control would be a regression — but it is a daylight-ops variant of
+   this same console, not a separate design.
+
+   Two token vocabularies are declared deliberately:
+     1. Motora's own names (--bg, --panel, --cyan, --amber …) for new work.
+     2. The CRM's existing names (--paper, --ink, --ion-600 …) aliased onto
+        them, so ~2,500 lines of existing layout re-skin without being rewritten.
+   ============================================================================ */
 
 :root {
-  /* Surfaces */
-  --paper: #eef1f6;
-  --paper-raised: #f8fafd;
-  --paper-sunk: #e2e7f0;
+  /* ---- Motora core palette (dark = the product) ---- */
+  --bg: #05070b;
+  --bg-raise: #090d14;
+  --panel: #0b111b;
+  --panel-2: #0f1622;
+  --line-m: #1b2838;
+  --line-bright: #2e4763;
+  --cyan: #35e0ff;
+  --cyan-deep: #0e7f96;
+  --cyan-dim: rgba(53, 224, 255, 0.12);
+  --amber: #ffb547;
+  --red: #ff5d5d;
+  --green: #3ee08f;
+  --text: #e6eefb;
+  --muted: #7d8fa5;
 
-  /* Text */
-  --ink: #0e1626;
-  --ink-soft: #3a465e;
-  --slate: #66738d;
-  --slate-faint: #98a3b9;
+  /* Angular cut — Motora's signature geometry. */
+  --cut: polygon(
+    10px 0,
+    100% 0,
+    100% calc(100% - 10px),
+    calc(100% - 10px) 100%,
+    0 100%,
+    0 10px
+  );
+  --speed: 200ms;
+  --ease: cubic-bezier(0.2, 0.8, 0.3, 1);
 
-  /* Hairlines */
-  --line: #d5dbe7;
-  --line-strong: #b6c0d4;
+  --mono: "Cascadia Code", Consolas, "JetBrains Mono", Menlo, monospace;
+  --sans: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif;
 
-  /* Structural steel */
-  --steel-900: #101c34;
-  --steel-800: #1c2e55;
+  /* ---- CRM token aliases: existing components inherit Motora ---- */
+  --paper: var(--bg);
+  --paper-raised: var(--panel);
+  --paper-sunk: var(--bg-raise);
 
-  /* Ion — proprietary interaction / focus / system-confidence signal */
-  --ion-600: #0968c7;
-  --ion-500: #237fe0;
-  --ion-100: #d7eaff;
+  --ink: var(--text);
+  --ink-soft: #b9c8dd;
+  --slate: var(--muted);
+  --slate-faint: #5d6d81;
 
-  /* Gold — AI provenance ONLY */
-  --gold-600: #9a6b00;
-  --gold-500: #c08a0f;
-  --gold-100: #f9efd4;
-  --gold-border: #e3c87e;
+  --line: var(--line-m);
+  --line-strong: var(--line-bright);
 
-  /* Status */
-  --good: var(--ion-600);
-  --warn: #c4611b;
-  --crit: #c93b3b;
-  --info: #5a6bb0;
+  --steel-900: #070c14;
+  --steel-800: #101a29;
 
+  /* Ion is the CRM's interaction signal; on this deck it IS Motora's cyan. */
+  --ion-600: var(--cyan);
+  --ion-500: #6fe9ff;
+  --ion-100: var(--cyan-dim);
+
+  /* Gold stays reserved for AI provenance — Motora's amber serves it exactly. */
+  --gold-600: #ffc76b;
+  --gold-500: var(--amber);
+  --gold-100: rgba(255, 181, 71, 0.1);
+  --gold-border: rgba(255, 181, 71, 0.4);
+
+  /* Status. Green is confined to genuine success semantics only — it is not a
+     surface or accent colour anywhere in this product. */
+  --good: var(--cyan);
+  --warn: var(--amber);
+  --crit: var(--red);
+  --info: #8fa5ff;
+
+  --glow: 0 0 18px rgba(53, 224, 255, 0.35);
+
+  --chamfer: var(--cut);
+  --radius: 0px; /* Motora is angular: cuts, never rounded corners. */
+  --rail-w: 232px;
+  --rail-w-collapsed: 62px;
+
+  --font-ui: var(--sans);
+  --font-mono: var(--mono);
+
+  color-scheme: dark;
+}
+
+/* ---- Daylight ops variant -------------------------------------------------
+   Same console, lit room. Surfaces invert; the cyan/amber command language and
+   all geometry are unchanged, so the product still reads as one design. Cyan is
+   darkened here because #35e0ff on white is unreadable (1.6:1) — the accent has
+   to earn its contrast in both rooms. */
+
+:root[data-theme="light"] {
+  --bg: #eef1f6;
+  --bg-raise: #e2e7f0;
+  --panel: #ffffff;
+  --panel-2: #f7f9fc;
+  --line-m: #ccd4e0;
+  --line-bright: #a7b2c6;
+  --cyan: #0a6f8c;
+  --cyan-deep: #084f64;
+  --cyan-dim: rgba(10, 111, 140, 0.1);
+  --amber: #9a6b00;
+  --red: #c93b3b;
+  --green: #1f7a52;
+  --text: #0a1020;
+  --muted: #55627a;
+
+  --ink-soft: #2f3a4f;
+  --slate-faint: #7a869c;
+  --steel-900: #0f1a2f;
+  --steel-800: #1b2c50;
+  --ion-500: #0d8bad;
+  --gold-600: #7d5600;
+  --gold-100: rgba(154, 107, 0, 0.1);
+  --gold-border: rgba(154, 107, 0, 0.38);
+  --info: #4459a8;
   --glow: none;
 
-  /* Geometry & type */
-  --chamfer: polygon(
-    0 0,
-    calc(100% - 12px) 0,
-    100% 12px,
-    100% 100%,
-    12px 100%,
-    0 calc(100% - 12px)
-  );
-  --radius: 2px;
-  --rail-w: 232px;
-  --grid-size: 56px;
-  --font-ui: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial,
-    sans-serif;
-  --font-mono: ui-monospace, "Cascadia Mono", "SFMono-Regular", Consolas,
-    "Liberation Mono", Menlo, monospace;
-
   color-scheme: light;
-}
-
-/* ---- Dark palette (flagship) -------------------------------- */
-
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --paper: #070b12;
-    --paper-raised: #111925;
-    --paper-sunk: #05070c;
-    --ink: #e8edf6;
-    --ink-soft: #b7c1d4;
-    --slate: #98a8bf;
-    --slate-faint: #74839b;
-    --line: #263246;
-    --line-strong: #3b4b64;
-    --steel-900: #0c1526;
-    --steel-800: #182741;
-    --ion-600: #48b8ff;
-    --ion-500: #72c9ff;
-    --ion-100: #0f2a3f;
-    --gold-600: #f5b83d;
-    --gold-500: #e8a020;
-    --gold-100: #2e2208;
-    --gold-border: #6b5212;
-    --warn: #ff9f3d;
-    --crit: #ff5c5c;
-    --info: #8fa5ff;
-    --glow: 0 0 16px rgba(56, 182, 255, 0.35);
-    color-scheme: dark;
-  }
-}
-
-:root[data-theme="dark"] {
-  --paper: #070b12;
-  --paper-raised: #111925;
-  --paper-sunk: #05070c;
-  --ink: #e8edf6;
-  --ink-soft: #b7c1d4;
-  --slate: #98a8bf;
-  --slate-faint: #74839b;
-  --line: #263246;
-  --line-strong: #3b4b64;
-  --steel-900: #0c1526;
-  --steel-800: #182741;
-  --ion-600: #48b8ff;
-  --ion-500: #72c9ff;
-  --ion-100: #0f2a3f;
-  --gold-600: #f5b83d;
-  --gold-500: #e8a020;
-  --gold-100: #2e2208;
-  --gold-border: #6b5212;
-  --warn: #ff9f3d;
-  --crit: #ff5c5c;
-  --info: #8fa5ff;
-  --glow: 0 0 16px rgba(56, 182, 255, 0.35);
-  color-scheme: dark;
 }

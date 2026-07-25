@@ -104,6 +104,17 @@ export interface ReferenceEntryMutation {
   effectiveTo?: string | null;
 }
 
+export interface LocaleOption {
+  code: string;
+  englishName: string;
+  nativeName: string;
+  isDefault: boolean;
+  sortOrder: number;
+}
+
+/** Flat key_path -> translated value map for one locale. */
+export type TranslationBundle = Record<string, string>;
+
 export interface MeResponse {
   user: AuthUser;
   tenant: AuthTenant;
@@ -480,6 +491,25 @@ export const api = {
 
   me(): Promise<MeResponse> {
     return request<MeResponse>("GET", "/auth/me");
+  },
+
+  /**
+   * Translation endpoints are optionally authenticated on the server: without a
+   * token they return the base product strings (so the login screen is
+   * translated), with one they also apply the tenant's own relabelling.
+   *
+   * skipAuthRedirect: a 401 here means the stored token has expired. The other
+   * queries on the page will hit the same 401 and drive the logout properly;
+   * having a background bundle refresh be the thing that ejects the user would
+   * make an expiry look like a random sign-out.
+   */
+  locales(): Promise<LocaleOption[]> {
+    return request<LocaleOption[]>("GET", "/i18n/locales", undefined, { skipAuthRedirect: true });
+  },
+
+  translationBundle(locale: string): Promise<TranslationBundle> {
+    return request<TranslationBundle>("GET", `/i18n/bundle/${encodeURIComponent(locale)}`,
+      undefined, { skipAuthRedirect: true });
   },
 
   tenants(): Promise<TenantOption[]> {

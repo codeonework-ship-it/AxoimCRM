@@ -5,6 +5,7 @@ import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataViewFrame } from "../components/DataViewFrame";
 import { useToasts } from "../components/Toasts";
 import { formatDate } from "../lib/format";
+import { GridLoader } from "../components/Loaders";
 
 const TYPES = ["TASK", "EVENT", "CALL", "EMAIL_LOG", "NOTE"];
 const STATUSES = ["OPEN", "COMPLETED", "CANCELLED"];
@@ -134,7 +135,7 @@ export function ActivitiesPage() {
         <button className="btn btn-primary btn-sm" disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>{createMutation.isPending ? "Saving..." : "Create activity"}</button>
       </section>
 
-      {activitiesQ.isLoading && <p className="loading-note">Loading activities...</p>}
+      {activitiesQ.isLoading && <GridLoader label="Reading engagement timeline" rows={6} columns={5} />}
       {activitiesQ.isError && <p className="empty-note">Activities failed to load{activitiesQ.error instanceof Error ? `: ${activitiesQ.error.message}` : "."}</p>}
       {activitiesQ.isSuccess && grouped.length === 0 && <p className="empty-note">No activities match the current query.</p>}
       {grouped.map(([group, items]) => <section className="activity-group" key={group}>

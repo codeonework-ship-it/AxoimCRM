@@ -6,6 +6,7 @@ import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataViewFrame } from "../components/DataViewFrame";
 import { MasterToolbar, canManageMasters } from "../components/MasterToolbar";
 import { useToasts } from "../components/Toasts";
+import { GridLoader } from "../components/Loaders";
 
 export function AccountsPage() {
   const [grouped, setGrouped] = useState(false);
@@ -58,7 +59,7 @@ export function AccountsPage() {
     </section>
     <MasterToolbar master="accounts" entityType="ACCOUNT" search={search} filter={industryFilter} grouped={grouped} groupLabel="Industry" onToggleGroup={() => setGrouped((value) => !value)} onChanged={() => void accountsQ.refetch()} />
     <DataViewFrame title="Accounts results">
-      {accountsQ.isLoading && <p className="loading-note">Loading accounts...</p>}
+      {accountsQ.isLoading && <GridLoader label="Reading client register" rows={6} columns={4} />}
       {accountsQ.isError && <p className="empty-note">Accounts failed to load{accountsQ.error instanceof Error ? `: ${accountsQ.error.message}` : "."}</p>}
       {accountsQ.isSuccess && <div className="table-wrap"><table className="data-table"><thead><tr><th>Name</th><th>Industry</th><th>Owner</th>{canManageMasters(user?.role) && <th className="table-action">Action</th>}</tr></thead>
       <tbody>{accounts.map((account) => {

@@ -8,14 +8,14 @@ _Last updated: 2026-07-25_
 
 | Epic | Capability | Status | Train | Notes |
 |---|---|:--:|:--:|---|
-| E01 | Tenancy, identity and access | 🟡 | R1 | Tenancy/auth skeleton in `backend/`: tenant + user tables, `TenantContext` + session-variable binding, Postgres RLS `tenant_isolation` policies on every tenant table, JWT scaffolding. No SSO/SCIM/MFA yet |
-| E02 | RBAC, record sharing and segregation of duties | ⛔ | R1 | |
-| E03 | Organization, reference and master data | ⛔ | R1 (partial) | P0 stories in R1; territory/quota P1 stories in R3 |
-| E04 | Accounts, contacts, hierarchy and buying groups | 🟡 | R1 | Tenant-scoped account/contact schema and read-only Accounts preview exist; hierarchy, buying-group workspace, record detail and acceptance coverage remain open |
-| E05 | Lead capture, qualification and routing | 🟡 | R1 | Lead→opportunity vertical-slice skeleton: `lead` table, seed data and the beginnings of the capture/convert API path in `backend/` |
-| E06 | Opportunity and pipeline management | 🟡 | R1 | Pipeline board, optimistic drag plus keyboard/touch Move control, server stage gate, and outbox events exist for the walking slice; full opportunity lifecycle remains open |
+| E01 | Tenancy, identity and access | 🟡 | R1 | Tenant lifecycle, local password policy, login throttling, MFA/TOTP, recovery codes, sessions/revocation, network rules, step-up, SCIM/service-token foundations, branding and impersonation controls are implemented. Live external IdP federation remains pending |
+| E02 | RBAC, record sharing and segregation of duties | 🟡 | R1 | Role hierarchy, profiles, permission sets/groups, object/FLS policy tables, sharing evidence, masking, SoD, maker-checker, delegated admin, access reviews, export audit and access explainers are implemented in schema/services |
+| E03 | Organization, reference and master data | 🟡 | R1 (partial) | Multi-currency/rates, fiscal calendar, business hours/holidays, governed picklists, territory preview/activation, quotas and maker-checker governed master changes are implemented |
+| E04 | Accounts, contacts, hierarchy and buying groups | 🟡 | R1 | Account/contact management foundation now includes hierarchy, rollups, buying groups, duplicate detection/merge evidence, consent/suppression, health snapshots and account 360 data services; deeper UI flows remain open |
+| E05 | Lead capture, qualification and routing | 🟡 | R1 | Lead capture now includes duplicate handling, scoring, routing, SLA clocks, qualification framework, conversion/disqualification support and seeded lead operations data |
+| E06 | Opportunity and pipeline management | 🟡 | R1 | Opportunity lifecycle now includes multi-pipeline metadata, stage gates, line items, revenue splits, risk signals, slippage/movement, closure reasons and movement history foundations |
 | E07 | Activity, email and calendar engagement | 🟡 | R2 | First-party tasks, events, calls, notes, manual email logs and unified activity timeline are implemented. Microsoft/Google/telephony connector capture remains intentionally pending |
-| E08 | Products, price books, quotes and CPQ | ⛔ | R2 | |
+| E08 | Products, price books, quotes and CPQ | 🟡 | R2 | CPQ database foundation is implemented: product catalogue, bundles, configuration rules, price books, pricing methods, contracted prices, approvals, quote versioning, quote lines, document/e-sign hand-off state and seeded governed values. API/UI workflow remains open |
 | E09 | Contracts, orders, subscriptions and renewals | ⛔ | R3 | |
 | E10 | Forecasting and revenue intelligence | ⛔ | R2 | |
 | E11 | Campaigns, segments and marketing alignment | ⛔ | R3 | |
@@ -24,15 +24,15 @@ _Last updated: 2026-07-25_
 | E14 | Workflow automation, approvals and rules engine | ⛔ | R1 (partial) | Engine + approvals in R1; visual builder and simulation in R2 |
 | E15 | Reporting, dashboards and analytics | ⛔ | R2 | |
 | E16 | AI copilot and agentic assistance | ⛔ | R2 (P0 slice) | Deliberately after E02 — permission-scoped grounding needs the sharing model first |
-| E17 | Integration platform, APIs, webhooks and events | ⛔ | R2 | Outbox table and Kafka relay config exist in the skeleton as plumbing for the E05/E06 slice |
+| E17 | Integration platform, APIs, webhooks and events | 🟡 | R2 | Outbox/Kafka relay, OpenAPI document, Prometheus metrics exposure, service credentials and SCIM service-token foundations are implemented. External webhooks/connectors remain pending |
 | E18 | Data migration and onboarding | ⛔ | R2 | |
 | E19 | Administration, configuration, sandbox and release | ⛔ | R1 (partial) | Custom objects/layouts/import in R1; sandbox + promotion in R2 |
-| E20 | Audit, compliance, observability and governance | ⛔ | R1 (partial) | Immutable audit + observability in R1; DSR/consent/tenant export in R2 |
+| E20 | Audit, compliance, observability and governance | 🟡 | R1 (partial) | Tamper-evident audit chain, read/export/authentication audit, field history, retention/legal hold, DSR, consent withdrawal, encryption posture, tenant export, evidence packs, SLI and usage telemetry are implemented |
 | E21 | Mobile and offline field access | ⛔ | R3 | Responsive-UI P0 story lands with R2 |
 | E22 | BFSI vertical pack | ⛔ | R4 | Gated on the pack framework proving out against a stable core |
 | E23 | Commodity trading vertical pack | ⛔ | R4 | Origination only; CTRM connector contract per [system design §11](architecture/system-design.md#11-integration-architecture-and-the-ctrm-connector) |
 
-**0 / 23 epics completed · 9 partial (walking vertical slice) · 14 not started.**
+**0 / 23 epics completed · 12 partial (walking vertical slice) · 11 not started.**
 
 ## 2026-07-25 implementation increment
 
@@ -46,6 +46,8 @@ The current runnable slice now includes these additional partial deliveries:
 - **E03 reference data:** governed value-set tables, seeded lead/status governance values, reference-data API, and Reference Data UI workspace are implemented for the preview.
 - **E02/E15/E19:** RBAC screen policies, user-management cockpit, trial/company/billing administration, Jasper report downloads, email/report alert configuration and a standalone reporting project boundary are implemented. External delivery providers remain pending.
 - **E07:** first-party activity timeline is implemented with tenant-scoped tasks, events, calls, notes and manual email logs; activity creation/completion writes audit/outbox events and reminder notifications.
+- **E01/E02/E03/E04/E05/E06/E17/E20:** scanned and integrated the larger security, identity, org-data, account, lead, pipeline, audit/compliance and observability implementation set; compilation blockers, consent-DSR service wiring, migration constraints and runtime actuator exposure were hardened.
+- **E08:** CPQ product/price-book/quote schema foundation and governed CPQ reference values are implemented through `V90`; quote/e-sign vendor integrations remain intentionally pending.
 
 ## Skeleton work in detail
 

@@ -6,15 +6,32 @@ import { App } from "./App";
 import { AuthProvider } from "./auth/AuthContext";
 import { ToastProvider } from "./components/Toasts";
 import { ErrorBoundary } from "./components/ErrorBoundary";
+import { I18nProvider } from "./i18n/I18nProvider";
 import { ApiUnreachableError } from "./api/client";
 import { isDesktop } from "./lib/desktop";
+/*
+ * Stylesheet order is load-bearing:
+ *   1. Bootstrap — foundation and utilities only.
+ *   2. tokens    — the MOTORA palette, as custom properties.
+ *   3. app       — component layout and structure.
+ *   4. motora    — the cinematic skin. Loads LAST so it wins over both
+ *                  Bootstrap Reboot's light defaults and app.css's earlier
+ *                  surface rules.
+ */
+import "bootstrap/dist/css/bootstrap.min.css";
 import "./styles/tokens.css";
 import "./styles/app.css";
+import "./styles/motora.css";
 
+/*
+ * Theme resolution. AEGIS dark is the flagship, so it is also the DEFAULT:
+ * a first-run user gets the cinematic console, not whatever the OS happens
+ * to prefer. An explicit choice via the TopBar toggle always wins and is
+ * remembered; "light" remains a first-class daylight-ops mode.
+ */
 const savedTheme = localStorage.getItem("axiom.theme");
-if (savedTheme === "light" || savedTheme === "dark") {
-  document.documentElement.dataset.theme = savedTheme;
-}
+document.documentElement.dataset.theme =
+  savedTheme === "light" || savedTheme === "dark" ? savedTheme : "dark";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,13 +53,20 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <Router>
-          <AuthProvider>
-            <ToastProvider>
-              <App />
-            </ToastProvider>
-          </AuthProvider>
-        </Router>
+        {/*
+          I18nProvider sits outside AuthProvider on purpose: the bundle endpoint
+          is anonymous, so the login screen is translated too. Inside Auth it
+          would only start resolving strings after sign-in.
+        */}
+        <I18nProvider>
+          <Router>
+            <AuthProvider>
+              <ToastProvider>
+                <App />
+              </ToastProvider>
+            </AuthProvider>
+          </Router>
+        </I18nProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   </StrictMode>,

@@ -10,6 +10,7 @@ import { ApiUnreachable } from "../components/ApiUnreachable";
 import { useToasts } from "../components/Toasts";
 import { formatDate, formatMoney, initials } from "../lib/format";
 import { LockIcon } from "../components/icons";
+import { BoardLoader } from "../components/Loaders";
 
 /** Move one opportunity between stages, immutably. Returns null if no-op. */
 function moveCard(
@@ -117,7 +118,7 @@ export function PipelinePage() {
   }
 
   if (boardQ.isLoading) {
-    return <p className="loading-note">Loading board…</p>;
+    return <BoardLoader label="Reading pipeline" columns={4} cardsPerColumn={2} />;
   }
 
   if (boardQ.isError) {

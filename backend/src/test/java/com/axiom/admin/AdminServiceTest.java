@@ -1,6 +1,7 @@
 package com.axiom.admin;
 
 import com.axiom.common.ForbiddenException;
+import com.axiom.tenancy.PlatformSession;
 import com.axiom.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,7 +17,11 @@ class AdminServiceTest {
     private AdminService service;
 
     @BeforeEach void setUp() {
-        service = new AdminService(mock(JdbcTemplate.class));
+        // A real PlatformSession over a mocked JdbcTemplate: the role guard must still
+        // run for real, otherwise billingRequiresPlatformRole would pass vacuously.
+        service = new AdminService(mock(JdbcTemplate.class), new PlatformSession(mock(JdbcTemplate.class)),
+                mock(com.axiom.identity.StepUpService.class), mock(com.axiom.identity.SessionService.class),
+                mock(com.axiom.identity.PasswordPolicyService.class));
         TenantContext.set(new TenantContext.Principal(UUID.randomUUID(), UUID.randomUUID(),
                 "SALES", "Sales", "sales@example.com"));
     }

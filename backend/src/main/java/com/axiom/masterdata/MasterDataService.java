@@ -70,10 +70,13 @@ public class MasterDataService {
     private static final Pattern EMAIL = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$");
     private final JdbcTemplate jdbc;
     private final AuditService audit;
+    private final com.axiom.identity.StepUpService stepUp;
 
-    public MasterDataService(JdbcTemplate jdbc, AuditService audit) {
+    public MasterDataService(JdbcTemplate jdbc, AuditService audit,
+                             com.axiom.identity.StepUpService stepUp) {
         this.jdbc = jdbc;
         this.audit = audit;
+        this.stepUp = stepUp;
     }
 
     public FilePayload template(String masterPath) {
@@ -106,6 +109,9 @@ public class MasterDataService {
     public FilePayload export(String masterPath, ExportFormat format, String search, String filter) {
         Master master = Master.fromPath(masterPath);
         CrmRole.requireExport(TenantContext.get().role());
+        // Bulk export is a controlled action (FR-TEN-009): holding a live session is
+        // not sufficient authority to walk out with an entire master file.
+        stepUp.requireStepUp("Exporting " + master.name().toLowerCase(Locale.ROOT).replace('_', ' '));
         TabularData data = exportData(master, search, filter);
         byte[] bytes = switch (format) {
             case XLSX -> xlsx(master, data);
@@ -125,6 +131,9 @@ public class MasterDataService {
     public void softDelete(String masterPath, UUID id) {
         Master master = Master.fromPath(masterPath);
         CrmRole.requireMasterAdmin(TenantContext.get().role());
+        // Deleting master data is a controlled action (FR-TEN-009).
+        stepUp.requireStepUp("Deleting a " + master.name().toLowerCase(Locale.ROOT).replace('_', ' ')
+                + " record");
         UUID tenantId = TenantContext.get().tenantId();
         int inUse = switch (master) {
             case ACCOUNTS -> count("select count(*) from contact where tenant_id=? and account_id=? and deleted_at is null", tenantId, id)

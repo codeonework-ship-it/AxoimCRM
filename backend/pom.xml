@@ -43,6 +43,22 @@
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
     </dependency>
+    <!--
+      Observability and API documentation.
+      springdoc serves the OpenAPI 3 document and Swagger UI, satisfying
+      FR-INT-001's requirement for a published, versioned specification.
+      micrometer-registry-prometheus exposes /actuator/prometheus for scraping
+      (FR-AUD-014 / ADR guidance on metrics).
+    -->
+    <dependency>
+      <groupId>org.springdoc</groupId>
+      <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+      <version>2.6.0</version>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.springframework.kafka</groupId>
       <artifactId>spring-kafka</artifactId>
@@ -127,6 +143,24 @@
       <plugin>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
+      </plugin>
+      <!--
+        Integration tests (*IT) run under Failsafe on `mvn verify`, not `mvn test`.
+        TenantIsolationIT needs a real PostgreSQL via Testcontainers to exercise
+        row-level security, which cannot be verified against a mock. It skips
+        cleanly when Docker is unavailable (@Testcontainers(disabledWithoutDocker)).
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>

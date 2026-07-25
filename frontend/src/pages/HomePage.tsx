@@ -5,6 +5,7 @@ import { formatDate, formatMoney } from "../lib/format";
 import { useAuth } from "../auth/AuthContext";
 import { Link } from "react-router-dom";
 import { ArrowIcon, SparkIcon } from "../components/icons";
+import { LoaderStatus } from "../components/Loaders";
 
 export function HomePage() {
   const { user } = useAuth();
@@ -134,7 +135,7 @@ export function HomePage() {
             </span>
           </div>
 
-          {boardQ.isLoading && <p className="loading-note">Scanning board…</p>}
+          {boardQ.isLoading && <LoaderStatus label="Scanning pipeline for exceptions" />}
           {isUnreachable(boardQ.error) && (
             <p className="empty-note">Board data unavailable — API unreachable.</p>
           )}

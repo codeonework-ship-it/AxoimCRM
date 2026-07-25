@@ -150,3 +150,170 @@ export function SparkIcon({ size }: IconProps) {
     </svg>
   );
 }
+
+/* ── Module glyphs ────────────────────────────────────────────────────────
+   Each module in the navigation gets its own mark so the sidebar can be read
+   by shape at a glance, not only by label. Same 1.5px squared-joint language
+   as the core set above. */
+
+export function ForecastIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M3 17l5-5 3 3 4-6 6 6" />
+      <path d="M3 21h18" />
+    </svg>
+  );
+}
+
+export function QuoteIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M5 3h9l5 5v13H5z" />
+      <path d="M14 3v5h5" />
+      <path d="M9 13h6M9 17h4" />
+    </svg>
+  );
+}
+
+export function ContractIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M5 3h14v18H5z" />
+      <path d="M9 8h6M9 12h6" />
+      <path d="M9 16.5c1.5-1.5 3-1.5 4.5 0" />
+    </svg>
+  );
+}
+
+export function CampaignIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M4 10v4h4l6 4V6l-6 4z" />
+      <path d="M18 9c1.2 1.2 1.2 4.8 0 6" />
+    </svg>
+  );
+}
+
+export function CaseIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M3 8h18v12H3z" />
+      <path d="M9 8V5h6v3" />
+      <path d="M3 13h18" />
+    </svg>
+  );
+}
+
+export function PartnerIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M8 11a3 3 0 100-6 3 3 0 000 6z" />
+      <path d="M17 12a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
+      <path d="M2 20c0-3.3 2.7-5 6-5s6 1.7 6 5" />
+      <path d="M16 15c3 0 6 1.3 6 5" />
+    </svg>
+  );
+}
+
+export function AutomationIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M5 5h5v5H5zM14 14h5v5h-5z" />
+      <path d="M10 7.5h4v9h0" />
+    </svg>
+  );
+}
+
+export function IntegrationIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M9 3v6M15 3v6" />
+      <path d="M6 9h12v4a6 6 0 01-12 0z" />
+      <path d="M12 19v2" />
+    </svg>
+  );
+}
+
+export function MigrationIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M3 7h12" />
+      <path d="M11 3l4 4-4 4" />
+      <path d="M21 17H9" />
+      <path d="M13 13l-4 4 4 4" />
+    </svg>
+  );
+}
+
+export function AuditIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z" />
+      <path d="M9 12l2 2 4-4" />
+    </svg>
+  );
+}
+
+export function BfsiIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M3 9l9-5 9 5" />
+      <path d="M5 9v9M10 9v9M14 9v9M19 9v9" />
+      <path d="M3 21h18" />
+    </svg>
+  );
+}
+
+export function CommodityIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M3 15h4l3-8 4 12 3-6h4" />
+    </svg>
+  );
+}
+
+export function AiIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3z" />
+      <path d="M18 16l.9 2.1L21 19l-2.1.9L18 22l-.9-2.1L15 19l2.1-.9z" />
+    </svg>
+  );
+}
+
+export function MobileIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M7 2h10v20H7z" />
+      <path d="M11 18h2" />
+    </svg>
+  );
+}
+
+export function ProductIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M12 2l9 5v10l-9 5-9-5V7z" />
+      <path d="M3 7l9 5 9-5M12 12v10" />
+    </svg>
+  );
+}
+
+export function ChevronIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <path d="M9 5l7 7-7 7" />
+    </svg>
+  );
+}
+
+/** Language / locale. Meridians rather than a flag: a language is not a country. */
+export function GlobeIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17" />
+      <path d="M12 3.5c2.6 2.4 4 5.3 4 8.5s-1.4 6.1-4 8.5c-2.6-2.4-4-5.3-4-8.5s1.4-6.1 4-8.5z" />
+    </svg>
+  );
+}

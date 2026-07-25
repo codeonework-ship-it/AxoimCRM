@@ -6,6 +6,7 @@ import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataViewFrame } from "../components/DataViewFrame";
 import { MasterToolbar, canManageMasters } from "../components/MasterToolbar";
 import { useToasts } from "../components/Toasts";
+import { GridLoader } from "../components/Loaders";
 
 const CONVERTIBLE = new Set(["NEW", "QUALIFIED"]);
 const STATUSES = ["NEW", "WORKING", "NURTURING", "QUALIFIED", "CONVERTED", "DISQUALIFIED"];
@@ -69,7 +70,7 @@ export function LeadsPage() {
     </section>
     <MasterToolbar master="leads" entityType="LEAD" search={search} filter={statusFilter} grouped={grouped} groupLabel="Status" onToggleGroup={() => setGrouped((value) => !value)} onChanged={() => void leadsQ.refetch()} />
     <DataViewFrame title="Lead queue">
-      {leadsQ.isLoading && <p className="loading-note">Loading leads...</p>}
+      {leadsQ.isLoading && <GridLoader label="Reading lead queue" rows={6} columns={4} />}
       {leadsQ.isError && <p className="empty-note">Leads failed to load{leadsQ.error instanceof Error ? `: ${leadsQ.error.message}` : "."}</p>}
       {leadsQ.isSuccess && leads.length === 0 && <p className="empty-note">No leads match the current query.</p>}
       {leads.map((lead) => { const showGroup = grouped && lead.status !== previousGroup; previousGroup = lead.status; return <Fragment key={lead.id}>

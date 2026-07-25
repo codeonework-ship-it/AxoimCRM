@@ -1,0 +1,665 @@
+/* ============================================================================
+   AXIOM // COMMAND DECK — MOTORA skin layer.
+
+   Loads AFTER bootstrap.min.css and app.css. Bootstrap is a foundation/utility
+   layer only; this file is the product's visual identity and must win.
+
+   Ported from motora/src/theme.css and mapped onto the CRM's component
+   vocabulary (.rail, .panel, .btn, .master-tab, tables, loaders …) rather than
+   Motora's marketplace one (.vcard, .hangar, .duel …).
+   ============================================================================ */
+
+/* ---- Bootstrap guard ------------------------------------------------------
+   Bootstrap Reboot ships a light-theme body and its own link colours. Re-assert
+   the deck. Also strip the container gutters we don't use — this app owns its
+   own spacing. */
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+.container,
+.container-fluid { padding-right: 0; padding-left: 0; }
+a { --bs-link-color: var(--cyan); --bs-link-hover-color: var(--cyan); text-decoration: none; }
+hr { color: var(--line); }
+img, svg { max-width: 100%; }
+table { max-width: 100%; }
+/* Bootstrap sets --bs-body-* on :root; point them at our tokens so any stray
+   Bootstrap component inherits the deck instead of Bootstrap's greys. */
+:root {
+  --bs-body-bg: var(--bg);
+  --bs-body-color: var(--text);
+  --bs-border-color: var(--line);
+  --bs-primary: var(--cyan);
+  --bs-font-sans-serif: var(--sans);
+  --bs-font-monospace: var(--mono);
+}
+
+/* Golden rule from Motora: the page never scrolls sideways. */
+html { overflow-x: hidden; }
+body { max-width: 100%; overflow-x: hidden; }
+
+::selection { background: var(--cyan); color: #04222b; }
+:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--bg-raise); }
+::-webkit-scrollbar-thumb { background: #223247; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #31485f; }
+
+/* ---- Deck ground ---------------------------------------------------------
+   Motora's faint 56px telemetry grid, at its original 0.022 alpha. On carbon
+   this reads as texture, not lines. It is dark-only: on the daylight variant the
+   same grid was visually noisy, which is the defect that got reported. */
+.app-ground {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1100px 460px at 50% -12%, rgba(53, 224, 255, 0.06), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(53, 224, 255, 0.022) 0 1px, transparent 1px 56px),
+    repeating-linear-gradient(90deg, rgba(53, 224, 255, 0.022) 0 1px, transparent 1px 56px);
+}
+:root[data-theme="light"] .app-ground {
+  background-image: none;
+}
+
+/* ---- HUD panels: corner brackets ----------------------------------------
+   Motora's signature frame. Applied to the CRM's panels and cards. */
+.panel,
+.card {
+  position: relative;
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line);
+  border-radius: 0;
+}
+.panel::before,
+.panel::after,
+.card::before,
+.card::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  z-index: 1;
+}
+.panel::before,
+.card::before {
+  top: -1px; left: -1px;
+  border-top: 2px solid var(--cyan);
+  border-left: 2px solid var(--cyan);
+  /* Cancel the old gradient top-edge rule from the previous skin. */
+  width: 14px; height: 14px; background: none; opacity: 1;
+}
+.panel::after,
+.card::after {
+  bottom: -1px; right: -1px;
+  border-bottom: 2px solid var(--cyan);
+  border-right: 2px solid var(--cyan);
+}
+
+/* ---- Type: mono readouts and // kickers --------------------------------- */
+.eyebrow,
+.label,
+.rail-section,
+thead th,
+.master-tab,
+.count-readout {
+  font-family: var(--mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.page-head h1 {
+  font-family: var(--sans);
+  font-size: clamp(1.3rem, 3vw, 1.9rem);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text);
+}
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.66rem;
+  letter-spacing: 0.3em;
+  color: var(--cyan);
+}
+.eyebrow::before { content: "//"; opacity: 0.7; }
+.num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+/* ---- Command rail -------------------------------------------------------- */
+.rail {
+  background: linear-gradient(180deg, #070c14 0%, #05070b 100%);
+  border-right: 1px solid var(--line);
+  box-shadow: inset -1px 0 0 rgba(53, 224, 255, 0.28);
+}
+.rail-brand strong { letter-spacing: 0.3em; font-weight: 800; color: #f2f8ff; }
+.rail-brand small {
+  font-family: var(--mono);
+  letter-spacing: 0.28em;
+  color: var(--cyan);
+}
+.rail-section { font-size: 0.62rem; letter-spacing: 0.26em; color: #8fa3bb; }
+.rail-section:hover { color: var(--cyan); }
+.rail-btn {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #c3d2e6;
+  clip-path: none;
+  border-left: 2px solid transparent;
+}
+.rail-btn:hover { color: var(--text); background: rgba(53, 224, 255, 0.08); }
+.rail-btn.active {
+  color: var(--cyan);
+  background: linear-gradient(90deg, rgba(53, 224, 255, 0.16), transparent 85%);
+  border-left-color: var(--cyan);
+}
+.rail-btn.active::before {
+  box-shadow: 0 0 10px var(--cyan);
+  background: var(--cyan);
+}
+.rail-btn.is-planned { color: #8496ad; background: none; }
+.rail-btn.is-planned svg { opacity: 0.6; }
+.rail-flag {
+  font-family: var(--mono);
+  border-color: var(--line-bright);
+  color: #9db0c8;
+  border-radius: 0;
+}
+.rail-flag.is-partial { border-color: rgba(255, 181, 71, 0.5); color: var(--amber); }
+.rail-avatar { clip-path: var(--cut); background: var(--cyan-dim); color: var(--cyan); }
+
+/* ---- Top bar ------------------------------------------------------------- */
+.topbar {
+  background: rgba(5, 7, 11, 0.86);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--line);
+}
+:root[data-theme="light"] .topbar { background: rgba(255, 255, 255, 0.9); }
+
+/* ---- Controls: angular command keys ------------------------------------- */
+.btn {
+  min-height: 38px;
+  gap: 9px;
+  padding: 9px 18px;
+  border: 1px solid var(--line-bright);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  clip-path: var(--cut);
+  box-shadow: none;
+  transition: transform var(--speed) var(--ease), box-shadow var(--speed) var(--ease),
+    background var(--speed) var(--ease), color var(--speed) var(--ease),
+    border-color var(--speed) var(--ease);
+}
+.btn:hover {
+  transform: translateY(-1px);
+  border-color: var(--cyan);
+  color: var(--cyan);
+  background: transparent;
+  box-shadow: none;
+}
+.btn:active { transform: translateY(0); }
+
+.btn-primary,
+.btn.btn-primary {
+  border: 1px solid var(--cyan);
+  background: var(--cyan);
+  color: #03222b;
+  font-weight: 700;
+  filter: none;
+}
+.btn-primary:hover {
+  background: var(--cyan);
+  color: #03222b;
+  box-shadow: 0 0 22px rgba(53, 224, 255, 0.45);
+  filter: none;
+}
+/* The previous skin's sweep pseudo-element would sit over the cyan fill. */
+.btn-primary::after { content: none; }
+.btn-primary:disabled {
+  background: var(--line-bright);
+  border-color: var(--line-bright);
+  color: var(--bg-raise);
+  box-shadow: none;
+}
+.btn-danger {
+  border: 1px solid var(--red);
+  background: transparent;
+  color: var(--red);
+}
+.btn-danger:hover { background: var(--red); color: #2a0a0a; box-shadow: 0 0 18px rgba(255, 93, 93, 0.35); }
+.btn-sm, .btn.btn-sm { min-height: 32px; padding: 6px 13px; font-size: 0.64rem; }
+.btn[aria-pressed="true"] { background: var(--cyan); border-color: var(--cyan); color: #03222b; }
+
+.icon-btn {
+  width: 40px; height: 40px;
+  border: 1px solid var(--line-bright);
+  border-radius: 0;
+  clip-path: var(--cut);
+  background: rgba(5, 7, 11, 0.6);
+  color: var(--muted);
+}
+.icon-btn:hover { color: var(--cyan); border-color: var(--cyan); background: rgba(5, 7, 11, 0.6); }
+
+.link-btn {
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  color: var(--cyan);
+}
+.link-btn.danger-link { color: var(--red); }
+
+/* ---- Fields -------------------------------------------------------------- */
+input[type="text"], input[type="email"], input[type="password"],
+input[type="number"], input[type="search"], input[type="url"],
+select, textarea {
+  min-height: 40px;
+  border: 1px solid var(--line-bright);
+  border-radius: 0;
+  background: var(--bg-raise);
+  color: var(--text);
+}
+select {
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 3px var(--cyan-dim), 0 0 18px rgba(53, 224, 255, 0.18);
+}
+
+/* ---- Tables: telemetry readouts ----------------------------------------- */
+thead th {
+  font-size: 0.62rem;
+  color: var(--muted);
+  font-weight: 400;
+  border-bottom: 1px solid var(--line-bright);
+  background: var(--panel-2);
+}
+tbody td { font-size: 0.86rem; color: var(--text); }
+tbody tr + tr td { border-top: 1px solid var(--line); }
+tbody tr:hover td { background: rgba(53, 224, 255, 0.05); }
+tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
+
+/* ---- Tabs (master data) -------------------------------------------------- */
+.master-tab {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.16em;
+  color: var(--muted);
+  border-radius: 0;
+}
+.master-tab:hover { color: var(--text); }
+.master-tab[aria-selected="true"] {
+  color: var(--cyan);
+  border-bottom-color: var(--cyan);
+  box-shadow: 0 2px 10px -6px var(--cyan);
+}
+
+/* ---- Chips / badges ------------------------------------------------------ */
+.chip, .badge-pill, .status-chip {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border-radius: 0;
+  color: var(--cyan);
+  background: var(--cyan-dim);
+  border: 1px solid rgba(53, 224, 255, 0.35);
+}
+
+/* ---- AI provenance stays amber, never cyan ------------------------------ */
+.ai-card, .ai-panel {
+  border-color: var(--gold-border);
+}
+.ai-card::before, .ai-card::after,
+.ai-panel::before, .ai-panel::after {
+  border-color: var(--amber);
+}
+
+/* ============================================================================
+   LOADERS — CRM-domain, not generic spinners.
+   A spinner says "wait". These say what the system is doing and roughly how
+   much of it is left, and they hold the shape of the content that is coming so
+   the layout does not jump when data lands.
+   ========================================================================== */
+
+/* Scanline sweep — the shared motion primitive (Motora's .skel::after). */
+@keyframes aegis-scan { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+
+.skel {
+  position: relative;
+  overflow: hidden;
+  background: var(--panel);
+  border: 1px solid var(--line);
+}
+.skel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 35%, rgba(53, 224, 255, 0.09) 50%, transparent 65%);
+  animation: aegis-scan 1.1s linear infinite;
+}
+
+/* Bar primitives used to hold a row's shape. */
+.skel-bar {
+  height: 10px;
+  background: linear-gradient(90deg, var(--line) 0%, var(--line-bright) 50%, var(--line) 100%);
+  background-size: 200% 100%;
+  animation: aegis-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes aegis-shimmer {
+  0% { background-position: 140% 0; }
+  100% { background-position: -40% 0; }
+}
+.skel-bar.w-xs { width: 14%; }
+.skel-bar.w-sm { width: 26%; }
+.skel-bar.w-md { width: 45%; }
+.skel-bar.w-lg { width: 68%; }
+.skel-bar.tall { height: 16px; }
+
+/* The status line: what the deck is actually doing. */
+.loader-status {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+.loader-status::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan);
+  animation: aegis-pulse 1s ease-in-out infinite;
+}
+@keyframes aegis-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+/* Indeterminate progress rail beneath the status line. */
+.loader-rail {
+  height: 2px;
+  margin-top: 10px;
+  background: var(--line);
+  overflow: hidden;
+}
+.loader-rail > i {
+  display: block;
+  height: 100%;
+  width: 40%;
+  background: linear-gradient(90deg, var(--cyan-deep), var(--cyan));
+  box-shadow: 0 0 10px rgba(53, 224, 255, 0.5);
+  animation: aegis-rail 1.15s var(--ease) infinite;
+}
+@keyframes aegis-rail {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(320%); }
+}
+
+/* Panel-level loader: centred status inside a HUD frame. */
+.loader-panel {
+  display: grid;
+  place-items: center;
+  gap: 4px;
+  min-height: 220px;
+  padding: 40px 24px;
+  text-align: center;
+}
+.loader-panel .loader-sub {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.loader-panel .loader-rail { width: min(300px, 60vw); }
+
+/* Grid/table loader: skeleton rows that match the real row rhythm. */
+.loader-rows { display: grid; gap: 1px; }
+.loader-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1.6fr 0.6fr 0.7fr 0.7fr;
+  gap: 18px;
+  align-items: center;
+  padding: 13px 14px;
+  border-top: 1px solid var(--line);
+}
+.loader-row:first-child { border-top: 0; }
+@media (max-width: 700px) {
+  .loader-row { grid-template-columns: 1fr 1fr; }
+  .loader-row > *:nth-child(n + 3) { display: none; }
+}
+
+/* Card loader: holds the shape of a pipeline deal card. */
+.loader-cards { display: grid; gap: 12px; }
+.loader-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  clip-path: var(--cut);
+}
+
+/* Inline loader for a control that is working (e.g. a submitting button). */
+.loader-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+.loader-inline::before {
+  content: "";
+  width: 12px; height: 12px;
+  border: 1.5px solid var(--cyan);
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: aegis-spin 0.7s linear infinite;
+}
+@keyframes aegis-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .skel::after, .skel-bar, .loader-status::before,
+  .loader-rail > i, .loader-inline::before { animation: none; }
+}
+
+/* ---- Entrance rise ------------------------------------------------------- */
+@keyframes aegis-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.shell-content > * { animation: aegis-rise 0.42s var(--ease) both; }
+@media (prefers-reduced-motion: reduce) { .shell-content > * { animation: none; } }
+
+/* ============================================================================
+   HEADER USER MENU
+   Identity + sign-out, top-right. Moved out of the rail: it competed with the
+   module list, broke the top-right convention users expect, and vanished when
+   the rail collapsed to icons. Sign-out now sits one deliberate disclosure step
+   away instead of one mis-click from navigation.
+   ========================================================================== */
+
+.user-menu { position: relative; margin-left: 2px; }
+
+.user-trigger {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  padding: 4px 11px 4px 5px;
+  border: 1px solid var(--line-bright);
+  background: rgba(5, 7, 11, 0.55);
+  color: var(--text);
+  clip-path: var(--cut);
+  cursor: pointer;
+  transition: border-color var(--speed) var(--ease), color var(--speed) var(--ease);
+}
+:root[data-theme="light"] .user-trigger { background: var(--panel); }
+.user-trigger:hover { border-color: var(--cyan); }
+.user-trigger svg { flex: 0 0 12px; opacity: 0.7; transform: rotate(90deg); }
+.user-trigger[aria-expanded="true"] { border-color: var(--cyan); }
+.user-trigger[aria-expanded="true"] svg { transform: rotate(-90deg); }
+
+.user-avatar {
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  clip-path: var(--cut);
+  background: var(--cyan-dim);
+  border: 1px solid rgba(53, 224, 255, 0.35);
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.user-avatar.lg { flex-basis: 40px; width: 40px; height: 40px; font-size: 0.82rem; }
+
+.user-id { display: flex; flex-direction: column; min-width: 0; text-align: left; }
+.user-id strong {
+  overflow: hidden;
+  max-width: 15ch;
+  font-size: 0.76rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.user-id small {
+  font-family: var(--mono);
+  font-size: 0.54rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cyan);
+}
+
+/* Popover */
+.user-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 80;
+  width: 264px;
+  padding: 14px;
+  background: var(--bg-raise);
+  border: 1px solid var(--line-bright);
+  border-top: 2px solid var(--cyan);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, 0.6);
+}
+.user-pop-head {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.user-pop-head > span { display: flex; flex-direction: column; min-width: 0; }
+.user-pop-head strong { font-size: 0.86rem; }
+.user-pop-head small {
+  overflow: hidden;
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-overflow: ellipsis;
+}
+
+.user-facts { display: grid; gap: 9px; margin: 12px 0 14px; }
+.user-facts > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.user-facts dt {
+  font-family: var(--mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.user-facts dd {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--text);
+  text-align: right;
+}
+
+.user-signout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--red);
+  background: transparent;
+  color: var(--red);
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  clip-path: var(--cut);
+  cursor: pointer;
+  transition: background var(--speed) var(--ease), color var(--speed) var(--ease);
+}
+.user-signout:hover { background: var(--red); color: #2a0a0a; }
+
+/* Narrow headers: keep the avatar, drop the name block. */
+@media (max-width: 860px) {
+  .user-id { display: none; }
+  .user-trigger { padding: 4px 7px; }
+  .user-pop { right: 0; max-width: calc(100vw - 16px); }
+}
+
+/* ============================================================================
+   CONTROL GEOMETRY CORRECTION
+   Motora's diagonal corner cut (--cut) read as a bevelled / 3D cube edge at
+   button scale, which is not what this product wants. Controls are now plain
+   rectangles with square corners — still unmistakably on-theme, because the
+   theme's character at this size comes from the cyan fill, the hairline border,
+   and the mono uppercase label, not from the corner shape.
+
+   The cut is KEPT where it works: large HUD surfaces and avatars, where it reads
+   as panel geometry rather than as a chamfered button.
+   ========================================================================== */
+
+.btn,
+.btn.btn-primary,
+.btn-primary,
+.btn-danger,
+.btn-sm,
+.icon-btn,
+.user-trigger,
+.user-signout {
+  clip-path: none;
+  border-radius: 0;
+}
+
+/* Primary keeps its presence through fill and glow, not geometry. */
+.btn-primary,
+.btn.btn-primary {
+  border: 1px solid var(--cyan);
+  background: var(--cyan);
+  color: #03222b;
+}
+.btn-primary:hover,
+.btn.btn-primary:hover {
+  box-shadow: 0 0 18px rgba(53, 224, 255, 0.4);
+}
+
+/* Secondary reads as a console key via its hairline and cyan hover. */
+.btn:not(.btn-primary):not(.btn-danger):hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
