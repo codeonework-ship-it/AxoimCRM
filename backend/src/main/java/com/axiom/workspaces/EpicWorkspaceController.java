@@ -1,6 +1,10 @@
 package com.axiom.workspaces;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -9,9 +13,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/workspaces")
 public class EpicWorkspaceController {
     private final EpicWorkspaceService workspaces;
+    private final WorkspaceExportService exports;
 
-    public EpicWorkspaceController(EpicWorkspaceService workspaces) {
+    public EpicWorkspaceController(EpicWorkspaceService workspaces, WorkspaceExportService exports) {
         this.workspaces = workspaces;
+        this.exports = exports;
     }
 
     @GetMapping("/forecast")
@@ -117,5 +123,18 @@ public class EpicWorkspaceController {
                                                         @RequestParam(required = false) String status,
                                                         @RequestParam(defaultValue = "0") int page) {
         return workspaces.commodity(search, status, page);
+    }
+
+    @GetMapping("/{module}/export")
+    public ResponseEntity<byte[]> export(@PathVariable String module,
+                                         @RequestParam WorkspaceExportService.ExportFormat format,
+                                         @RequestParam(required = false) String search,
+                                         @RequestParam(required = false) String status,
+                                         @RequestParam(defaultValue = "0") int page) {
+        WorkspaceExportService.FilePayload file = exports.export(module, format, search, status, page);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.filename() + "\"")
+                .contentType(MediaType.parseMediaType(file.contentType()))
+                .body(file.bytes());
     }
 }

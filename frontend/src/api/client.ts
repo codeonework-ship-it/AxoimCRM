@@ -866,4 +866,13 @@ export const api = {
       status: params?.status ?? params?.filter,
     })}`);
   },
+
+  exportWorkspace(module: "forecast" | "contracts" | "campaigns" | "cases" | "migration" | "partners" | "automation" | "analytics" | "copilot" | "mobile" | "integrations" | "sandbox" | "audit" | "bfsi" | "commodity", format: "XLSX" | "DOCX" | "PDF", params?: ListParams & { status?: string }): Promise<DownloadedFile> {
+    return fileRequest(`/workspaces/${module}/export${queryString({
+      format,
+      page: params?.page ?? 0,
+      search: params?.search,
+      status: params?.status ?? params?.filter,
+    })}`);
+  },
 };

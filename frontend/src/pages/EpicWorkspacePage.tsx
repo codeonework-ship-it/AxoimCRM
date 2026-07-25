@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { Fragment, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { api, isUnreachable, type WorkspaceRow } from "../api/client";
+import { api, isUnreachable, type DownloadedFile, type WorkspaceRow } from "../api/client";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataViewFrame } from "../components/DataViewFrame";
 import { GridLoader } from "../components/Loaders";
+import { useToasts } from "../components/Toasts";
 import { formatDate, formatMoney } from "../lib/format";
 
 export type WorkspaceModule =
@@ -67,18 +68,34 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [grouped, setGrouped] = useState(false);
+  const toasts = useToasts();
   const workspaceQ = useQuery({
     queryKey: ["workspace", module, page, search, status],
     queryFn: () => api.workspace(module, { page, search, status }),
     retry: 1,
   });
 
-  if (isUnreachable(workspaceQ.error)) return <ApiUnreachable onRetry={() => void workspaceQ.refetch()} retrying={workspaceQ.isFetching} />;
+  if (isUnreachable(workspaceQ.error)) {
+    return <ApiUnreachable onRetry={() => void workspaceQ.refetch()} retrying={workspaceQ.isFetching} />;
+  }
 
   const workspace = workspaceQ.data;
   const rows = workspace?.rows.items ?? [];
+  const visibleRows = grouped
+    ? [...rows].sort((a, b) => a.status.localeCompare(b.status) || a.title.localeCompare(b.title))
+    : rows;
   const total = workspace?.rows.total ?? 0;
   const totalPages = workspace?.rows.totalPages ?? 0;
+
+  async function download(format: "XLSX" | "DOCX" | "PDF", label: string) {
+    try {
+      saveFile(await api.exportWorkspace(module, format, { page, search, status }));
+      toasts.push("info", `${label} ready`, "The export used the current page, search and status filters.");
+    } catch (error) {
+      toasts.push("error", `${label} failed`, error instanceof Error ? error.message : "Download failed.");
+    }
+  }
 
   return <>
     <div className="page-head epic-head">
@@ -93,24 +110,49 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
     <div className="kpi-row epic-kpis">
       {(workspace?.summary ?? []).map((metric) => <div className="kpi" key={metric.label}>
         <span className="label">{metric.label}</span>
-        <div className={`kpi-value ${metric.tone === "crit" ? "crit" : ""}`}>{metric.unit === "money" ? formatMoney(Number(metric.value)) : metric.value}</div>
+        <div className={`kpi-value ${metric.tone === "crit" ? "crit" : ""}`}>
+          {metric.unit === "money" ? formatMoney(Number(metric.value)) : metric.value}
+        </div>
         <div className="kpi-sub">{metric.unit === "money" ? "Tenant currency rollup" : "Tenant-scoped count"}</div>
       </div>)}
-      {workspaceQ.isLoading && [0, 1, 2].map((i) => <div className="kpi" key={i}><span className="label">Loading</span><div className="kpi-value">…</div><div className="kpi-sub">Reading workspace</div></div>)}
+      {workspaceQ.isLoading && [0, 1, 2].map((i) => <div className="kpi" key={i}>
+        <span className="label">Loading</span>
+        <div className="kpi-value">...</div>
+        <div className="kpi-sub">Reading workspace</div>
+      </div>)}
     </div>
 
     <section className="list-controls" aria-label={`${titleFromModule(module)} search and filters`}>
-      <label><span>Search</span><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} placeholder="Code, title, owner, account or context" /></label>
-      <label><span>Status</span><select value={status} onChange={(event) => { setStatus(event.target.value); setPage(0); }}><option value="">All statuses</option>{STATUS_OPTIONS[module].map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+      <label>
+        <span>Search</span>
+        <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} placeholder="Code, title, owner, account or context" />
+      </label>
+      <label>
+        <span>Status</span>
+        <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(0); }}>
+          <option value="">All statuses</option>
+          {STATUS_OPTIONS[module].map((value) => <option key={value} value={value}>{value}</option>)}
+        </select>
+      </label>
       <button className="btn btn-sm" onClick={() => { setSearch(""); setStatus(""); setPage(0); }} disabled={!search && !status}>Reset</button>
     </section>
 
-    <DataViewFrame title={`${workspace?.title ?? titleFromModule(module)} register`} actions={<span className="cpq-note">100 rows/page · tenant/RLS governed</span>}>
+    <div className="master-toolbar" role="toolbar" aria-label={`${titleFromModule(module)} data tools`}>
+      <button className={`btn btn-sm${grouped ? " active" : ""}`} aria-pressed={grouped} onClick={() => setGrouped((value) => !value)}>
+        Group: {grouped ? "Status" : "Off"}
+      </button>
+      <span className="toolbar-divider" aria-hidden />
+      <button className="btn btn-sm" onClick={() => void download("XLSX", "Excel export")}>Export Excel</button>
+      <button className="btn btn-sm" onClick={() => void download("DOCX", "Word export")}>Export Word</button>
+      <button className="btn btn-sm" onClick={() => void download("PDF", "PDF export")}>Export PDF</button>
+    </div>
+
+    <DataViewFrame title={`${workspace?.title ?? titleFromModule(module)} register`} actions={<span className="cpq-note">100 rows/page - tenant/RLS governed</span>}>
       {workspaceQ.isLoading && <GridLoader label="Reading operational workspace" rows={6} columns={6} />}
       {workspaceQ.isError && <p className="empty-note">Workspace failed to load{workspaceQ.error instanceof Error ? `: ${workspaceQ.error.message}` : "."}</p>}
-      {workspaceQ.isSuccess && <WorkspaceTable rows={rows} />}
+      {workspaceQ.isSuccess && <WorkspaceTable rows={visibleRows} grouped={grouped} />}
       {workspaceQ.isSuccess && <footer className="page-controls" aria-label="Workspace pagination">
-        <span>Showing {rows.length} of {total} records - 100 rows per page</span>
+        <span>Showing {visibleRows.length} of {total} records - 100 rows per page</span>
         <div>
           <button className="btn btn-sm" disabled={page === 0 || workspaceQ.isFetching} onClick={() => setPage((value) => Math.max(0, value - 1))}>Previous</button>
           <strong>Page {totalPages === 0 ? 0 : page + 1} of {totalPages}</strong>
@@ -121,22 +163,41 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
   </>;
 }
 
-function WorkspaceTable({ rows }: { rows: WorkspaceRow[] }) {
+function WorkspaceTable({ rows, grouped }: { rows: WorkspaceRow[]; grouped: boolean }) {
+  let previousStatus = "";
   return <div className="table-wrap"><table className="data-table cpq-table epic-table">
     <thead><tr><th>Code</th><th>Record</th><th>Owner</th><th>Amount</th><th>Target</th><th>Status</th><th>Signals</th></tr></thead>
     <tbody>
-      {rows.map((row) => <tr key={row.id}>
-        <td className="mono">{row.code}</td>
-        <td>{row.title}<small>{row.subtitle}</small></td>
-        <td>{row.ownerName ?? "-"}</td>
-        <td>{row.amount == null ? "—" : formatMoney(row.amount)}</td>
-        <td>{formatDate(row.targetDate)}</td>
-        <td><span className={`chip ${statusClass(row.status)}`}>{row.status}</span><small>Updated {formatDate(row.updatedAt)}</small></td>
-        <td>{Object.entries(row.metrics ?? {}).slice(0, 3).map(([key, value]) => <span className="chip cpq-mini" key={key}>{humanize(key)}: {String(value)}</span>)}</td>
-      </tr>)}
+      {rows.map((row) => {
+        const showGroup = grouped && row.status !== previousStatus;
+        previousStatus = row.status;
+        return <Fragment key={row.id}>
+          {showGroup && <tr className="group-row"><th colSpan={7}>{row.status}</th></tr>}
+          <tr>
+            <td className="mono">{row.code}</td>
+            <td>{row.title}<small>{row.subtitle}</small></td>
+            <td>{row.ownerName ?? "-"}</td>
+            <td>{row.amount == null ? "-" : formatMoney(row.amount)}</td>
+            <td>{formatDate(row.targetDate)}</td>
+            <td><span className={`chip ${statusClass(row.status)}`}>{row.status}</span><small>Updated {formatDate(row.updatedAt)}</small></td>
+            <td>{Object.entries(row.metrics ?? {}).slice(0, 3).map(([key, value]) => <span className="chip cpq-mini" key={key}>{humanize(key)}: {String(value)}</span>)}</td>
+          </tr>
+        </Fragment>;
+      })}
       {rows.length === 0 && <tr><td colSpan={7} className="empty-note">No records match the current query.</td></tr>}
     </tbody>
   </table></div>;
+}
+
+function saveFile(file: DownloadedFile) {
+  const url = URL.createObjectURL(file.blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = file.filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 500);
 }
 
 function titleFromModule(module: WorkspaceModule): string {

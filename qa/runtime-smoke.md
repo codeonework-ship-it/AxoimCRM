@@ -75,4 +75,14 @@ The canonical Compose file builds the Spring Boot API and React web application 
 - Web routes `/accounts`, `/integrations`, `/sandbox`, `/audit`, `/packs/bfsi` and `/packs/commodity` returned HTTP 200 through the nginx SPA fallback.
 - Kafka broker API health command completed successfully.
 
+## 2026-07-25 governed workspace export and desktop publish verification
+
+- Backend `mvn verify` passed after adding workspace export routing and attachment generation.
+- Frontend `npm run build` passed after adding grouped epic workspace views and Excel/Word/PDF export actions.
+- Docker Compose rebuild passed for API and web; PostgreSQL 17, Kafka 3.7, API and web containers are healthy.
+- Authenticated same-origin proxy export smoke passed for `GET /api/v1/workspaces/forecast/export?format=XLSX&page=0&status=SUBMITTED`, `DOCX` and `PDF`.
+- Export smoke returned HTTP 200 with attachment filenames `forecast-workspace-page-1.xlsx`, `.docx` and `.pdf`; payload sizes were non-zero.
+- Workspace export audit smoke passed: three `WORKSPACE_EXPORT` audit rows were visible for entity type `WORKSPACE`.
+- Electron local publish passed with `npm run package`; generated artifact is `electron-client/release/AxiomCRM-win-x64-0.1.0.zip` and is intentionally ignored from Git because it is a generated binary artifact.
+
 Docker Hub pulls were blocked on this workstation by Docker Desktop's internal HTTPS proxy. Local runtime images plus PostgreSQL 16 and Kafka 3.7 were used for this workstation's live verification only; that private recovery override is deliberately not part of the repository. The canonical, reproducible Compose definition and version targets remain unchanged and are the CI/release contract.

@@ -13,7 +13,9 @@ const {
 const IS_DEV = process.env.ELECTRON_DEV === "1";
 const DEV_URL = "http://localhost:5173";
 const HOSTED_URL = process.env.AXIOM_WEB_URL;
-const PROD_INDEX = path.join(__dirname, "..", "frontend", "dist", "index.html");
+const PROD_INDEX = app.isPackaged
+  ? path.join(process.resourcesPath, "frontend", "dist", "index.html")
+  : path.join(__dirname, "..", "frontend", "dist", "index.html");
 
 /** @type {BrowserWindow | null} */
 let mainWindow = null;

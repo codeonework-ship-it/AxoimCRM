@@ -5,7 +5,9 @@
   "description": "Axiom CRM desktop shell",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "package": "node scripts/package-desktop.cjs",
+    "publish:local": "npm run package"
   },
   "devDependencies": {
     "electron": "^31.3.0"

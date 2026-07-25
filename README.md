@@ -145,7 +145,7 @@ Current verified increment: platform super-admin/super-audit roles, tenant switc
 ## Frontend and desktop client
 
 - `frontend/` — React 18 + TypeScript + Vite web application (`npm install && npm run dev`, serves on `:5173`) or production Nginx image in Compose on `:4280`.
-- `electron-client/` — Electron shell scaffold (`npm install && npm start`). The desktop client is the delivery vehicle for OS-native push notifications per the [notifications spec](docs/product/18-notifications-and-alerting.md); packaging/signing is tracked as a named risk in the [delivery plan](docs/product/15-agile-delivery-plan.md#9-risk-register).
+- `electron-client/` — Electron shell scaffold (`npm install && npm start`) plus local desktop packaging (`npm run package`) that creates a portable Windows folder and zip under `electron-client/release/`. The desktop client is the delivery vehicle for OS-native push notifications per the [notifications spec](docs/product/18-notifications-and-alerting.md); code signing and store publishing still require external certificates/accounts and are tracked as release-management risks in the [delivery plan](docs/product/15-agile-delivery-plan.md#9-risk-register).
 
 ## Ground rules for contributors
 

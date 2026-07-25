@@ -2,7 +2,9 @@ package com.axiom.workspaces;
 
 import com.axiom.api.PageResult;
 import org.junit.jupiter.api.Test;
+import org.springframework.http.ResponseEntity;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -13,7 +15,7 @@ import static org.mockito.Mockito.when;
 class EpicWorkspaceControllerTest {
     @Test void delegatesForecastPaginationAndFilters() {
         EpicWorkspaceService service = mock(EpicWorkspaceService.class);
-        EpicWorkspaceController controller = new EpicWorkspaceController(service);
+        EpicWorkspaceController controller = new EpicWorkspaceController(service, mock(WorkspaceExportService.class));
         EpicWorkspaceService.WorkspacePage page = new EpicWorkspaceService.WorkspacePage(
                 "FORECASTING", "Forecast", "desc", List.of(), PageResult.of(List.of(), 2, 100, 0));
         when(service.forecast("commit", "SUBMITTED", 2)).thenReturn(page);
@@ -24,7 +26,7 @@ class EpicWorkspaceControllerTest {
 
     @Test void delegatesMigrationPaginationAndFilters() {
         EpicWorkspaceService service = mock(EpicWorkspaceService.class);
-        EpicWorkspaceController controller = new EpicWorkspaceController(service);
+        EpicWorkspaceController controller = new EpicWorkspaceController(service, mock(WorkspaceExportService.class));
         EpicWorkspaceService.WorkspacePage page = new EpicWorkspaceService.WorkspacePage(
                 "MIGRATION", "Migration", "desc", List.of(), PageResult.of(List.of(), 1, 100, 0));
         when(service.migrations("contacts", "READY_TO_IMPORT", 1)).thenReturn(page);
@@ -35,7 +37,7 @@ class EpicWorkspaceControllerTest {
 
     @Test void delegatesNextFiveEpicWorkspaces() {
         EpicWorkspaceService service = mock(EpicWorkspaceService.class);
-        EpicWorkspaceController controller = new EpicWorkspaceController(service);
+        EpicWorkspaceController controller = new EpicWorkspaceController(service, mock(WorkspaceExportService.class));
         EpicWorkspaceService.WorkspacePage page = new EpicWorkspaceService.WorkspacePage(
                 "CHANNEL", "Partners", "desc", List.of(), PageResult.of(List.of(), 0, 100, 0));
 
@@ -59,7 +61,7 @@ class EpicWorkspaceControllerTest {
 
     @Test void delegatesFinalFiveEpicWorkspaces() {
         EpicWorkspaceService service = mock(EpicWorkspaceService.class);
-        EpicWorkspaceController controller = new EpicWorkspaceController(service);
+        EpicWorkspaceController controller = new EpicWorkspaceController(service, mock(WorkspaceExportService.class));
         EpicWorkspaceService.WorkspacePage page = new EpicWorkspaceService.WorkspacePage(
                 "INTEGRATION", "Integrations", "desc", List.of(), PageResult.of(List.of(), 0, 100, 0));
 
@@ -79,5 +81,23 @@ class EpicWorkspaceControllerTest {
         verify(service).audit("access", "READY", 2);
         verify(service).bfsi("kyc", "CLEARED", 3);
         verify(service).commodity("copper", "OFFERED", 4);
+    }
+
+    @Test void exportsFilteredWorkspacePageAsAttachment() {
+        EpicWorkspaceService service = mock(EpicWorkspaceService.class);
+        WorkspaceExportService exports = mock(WorkspaceExportService.class);
+        EpicWorkspaceController controller = new EpicWorkspaceController(service, exports);
+        WorkspaceExportService.FilePayload file = new WorkspaceExportService.FilePayload(
+                "ok".getBytes(StandardCharsets.UTF_8), "text/plain", "forecast-workspace-page-1.txt");
+        when(exports.export("forecast", WorkspaceExportService.ExportFormat.XLSX, "commit", "SUBMITTED", 0)).thenReturn(file);
+
+        ResponseEntity<byte[]> response = controller.export(
+                "forecast", WorkspaceExportService.ExportFormat.XLSX, "commit", "SUBMITTED", 0);
+
+        assertEquals(200, response.getStatusCode().value());
+        assertEquals("attachment; filename=\"forecast-workspace-page-1.txt\"",
+                response.getHeaders().getFirst("Content-Disposition"));
+        assertEquals("ok", new String(response.getBody(), StandardCharsets.UTF_8));
+        verify(exports).export("forecast", WorkspaceExportService.ExportFormat.XLSX, "commit", "SUBMITTED", 0);
     }
 }

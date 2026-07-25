@@ -1,6 +1,7 @@
 **/node_modules/
 **/dist/
 **/target/
+electron-client/release/
 **/.npm-cache/
 **/.m2/
 *.log

@@ -34,6 +34,27 @@ public class EpicWorkspaceService {
     public record WorkspacePage(String moduleCode, String title, String description,
                                 List<SummaryMetric> summary, PageResult<WorkspaceRow> rows) {}
 
+    public WorkspacePage workspace(String module, String search, String status, int page) {
+        return switch (clean(module) == null ? "" : module.toLowerCase(Locale.ROOT)) {
+            case "forecast" -> forecast(search, status, page);
+            case "contracts" -> contracts(search, status, page);
+            case "campaigns" -> campaigns(search, status, page);
+            case "cases" -> cases(search, status, page);
+            case "migration" -> migrations(search, status, page);
+            case "partners" -> partners(search, status, page);
+            case "automation" -> automation(search, status, page);
+            case "analytics" -> analytics(search, status, page);
+            case "copilot" -> copilot(search, status, page);
+            case "mobile" -> mobile(search, status, page);
+            case "integrations" -> integrations(search, status, page);
+            case "sandbox" -> sandbox(search, status, page);
+            case "audit" -> audit(search, status, page);
+            case "bfsi" -> bfsi(search, status, page);
+            case "commodity" -> commodity(search, status, page);
+            default -> throw new com.axiom.common.NotFoundException("Unknown workspace module: " + module);
+        };
+    }
+
     public WorkspacePage forecast(String search, String status, int page) {
         int safePage = Math.max(page, 0);
         List<Object> args = new ArrayList<>(List.of(tenantId()));
