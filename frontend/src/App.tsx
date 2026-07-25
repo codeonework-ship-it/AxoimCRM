@@ -45,8 +45,13 @@ export function App() {
         <Route path="/analytics" element={<EpicWorkspacePage module="analytics" />} />
         <Route path="/copilot" element={<EpicWorkspacePage module="copilot" />} />
         <Route path="/migration" element={<EpicWorkspacePage module="migration" />} />
+        <Route path="/integrations" element={<EpicWorkspacePage module="integrations" />} />
+        <Route path="/sandbox" element={<EpicWorkspacePage module="sandbox" />} />
         <Route path="/automation" element={<EpicWorkspacePage module="automation" />} />
         <Route path="/mobile" element={<EpicWorkspacePage module="mobile" />} />
+        <Route path="/audit" element={<EpicWorkspacePage module="audit" />} />
+        <Route path="/packs/bfsi" element={<EpicWorkspacePage module="bfsi" />} />
+        <Route path="/packs/commodity" element={<EpicWorkspacePage module="commodity" />} />
         <Route path="/admin/*" element={<AdminPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

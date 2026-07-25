@@ -12,9 +12,11 @@
  * `AuthContext` writes, so the two stay in step without either owning the other.
  */
 
+const DEFAULT_API_BASE_URL = import.meta.env.DEV ? "http://localhost:8080/api/v1" : "/api/v1";
+
 const BASE_URL: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
-  "http://localhost:8080/api/v1";
+  DEFAULT_API_BASE_URL;
 
 /** Mirrors the key AuthContext uses. Changing one without the other breaks sign-in. */
 const SESSION_KEY = "axiom.session";

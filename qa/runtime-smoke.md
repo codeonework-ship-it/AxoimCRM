@@ -61,4 +61,18 @@ The canonical Compose file builds the Spring Boot API and React web application 
 - Web routes `/partners`, `/automation`, `/analytics`, `/copilot` and `/mobile` returned HTTP 200 through the nginx SPA fallback.
 - CORS preflight for `Origin: http://localhost:4280` returned explicit allow-origin, methods and authorization-header access.
 
+## 2026-07-25 final five-surface workspace verification
+
+- The Docker web build now proxies same-origin `/api/` traffic to the API container; production frontend defaults to `/api/v1`, while Vite development still defaults to `http://localhost:8080/api/v1`.
+- Backend `mvn verify` passed after adding E17/E19/E20/E22/E23 workspace routes.
+- Frontend `npm run build` passed after adding `/integrations`, `/sandbox`, `/audit`, `/packs/bfsi` and `/packs/commodity`.
+- Docker Compose rebuild passed for API and web; PostgreSQL 17, Kafka 3.7, API and web containers are healthy.
+- Flyway `V95__integration_sandbox_audit_vertical_pack_workspaces` applied successfully.
+- Seed verification passed: 3 integration endpoint contracts, 3 sandbox environments, 3 audit evidence packs, 3 BFSI onboarding records and 3 commodity enquiries.
+- Authenticated same-origin proxy smoke passed through `http://localhost:4280/api/v1`: login issued a token, `/accounts?page=0` returned 9 records at page size 100, and `GET /api/v1/workspaces/integrations`, `/sandbox`, `/audit`, `/bfsi` and `/commodity` each returned seeded rows with the shared 100-row server pagination contract.
+- Positive server-side status filter checks passed for `ACTIVE` integrations, `ACTIVE` sandbox environments, `READY` audit packs, `CLEARED` BFSI onboarding and `OFFERED` commodity enquiries.
+- CORS preflight for `Origin: http://localhost:4280` returned explicit allow-origin, methods and authorization/content-type header access.
+- Web routes `/accounts`, `/integrations`, `/sandbox`, `/audit`, `/packs/bfsi` and `/packs/commodity` returned HTTP 200 through the nginx SPA fallback.
+- Kafka broker API health command completed successfully.
+
 Docker Hub pulls were blocked on this workstation by Docker Desktop's internal HTTPS proxy. Local runtime images plus PostgreSQL 16 and Kafka 3.7 were used for this workstation's live verification only; that private recovery override is deliberately not part of the repository. The canonical, reproducible Compose definition and version targets remain unchanged and are the CI/release contract.

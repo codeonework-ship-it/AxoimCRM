@@ -83,4 +83,39 @@ public class EpicWorkspaceController {
                                                      @RequestParam(defaultValue = "0") int page) {
         return workspaces.mobile(search, status, page);
     }
+
+    @GetMapping("/integrations")
+    public EpicWorkspaceService.WorkspacePage integrations(@RequestParam(required = false) String search,
+                                                           @RequestParam(required = false) String status,
+                                                           @RequestParam(defaultValue = "0") int page) {
+        return workspaces.integrations(search, status, page);
+    }
+
+    @GetMapping("/sandbox")
+    public EpicWorkspaceService.WorkspacePage sandbox(@RequestParam(required = false) String search,
+                                                      @RequestParam(required = false) String status,
+                                                      @RequestParam(defaultValue = "0") int page) {
+        return workspaces.sandbox(search, status, page);
+    }
+
+    @GetMapping("/audit")
+    public EpicWorkspaceService.WorkspacePage audit(@RequestParam(required = false) String search,
+                                                    @RequestParam(required = false) String status,
+                                                    @RequestParam(defaultValue = "0") int page) {
+        return workspaces.audit(search, status, page);
+    }
+
+    @GetMapping("/bfsi")
+    public EpicWorkspaceService.WorkspacePage bfsi(@RequestParam(required = false) String search,
+                                                   @RequestParam(required = false) String status,
+                                                   @RequestParam(defaultValue = "0") int page) {
+        return workspaces.bfsi(search, status, page);
+    }
+
+    @GetMapping("/commodity")
+    public EpicWorkspaceService.WorkspacePage commodity(@RequestParam(required = false) String search,
+                                                        @RequestParam(required = false) String status,
+                                                        @RequestParam(defaultValue = "0") int page) {
+        return workspaces.commodity(search, status, page);
+    }
 }

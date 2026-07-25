@@ -16,7 +16,12 @@ export type WorkspaceModule =
   | "automation"
   | "analytics"
   | "copilot"
-  | "mobile";
+  | "mobile"
+  | "integrations"
+  | "sandbox"
+  | "audit"
+  | "bfsi"
+  | "commodity";
 
 interface EpicWorkspacePageProps {
   module: WorkspaceModule;
@@ -33,6 +38,11 @@ const STATUS_OPTIONS: Record<WorkspaceModule, string[]> = {
   analytics: ["DRAFT", "ACTIVE", "ARCHIVED"],
   copilot: ["READY", "ACCEPTED", "DISMISSED", "EXPIRED"],
   mobile: ["ACTIVE", "LOCKED", "WIPED", "EXPIRED"],
+  integrations: ["DRAFT", "ACTIVE", "DEPRECATED", "RETIRED"],
+  sandbox: ["REQUESTED", "PROVISIONING", "ACTIVE", "REFRESHING", "FAILED", "ARCHIVED"],
+  audit: ["DRAFT", "GENERATING", "READY", "EXPORTED", "FAILED"],
+  bfsi: ["NOT_STARTED", "IN_PROGRESS", "CLEARED", "ENHANCED_DUE_DILIGENCE", "REJECTED"],
+  commodity: ["RECEIVED", "PRICING", "OFFERED", "WON", "LOST", "EXPIRED"],
 };
 
 const EYEBROWS: Record<WorkspaceModule, string> = {
@@ -46,6 +56,11 @@ const EYEBROWS: Record<WorkspaceModule, string> = {
   analytics: "Metric command",
   copilot: "Grounded intelligence",
   mobile: "Field readiness",
+  integrations: "Integration control",
+  sandbox: "Release control",
+  audit: "Governance proof",
+  bfsi: "Financial services pack",
+  commodity: "Trading origination",
 };
 
 export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
@@ -126,14 +141,17 @@ function WorkspaceTable({ rows }: { rows: WorkspaceRow[] }) {
 
 function titleFromModule(module: WorkspaceModule): string {
   if (module === "copilot") return "AI Copilot";
+  if (module === "bfsi") return "BFSI";
+  if (module === "sandbox") return "Sandbox & Release";
+  if (module === "audit") return "Audit & Compliance";
   return module === "forecast" ? "Forecast" : module === "migration" ? "Migration" : module.charAt(0).toUpperCase() + module.slice(1);
 }
 
 function statusClass(status: string): string {
   const normalized = status.toLowerCase().replace(/_/g, "-");
-  if (["active", "submitted", "booked", "imported", "met", "ready-to-import", "ready", "approved", "converted", "synced"].includes(normalized)) return "chip-active";
-  if (["draft", "planned", "uploaded", "validating", "working", "new", "in-review", "pending-renewal", "onboarding", "queued", "simulated"].includes(normalized)) return "chip-draft";
-  if (["escalated", "failed", "missed", "terminated", "cancelled", "suspended", "rejected", "expired", "locked", "wiped", "conflict", "disabled"].includes(normalized)) return "chip-cancelled";
+  if (["active", "submitted", "booked", "imported", "met", "ready-to-import", "ready", "approved", "converted", "synced", "exported", "cleared", "won", "succeeded", "deployed"].includes(normalized)) return "chip-active";
+  if (["draft", "planned", "uploaded", "validating", "working", "new", "in-review", "pending-renewal", "onboarding", "queued", "simulated", "requested", "provisioning", "refreshing", "generating", "in-progress", "pricing", "offered", "received"].includes(normalized)) return "chip-draft";
+  if (["escalated", "failed", "missed", "terminated", "cancelled", "suspended", "rejected", "expired", "locked", "wiped", "conflict", "disabled", "retired", "deprecated", "lost", "enhanced-due-diligence"].includes(normalized)) return "chip-cancelled";
   return `chip-${normalized}`;
 }
 

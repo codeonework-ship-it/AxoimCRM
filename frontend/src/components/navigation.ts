@@ -139,8 +139,8 @@ export const MODULE_GROUPS: ModuleGroup[] = [
     label: "Vertical packs",
     labelKey: "nav.group.verticals",
     items: [
-      { label: "BFSI", labelKey: "nav.module.bfsi", to: "/packs/bfsi", icon: BfsiIcon, epic: "E22", status: "planned" },
-      { label: "Commodity", labelKey: "nav.module.commodity", to: "/packs/commodity", icon: CommodityIcon, epic: "E23", status: "planned" },
+      { label: "BFSI", labelKey: "nav.module.bfsi", to: "/packs/bfsi", icon: BfsiIcon, epic: "E22", status: "partial" },
+      { label: "Commodity", labelKey: "nav.module.commodity", to: "/packs/commodity", icon: CommodityIcon, epic: "E23", status: "partial" },
     ],
   },
   {
@@ -150,8 +150,9 @@ export const MODULE_GROUPS: ModuleGroup[] = [
     items: [
       { label: "Reference Data", labelKey: "nav.module.referenceData", to: "/reference-data", icon: ReferenceIcon, epic: "E03", status: "partial", roles: GOVERNANCE_ROLES },
       { label: "Automation", labelKey: "nav.module.automation", to: "/automation", icon: AutomationIcon, epic: "E14", status: "partial", roles: ADMIN_ROLES },
-      { label: "Integrations", labelKey: "nav.module.integrations", to: "/integrations", icon: IntegrationIcon, epic: "E17", status: "planned", roles: ADMIN_ROLES },
+      { label: "Integrations", labelKey: "nav.module.integrations", to: "/integrations", icon: IntegrationIcon, epic: "E17", status: "partial", roles: ADMIN_ROLES },
       { label: "Migration", labelKey: "nav.module.migration", to: "/migration", icon: MigrationIcon, epic: "E18", status: "partial", roles: ADMIN_ROLES },
+      { label: "Sandbox & Release", labelKey: "nav.module.sandbox", to: "/sandbox", icon: IntegrationIcon, epic: "E19", status: "partial", roles: ADMIN_ROLES },
       { label: "Mobile", labelKey: "nav.module.mobile", to: "/mobile", icon: MobileIcon, epic: "E21", status: "partial", roles: ADMIN_ROLES },
     ],
   },
@@ -161,7 +162,7 @@ export const MODULE_GROUPS: ModuleGroup[] = [
     labelKey: "nav.group.governance",
     items: [
       { label: "Administration", labelKey: "nav.module.administration", to: "/admin", icon: ReferenceIcon, epic: "E19", status: "partial", roles: ADMIN_ROLES },
-      { label: "Audit & Compliance", labelKey: "nav.module.audit", to: "/audit", icon: AuditIcon, epic: "E20", status: "planned", roles: GOVERNANCE_ROLES },
+      { label: "Audit & Compliance", labelKey: "nav.module.audit", to: "/audit", icon: AuditIcon, epic: "E20", status: "partial", roles: GOVERNANCE_ROLES },
     ],
   },
 ];

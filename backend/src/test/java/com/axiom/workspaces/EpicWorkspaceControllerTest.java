@@ -56,4 +56,28 @@ class EpicWorkspaceControllerTest {
         verify(service).copilot("risk", "READY", 3);
         verify(service).mobile("ios", "ACTIVE", 4);
     }
+
+    @Test void delegatesFinalFiveEpicWorkspaces() {
+        EpicWorkspaceService service = mock(EpicWorkspaceService.class);
+        EpicWorkspaceController controller = new EpicWorkspaceController(service);
+        EpicWorkspaceService.WorkspacePage page = new EpicWorkspaceService.WorkspacePage(
+                "INTEGRATION", "Integrations", "desc", List.of(), PageResult.of(List.of(), 0, 100, 0));
+
+        when(service.integrations("outbox", "ACTIVE", 0)).thenReturn(page);
+        when(service.sandbox("uat", "ACTIVE", 1)).thenReturn(page);
+        when(service.audit("access", "READY", 2)).thenReturn(page);
+        when(service.bfsi("kyc", "CLEARED", 3)).thenReturn(page);
+        when(service.commodity("copper", "OFFERED", 4)).thenReturn(page);
+
+        assertEquals(page, controller.integrations("outbox", "ACTIVE", 0));
+        assertEquals(page, controller.sandbox("uat", "ACTIVE", 1));
+        assertEquals(page, controller.audit("access", "READY", 2));
+        assertEquals(page, controller.bfsi("kyc", "CLEARED", 3));
+        assertEquals(page, controller.commodity("copper", "OFFERED", 4));
+        verify(service).integrations("outbox", "ACTIVE", 0);
+        verify(service).sandbox("uat", "ACTIVE", 1);
+        verify(service).audit("access", "READY", 2);
+        verify(service).bfsi("kyc", "CLEARED", 3);
+        verify(service).commodity("copper", "OFFERED", 4);
+    }
 }

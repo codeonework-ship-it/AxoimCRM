@@ -321,6 +321,153 @@ public class EpicWorkspaceService {
                 PageResult.of(rows, safePage, QueryService.PAGE_SIZE, total));
     }
 
+    public WorkspacePage integrations(String search, String status, int page) {
+        int safePage = Math.max(page, 0);
+        List<Object> args = new ArrayList<>(List.of(tenantId()));
+        String where = where("c", search, status, args, "c.contract_code", "c.name", "c.direction", "c.auth_type", "u.display_name");
+        long total = total("""
+                select count(*) from integration.endpoint_contract c
+                join identity.app_user u on u.tenant_id = c.tenant_id and u.id = c.owner_id
+                """ + where, args);
+        List<WorkspaceRow> rows = query("""
+                select c.id, c.contract_code as code, c.name as title,
+                       c.direction || ' - ' || c.auth_type || ' - failures ' || c.failure_count as subtitle,
+                       c.status, u.display_name as owner_name, coalesce(sum(j.records_processed), 0)::numeric as amount,
+                       c.last_verified_at::date as target_date, c.created_at as updated_at,
+                       jsonb_build_object('jobs', count(j.id), 'failedRecords', coalesce(sum(j.records_failed), 0), 'webhooks', count(w.id), 'deliveryFailures', coalesce(sum(w.delivery_failures), 0)) as metrics
+                from integration.endpoint_contract c
+                join identity.app_user u on u.tenant_id = c.tenant_id and u.id = c.owner_id
+                left join integration.integration_job j on j.tenant_id = c.tenant_id and j.endpoint_contract_id = c.id
+                left join integration.webhook_subscription_stub w on w.tenant_id = c.tenant_id and w.endpoint_contract_id = c.id
+                """ + where + """
+                 group by c.id, c.contract_code, c.name, c.direction, c.auth_type, c.failure_count, c.status,
+                         u.display_name, c.last_verified_at, c.created_at
+                order by c.last_verified_at desc nulls last limit ? offset ?""", args, safePage);
+        return new WorkspacePage("INTEGRATION", "Integrations", "Endpoint contracts, integration jobs and webhook subscription stubs.",
+                List.of(countMetric("Active contracts", "integration.endpoint_contract", "status = 'ACTIVE'", "good"),
+                        countMetric("Retrying jobs", "integration.integration_job", "status = 'RETRYING'", "warn"),
+                        countMetric("Active webhooks", "integration.webhook_subscription_stub", "status = 'ACTIVE'", "good")),
+                PageResult.of(rows, safePage, QueryService.PAGE_SIZE, total));
+    }
+
+    public WorkspacePage sandbox(String search, String status, int page) {
+        int safePage = Math.max(page, 0);
+        List<Object> args = new ArrayList<>(List.of(tenantId()));
+        String where = where("s", search, status, args, "s.sandbox_code", "s.name", "s.sandbox_type", "s.source_environment", "u.display_name");
+        long total = total("""
+                select count(*) from platform.sandbox_environment s
+                join identity.app_user u on u.tenant_id = s.tenant_id and u.id = s.owner_id
+                """ + where, args);
+        List<WorkspaceRow> rows = query("""
+                select s.id, s.sandbox_code as code, s.name as title,
+                       s.sandbox_type || ' from ' || s.source_environment || ' - packages ' || count(p.id) as subtitle,
+                       s.status, u.display_name as owner_name, coalesce(sum(p.component_count), 0)::numeric as amount,
+                       s.expires_at::date as target_date, coalesce(s.last_refreshed_at, s.created_at) as updated_at,
+                       jsonb_build_object('packages', count(p.id), 'deployments', count(d.id), 'validationErrors', coalesce(sum(d.validation_errors), 0)) as metrics
+                from platform.sandbox_environment s
+                join identity.app_user u on u.tenant_id = s.tenant_id and u.id = s.owner_id
+                left join platform.release_package p on p.tenant_id = s.tenant_id and p.source_sandbox_id = s.id
+                left join platform.deployment_run d on d.tenant_id = p.tenant_id and d.release_package_id = p.id
+                """ + where + """
+                 group by s.id, s.sandbox_code, s.name, s.sandbox_type, s.source_environment, s.status,
+                         u.display_name, s.expires_at, s.last_refreshed_at, s.created_at
+                order by s.expires_at nulls last limit ? offset ?""", args, safePage);
+        return new WorkspacePage("PLATFORM", "Sandbox & Release", "Sandbox environments, release packages and deployment evidence.",
+                List.of(countMetric("Active sandboxes", "platform.sandbox_environment", "status = 'ACTIVE'", "good"),
+                        countMetric("Approved releases", "platform.release_package", "status in ('APPROVED','DEPLOYED')", "good"),
+                        countMetric("Failed deployments", "platform.deployment_run", "status = 'FAILED'", "warn")),
+                PageResult.of(rows, safePage, QueryService.PAGE_SIZE, total));
+    }
+
+    public WorkspacePage audit(String search, String status, int page) {
+        int safePage = Math.max(page, 0);
+        List<Object> args = new ArrayList<>(List.of(tenantId()));
+        String where = where("p", search, status, args, "p.pack_code", "p.name", "p.scope", "u.display_name");
+        long total = total("""
+                select count(*) from governance.audit_evidence_pack p
+                join identity.app_user u on u.tenant_id = p.tenant_id and u.id = p.generated_by
+                """ + where, args);
+        List<WorkspaceRow> rows = query("""
+                select p.id, p.pack_code as code, p.name as title,
+                       p.scope || ' - controls ' || p.control_count || ' - events ' || p.event_count as subtitle,
+                       p.status, u.display_name as owner_name, p.event_count::numeric as amount,
+                       p.generated_at::date as target_date, p.created_at as updated_at,
+                       jsonb_build_object('controls', p.control_count, 'reviews', count(r.id), 'findings', coalesce(sum(r.finding_count), 0), 'signalsRed', (select count(*) from governance.observability_signal s where s.tenant_id = p.tenant_id and s.status = 'RED')) as metrics
+                from governance.audit_evidence_pack p
+                join identity.app_user u on u.tenant_id = p.tenant_id and u.id = p.generated_by
+                left join governance.control_review r on r.tenant_id = p.tenant_id and r.evidence_pack_id = p.id
+                """ + where + """
+                 group by p.id, p.pack_code, p.name, p.scope, p.control_count, p.event_count, p.status,
+                         u.display_name, p.generated_at, p.created_at
+                order by p.created_at desc limit ? offset ?""", args, safePage);
+        return new WorkspacePage("GOVERNANCE", "Audit & Compliance", "Evidence packs, control reviews and observability signals.",
+                List.of(countMetric("Ready packs", "governance.audit_evidence_pack", "status in ('READY','EXPORTED')", "good"),
+                        countMetric("Open reviews", "governance.control_review", "status in ('SCHEDULED','IN_PROGRESS')", "warn"),
+                        countMetric("Amber/red signals", "governance.observability_signal", "status in ('AMBER','RED')", "warn")),
+                PageResult.of(rows, safePage, QueryService.PAGE_SIZE, total));
+    }
+
+    public WorkspacePage bfsi(String search, String status, int page) {
+        int safePage = Math.max(page, 0);
+        List<Object> args = new ArrayList<>(List.of(tenantId()));
+        String where = where("o", "kyc_status", search, status, args, "o.onboarding_number", "a.name", "o.client_type", "o.risk_rating", "u.display_name");
+        long total = total("""
+                select count(*) from bfsi.client_onboarding o
+                join crm.account a on a.tenant_id = o.tenant_id and a.id = o.account_id
+                join identity.app_user u on u.tenant_id = o.tenant_id and u.id = o.owner_id
+                """ + where, args);
+        List<WorkspaceRow> rows = query("""
+                select o.id, o.onboarding_number as code, a.name as title,
+                       o.client_type || ' - ' || o.risk_rating || ' risk - holdings ' || count(h.id) as subtitle,
+                       o.kyc_status as status, u.display_name as owner_name, coalesce(sum(h.balance_amount), 0) as amount,
+                       o.due_at as target_date, o.created_at as updated_at,
+                       jsonb_build_object('riskRating', o.risk_rating, 'holdings', count(h.id), 'screenings', count(s.id), 'hits', coalesce(sum(s.hit_count), 0)) as metrics
+                from bfsi.client_onboarding o
+                join crm.account a on a.tenant_id = o.tenant_id and a.id = o.account_id
+                join identity.app_user u on u.tenant_id = o.tenant_id and u.id = o.owner_id
+                left join bfsi.product_holding h on h.tenant_id = o.tenant_id and h.onboarding_id = o.id
+                left join bfsi.compliance_screening s on s.tenant_id = o.tenant_id and s.onboarding_id = o.id
+                """ + where + """
+                 group by o.id, o.onboarding_number, a.name, o.client_type, o.risk_rating, o.kyc_status,
+                         u.display_name, o.due_at, o.created_at
+                order by o.due_at limit ? offset ?""", args, safePage);
+        return new WorkspacePage("BFSI", "BFSI", "Financial-services onboarding, holdings and compliance screening.",
+                List.of(countMetric("EDD cases", "bfsi.client_onboarding", "kyc_status = 'ENHANCED_DUE_DILIGENCE'", "warn"),
+                        metric("Holdings", "balance_amount", "bfsi.product_holding", "status in ('ACTIVE','PROPOSED')"),
+                        countMetric("Screening hits", "bfsi.compliance_screening", "status = 'HIT'", "crit")),
+                PageResult.of(rows, safePage, QueryService.PAGE_SIZE, total));
+    }
+
+    public WorkspacePage commodity(String search, String status, int page) {
+        int safePage = Math.max(page, 0);
+        List<Object> args = new ArrayList<>(List.of(tenantId()));
+        String where = where("e", search, status, args, "e.enquiry_number", "e.commodity_name", "p.counterparty_code", "a.name");
+        long total = total("""
+                select count(*) from commodity.trade_enquiry e
+                join commodity.counterparty_profile p on p.tenant_id = e.tenant_id and p.id = e.counterparty_profile_id
+                join crm.account a on a.tenant_id = p.tenant_id and a.id = p.account_id
+                """ + where, args);
+        List<WorkspaceRow> rows = query("""
+                select e.id, e.enquiry_number as code, e.commodity_name || ' - ' || a.name as title,
+                       e.quantity || ' ' || e.unit || ' - exposure ' || p.exposure_amount as subtitle,
+                       e.status, p.counterparty_code as owner_name, e.notional_amount as amount,
+                       e.delivery_window_start as target_date, e.created_at as updated_at,
+                       jsonb_build_object('creditLimit', p.credit_limit, 'exposure', p.exposure_amount, 'termSheets', count(t.id), 'counterpartyStatus', p.status) as metrics
+                from commodity.trade_enquiry e
+                join commodity.counterparty_profile p on p.tenant_id = e.tenant_id and p.id = e.counterparty_profile_id
+                join crm.account a on a.tenant_id = p.tenant_id and a.id = p.account_id
+                left join commodity.contract_term_sheet t on t.tenant_id = e.tenant_id and t.trade_enquiry_id = e.id
+                """ + where + """
+                 group by e.id, e.enquiry_number, e.commodity_name, a.name, e.quantity, e.unit, p.exposure_amount,
+                         e.status, p.counterparty_code, e.notional_amount, e.delivery_window_start, e.created_at, p.credit_limit, p.status
+                order by e.created_at desc limit ? offset ?""", args, safePage);
+        return new WorkspacePage("COMMODITY", "Commodity", "Commodity counterparties, enquiries and term sheets.",
+                List.of(metric("Notional", "notional_amount", "commodity.trade_enquiry", "true"),
+                        metric("Exposure", "exposure_amount", "commodity.counterparty_profile", "true"),
+                        countMetric("Watchlist", "commodity.counterparty_profile", "status = 'WATCHLIST'", "warn")),
+                PageResult.of(rows, safePage, QueryService.PAGE_SIZE, total));
+    }
+
     private List<WorkspaceRow> query(String sql, List<Object> args, int safePage) {
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add(QueryService.PAGE_SIZE);
@@ -352,6 +499,10 @@ public class EpicWorkspaceService {
     }
 
     private String where(String alias, String search, String status, List<Object> args, String... searchColumns) {
+        return where(alias, "status", search, status, args, searchColumns);
+    }
+
+    private String where(String alias, String statusColumn, String search, String status, List<Object> args, String... searchColumns) {
         StringBuilder where = new StringBuilder(" where " + alias + ".tenant_id = ?");
         String q = searchPattern(search);
         if (q != null) {
@@ -365,7 +516,7 @@ public class EpicWorkspaceService {
         }
         String f = clean(status);
         if (f != null) {
-            where.append(" and upper(").append(alias).append(".status) = ?");
+            where.append(" and upper(").append(alias).append(".").append(statusColumn).append(") = ?");
             args.add(f.toUpperCase(Locale.ROOT));
         }
         return where.toString();

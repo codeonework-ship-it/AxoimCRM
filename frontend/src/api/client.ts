@@ -7,9 +7,11 @@
  * Base URL: http://localhost:8080/api/v1  (override with VITE_API_BASE_URL)
  */
 
+const DEFAULT_API_BASE_URL = import.meta.env.DEV ? "http://localhost:8080/api/v1" : "/api/v1";
+
 const BASE_URL: string =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
-  "http://localhost:8080/api/v1";
+  DEFAULT_API_BASE_URL;
 
 /* ------------------------------------------------------------------ */
 /* Types (mirror of backend contracts)                                 */
@@ -857,7 +859,7 @@ export const api = {
     return request<CpqQuoteSummary>("GET", "/cpq/quotes/summary");
   },
 
-  workspace(module: "forecast" | "contracts" | "campaigns" | "cases" | "migration" | "partners" | "automation" | "analytics" | "copilot" | "mobile", params?: ListParams & { status?: string }): Promise<WorkspacePage> {
+  workspace(module: "forecast" | "contracts" | "campaigns" | "cases" | "migration" | "partners" | "automation" | "analytics" | "copilot" | "mobile" | "integrations" | "sandbox" | "audit" | "bfsi" | "commodity", params?: ListParams & { status?: string }): Promise<WorkspacePage> {
     return request<WorkspacePage>("GET", `/workspaces/${module}${queryString({
       page: params?.page ?? 0,
       search: params?.search,
