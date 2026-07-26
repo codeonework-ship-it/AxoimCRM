@@ -2,6 +2,7 @@ import { useState } from "react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useT, type TranslateFn } from "../i18n/I18nProvider";
+import { preloadRoute } from "../routes/preload";
 import { ChevronIcon } from "./icons";
 import { NAV_BADGE_KEYS, groupsForRole, type ModuleItem } from "./navigation";
 
@@ -41,6 +42,8 @@ function ModuleLink({ item, onNavigate, t }: { item: ModuleItem; onNavigate: () 
       title={label}
       className={({ isActive }) => `rail-btn${isActive ? " active" : ""}`}
       onClick={onNavigate}
+      onFocus={() => preloadRoute(item.to)}
+      onMouseEnter={() => preloadRoute(item.to)}
     >
       <Icon />
       <span>{label}</span>

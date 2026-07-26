@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import { useT } from "../i18n/I18nProvider";
 import { initials } from "../lib/format";
+import { clearGridPreferences, notifyGridPreferencesReset } from "../lib/usePersistedGridState";
 import { ChevronIcon, LogoutIcon } from "./icons";
+import { useToasts } from "./Toasts";
 
 /**
  * Identity and sign-out, in the top-right of the header.
@@ -20,6 +22,7 @@ import { ChevronIcon, LogoutIcon } from "./icons";
 export function UserMenu() {
   const { user, tenant, logout } = useAuth();
   const t = useT();
+  const toasts = useToasts();
   const [open, setOpen] = useState(false);
   const wrapRef = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -50,6 +53,18 @@ export function UserMenu() {
 
   const name = user?.displayName ?? "Operator";
   const role = user?.role ?? "USER";
+  const resetGridViews = () => {
+    const cleared = clearGridPreferences();
+    notifyGridPreferencesReset();
+    setOpen(false);
+    toasts.push(
+      "info",
+      "Grid views reset",
+      cleared
+        ? "Saved grouping and column search preferences were cleared for this browser."
+        : "No saved grid preferences were found for this browser.",
+    );
+  };
 
   return (
     <div className="user-menu" ref={wrapRef}>
@@ -88,6 +103,10 @@ export function UserMenu() {
               <dd>{tenant?.name ?? "—"}</dd>
             </div>
           </dl>
+          <button className="user-menu-action" role="menuitem" onClick={resetGridViews}>
+            <span>{t("shell.resetGridViews", "Reset grid views")}</span>
+            <small>{t("shell.resetGridViewsHint", "Clear saved grouping and column search on this browser.")}</small>
+          </button>
           <button className="user-signout" role="menuitem" onClick={logout}>
             <LogoutIcon size={15} />
             {t("shell.signOut", "Sign out")}

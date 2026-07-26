@@ -1,60 +1,118 @@
+import { lazy, Suspense, type ComponentType } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { RequireAuth } from "./auth/RequireAuth";
-import { LoginPage } from "./pages/LoginPage";
-import { HomePage } from "./pages/HomePage";
-import { PipelinePage } from "./pages/PipelinePage";
-import { AccountsPage } from "./pages/AccountsPage";
-import { LeadsPage } from "./pages/LeadsPage";
-import { ReferenceDataPage } from "./pages/ReferenceDataPage";
-import { ReportsPage } from "./pages/ReportsPage";
-import { AdminPage } from "./pages/AdminPage";
-import { ActivitiesPage } from "./pages/ActivitiesPage";
-import { CpqPage } from "./pages/CpqPage";
-import { EpicWorkspacePage } from "./pages/EpicWorkspacePage";
+import { PanelLoader } from "./components/Loaders";
+import { type WorkspaceModule } from "./pages/EpicWorkspacePage";
+
+type CpqSection = "products" | "price-books" | "quotes";
+type AccessTab = "sso" | "requests" | "accounts";
+
+interface CpqRouteProps {
+  section: CpqSection;
+}
+
+interface WorkspaceRouteProps {
+  module: WorkspaceModule;
+}
+
+interface AccessGovernanceRouteProps {
+  initialTab?: AccessTab;
+}
+
+const LoginPage = lazyPage(() => import("./pages/LoginPage"), "LoginPage");
+const ActivateAccountPage = lazyPage(() => import("./pages/ActivateAccountPage"), "ActivateAccountPage");
+const HomePage = lazyPage(() => import("./pages/HomePage"), "HomePage");
+const PipelinePage = lazyPage(() => import("./pages/PipelinePage"), "PipelinePage");
+const AccountsPage = lazyPage(() => import("./pages/AccountsPage"), "AccountsPage");
+const LeadsPage = lazyPage(() => import("./pages/LeadsPage"), "LeadsPage");
+const ActivitiesPage = lazyPage(() => import("./pages/ActivitiesPage"), "ActivitiesPage");
+const CpqPage = lazyPage<CpqRouteProps>(() => import("./pages/CpqPage"), "CpqPage");
+const ReferenceDataPage = lazyPage(() => import("./pages/ReferenceDataPage"), "ReferenceDataPage");
+const ReportsPage = lazyPage(() => import("./pages/ReportsPage"), "ReportsPage");
+const EpicWorkspacePage = lazyPage<WorkspaceRouteProps>(() => import("./pages/EpicWorkspacePage"), "EpicWorkspacePage");
+const SearchPage = lazyPage(() => import("./pages/SearchPage"), "SearchPage");
+const AdminPage = lazyPage(() => import("./pages/AdminPage"), "AdminPage");
+const IntegrationDispatchPage = lazyPage(() => import("./pages/IntegrationDispatchPage"), "IntegrationDispatchPage");
+const AccessGovernancePage = lazyPage<AccessGovernanceRouteProps>(() => import("./pages/AccessGovernancePage"), "AccessGovernancePage");
+const RbacAdminPage = lazyPage(() => import("./pages/RbacAdminPage"), "RbacAdminPage");
+const UserActivityPage = lazyPage(() => import("./pages/UserActivityPage"), "UserActivityPage");
 
 export function App() {
   return (
-    <Routes>
-      <Route path="/login" element={<LoginPage />} />
-      <Route
-        element={
-          <RequireAuth>
-            <AppShell />
-          </RequireAuth>
-        }
-      >
-        <Route path="/" element={<HomePage />} />
-        <Route path="/pipeline" element={<PipelinePage />} />
-        <Route path="/accounts" element={<AccountsPage />} />
-        <Route path="/leads" element={<LeadsPage />} />
-        <Route path="/activities" element={<ActivitiesPage />} />
-        <Route path="/forecast" element={<EpicWorkspacePage module="forecast" />} />
-        <Route path="/products" element={<CpqPage section="products" />} />
-        <Route path="/price-books" element={<CpqPage section="price-books" />} />
-        <Route path="/quotes" element={<CpqPage section="quotes" />} />
-        <Route path="/contracts" element={<EpicWorkspacePage module="contracts" />} />
-        <Route path="/campaigns" element={<EpicWorkspacePage module="campaigns" />} />
-        <Route path="/cases" element={<EpicWorkspacePage module="cases" />} />
-        <Route path="/partners" element={<EpicWorkspacePage module="partners" />} />
-        {/* Bare /reference-data still resolves; the page redirects it onto the
-            first master's canonical /reference-data/:setCode path. */}
-        <Route path="/reference-data" element={<ReferenceDataPage />} />
-        <Route path="/reference-data/:setCode" element={<ReferenceDataPage />} />
-        <Route path="/reports" element={<ReportsPage />} />
-        <Route path="/analytics" element={<EpicWorkspacePage module="analytics" />} />
-        <Route path="/copilot" element={<EpicWorkspacePage module="copilot" />} />
-        <Route path="/migration" element={<EpicWorkspacePage module="migration" />} />
-        <Route path="/integrations" element={<EpicWorkspacePage module="integrations" />} />
-        <Route path="/sandbox" element={<EpicWorkspacePage module="sandbox" />} />
-        <Route path="/automation" element={<EpicWorkspacePage module="automation" />} />
-        <Route path="/mobile" element={<EpicWorkspacePage module="mobile" />} />
-        <Route path="/audit" element={<EpicWorkspacePage module="audit" />} />
-        <Route path="/packs/bfsi" element={<EpicWorkspacePage module="bfsi" />} />
-        <Route path="/packs/commodity" element={<EpicWorkspacePage module="commodity" />} />
-        <Route path="/admin/*" element={<AdminPage />} />
-      </Route>
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <Suspense fallback={<PanelLoader label="Loading Axiom workspace" detail="Preparing the selected module" />}>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        {/* Unauthenticated: the one-time activation link a provisioned trial is sent. */}
+        <Route path="/activate/:token" element={<ActivateAccountPage />} />
+        <Route
+          element={
+            <RequireAuth>
+              <AppShell />
+            </RequireAuth>
+          }
+        >
+          <Route path="/" element={<HomePage />} />
+          <Route path="/pipeline" element={<PipelinePage />} />
+          <Route path="/accounts" element={<AccountsPage />} />
+          <Route path="/leads" element={<LeadsPage />} />
+          <Route path="/activities" element={<ActivitiesPage />} />
+          {workspaceRoute("/forecast", "forecast")}
+          {cpqRoute("/products", "products")}
+          {cpqRoute("/price-books", "price-books")}
+          {cpqRoute("/quotes", "quotes")}
+          {workspaceRoute("/contracts", "contracts")}
+          {workspaceRoute("/campaigns", "campaigns")}
+          {workspaceRoute("/cases", "cases")}
+          {workspaceRoute("/partners", "partners")}
+          {/* Bare /reference-data still resolves; the page redirects it onto the
+              first master's canonical /reference-data/:setCode path. */}
+          <Route path="/reference-data" element={<ReferenceDataPage />} />
+          <Route path="/reference-data/:setCode" element={<ReferenceDataPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
+          {workspaceRoute("/analytics", "analytics")}
+          {workspaceRoute("/copilot", "copilot")}
+          {workspaceRoute("/migration", "migration")}
+          {workspaceRoute("/integrations", "integrations")}
+          <Route path="/integrations/dispatch" element={<IntegrationDispatchPage />} />
+          {workspaceRoute("/sandbox", "sandbox")}
+          {workspaceRoute("/automation", "automation")}
+          {workspaceRoute("/mobile", "mobile")}
+          {workspaceRoute("/audit", "audit")}
+          {workspaceRoute("/packs/bfsi", "bfsi")}
+          {workspaceRoute("/packs/commodity", "commodity")}
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/admin/*" element={<AdminPage />} />
+          {/* Access governance: SSO setup and the trial masters. */}
+          <Route path="/access" element={<AccessGovernancePage />} />
+          <Route path="/access/sso" element={<AccessGovernancePage initialTab="sso" />} />
+          <Route path="/access/trial-requests" element={<AccessGovernancePage initialTab="requests" />} />
+          <Route path="/access/trial-accounts" element={<AccessGovernancePage initialTab="accounts" />} />
+          {/* Authorization: the RBAC engine's admin surface and the access log.
+              Both pages gate themselves on the caller's role, mirroring the API. */}
+          <Route path="/security/authorization" element={<RbacAdminPage />} />
+          <Route path="/security/activity" element={<UserActivityPage />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </Suspense>
   );
+}
+
+function lazyPage<TProps = object>(
+  loader: () => Promise<Record<string, unknown>>,
+  exportName: string,
+) {
+  return lazy(async () => {
+    const module = await loader();
+    return { default: module[exportName] as ComponentType<TProps> };
+  });
+}
+
+function cpqRoute(path: string, section: CpqSection) {
+  return <Route key={path} path={path} element={<CpqPage section={section} />} />;
+}
+
+function workspaceRoute(path: string, module: WorkspaceModule) {
+  return <Route key={path} path={path} element={<EpicWorkspacePage module={module} />} />;
 }

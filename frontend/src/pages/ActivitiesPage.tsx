@@ -4,14 +4,24 @@ import { api, isUnreachable, type ActivityRow } from "../api/client";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataGridToolbar } from "../components/DataGridToolbar";
 import { DataViewFrame } from "../components/DataViewFrame";
+import { InfoTag } from "../components/InfoTag";
 import { useToasts } from "../components/Toasts";
 import { formatDate } from "../lib/format";
 import { GridLoader } from "../components/Loaders";
+import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, type GroupColumn } from "../lib/gridGrouping";
+import { usePersistedGridState } from "../lib/usePersistedGridState";
 
 const TYPES = ["TASK", "EVENT", "CALL", "EMAIL_LOG", "NOTE"];
 const STATUSES = ["OPEN", "COMPLETED", "CANCELLED"];
 const PRIORITIES = ["LOW", "NORMAL", "HIGH", "URGENT"];
 const RELATED_TYPES = ["ACCOUNT", "CONTACT", "LEAD", "OPPORTUNITY"];
+const ACTIVITY_GROUP_COLUMNS: GroupColumn<ActivityRow>[] = [
+  { key: "related", label: "Related record", value: (row) => row.relatedLabel ?? `${row.relatedEntityType} ${row.relatedEntityId.slice(0, 8)}` },
+  { key: "type", label: "Type", value: (row) => row.activityType },
+  { key: "status", label: "Status", value: (row) => row.status },
+  { key: "priority", label: "Priority", value: (row) => row.priority },
+  { key: "owner", label: "Owner", value: (row) => row.ownerName },
+];
 
 function localDateTime(value: string): string | null {
   return value ? new Date(value).toISOString() : null;
@@ -24,7 +34,7 @@ export function ActivitiesPage() {
   const [search, setSearch] = useState("");
   const [type, setType] = useState("");
   const [status, setStatus] = useState("OPEN");
-  const [groupedView, setGroupedView] = useState(true);
+  const [groupColumns, setGroupColumns, columnFilters, setColumnFilters] = usePersistedGridState("activities", { groupColumns: ["related"] });
   const [draft, setDraft] = useState({
     activityType: "TASK",
     subject: "",
@@ -76,19 +86,24 @@ export function ActivitiesPage() {
     onError: (error) => toasts.push("error", "Completion failed", error instanceof Error ? error.message : "Update failed."),
   });
 
-  if (isUnreachable(activitiesQ.error)) return <ApiUnreachable onRetry={() => void activitiesQ.refetch()} retrying={activitiesQ.isFetching} />;
-
   const total = activitiesQ.data?.total ?? 0;
   const totalPages = activitiesQ.data?.totalPages ?? 0;
-  const rows = activitiesQ.data?.items ?? [];
+  const rawRows = activitiesQ.data?.items ?? [];
+  const rows = filterRowsByColumns(rawRows, ACTIVITY_GROUP_COLUMNS, columnFilters);
+  const activeGroupColumns = selectedGroupColumns(ACTIVITY_GROUP_COLUMNS, groupColumns);
   const grouped = useMemo(() => {
     const result = new Map<string, ActivityRow[]>();
     rows.forEach((row) => {
-      const key = row.relatedLabel ?? `${row.relatedEntityType} ${row.relatedEntityId.slice(0, 8)}`;
+      const key = groupLabelFor(row, activeGroupColumns);
       result.set(key, [...(result.get(key) ?? []), row]);
     });
     return [...result.entries()];
-  }, [rows]);
+  }, [activeGroupColumns, rows]);
+
+  // Hooks must run in the same order on every render. Keeping this return
+  // below the grid projection prevents a request changing from success to a
+  // network/CORS failure from crashing React with a hook-order violation.
+  if (isUnreachable(activitiesQ.error)) return <ApiUnreachable onRetry={() => void activitiesQ.refetch()} retrying={activitiesQ.isFetching} />;
 
   function resetFilters() {
     setSearch("");
@@ -111,9 +126,9 @@ export function ActivitiesPage() {
     </div>
 
     <section className="list-controls activity-controls" aria-label="Activity search and filters">
-      <label><span>Search</span><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} placeholder="Subject, notes, outcome" /></label>
-      <label><span>Type</span><select value={type} onChange={(event) => { setType(event.target.value); setPage(0); }}><option value="">All types</option>{TYPES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
-      <label><span>Status</span><select value={status} onChange={(event) => { setStatus(event.target.value); setPage(0); }}><option value="">All statuses</option>{STATUSES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+      <label><span>Search <InfoTag text="Type words from the subject, notes, or outcome to narrow activities." label="Activity search help" /></span><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} placeholder="Subject, notes, outcome" /></label>
+      <label><span>Type <InfoTag text="Choose the kind of activity, such as task, call, email log, or note." label="Activity type help" /></span><select value={type} onChange={(event) => { setType(event.target.value); setPage(0); }}><option value="">All types</option>{TYPES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
+      <label><span>Status <InfoTag text="Show only open, completed, or cancelled activities." label="Activity status help" /></span><select value={status} onChange={(event) => { setStatus(event.target.value); setPage(0); }}><option value="">All statuses</option>{STATUSES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
       <button className="btn btn-sm" onClick={resetFilters}>Reset</button>
     </section>
 
@@ -121,9 +136,15 @@ export function ActivitiesPage() {
       title="Activity timeline"
       actions={<DataGridToolbar
         gridName="Activity timeline"
-        grouped={groupedView}
+        grouped={activeGroupColumns.length > 0}
         groupLabel="Related record"
-        onToggleGroup={() => setGroupedView((value) => !value)}
+        onToggleGroup={() => setGroupColumns((value) => value.length > 0 ? [] : ["related"])}
+        groupColumns={ACTIVITY_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
+        selectedGroupColumns={groupColumns}
+        onGroupColumnsChange={setGroupColumns}
+        filterColumns={ACTIVITY_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
+        columnFilters={columnFilters}
+        onColumnFiltersChange={setColumnFilters}
         auditEntityType="ACTIVITY"
         exportFilename="activity-timeline"
         exportRows={rows.map((row) => ({
@@ -142,28 +163,32 @@ export function ActivitiesPage() {
       />}
     >
       <section className="activity-create-panel" aria-label="Create activity">
+        <div className="form-title-with-info activity-create-help">
+          <span>Create activity</span>
+          <InfoTag text="Log a task, call, meeting, note, or email summary against a CRM record." label="Create activity form help" />
+        </div>
         <div className="activity-form-grid">
-          <select value={draft.activityType} onChange={(event) => setDraft((value) => ({ ...value, activityType: event.target.value }))}>{TYPES.map((value) => <option key={value} value={value}>{value}</option>)}</select>
-          <input value={draft.subject} onChange={(event) => setDraft((value) => ({ ...value, subject: event.target.value }))} placeholder="Subject" />
-          <select value={draft.priority} onChange={(event) => setDraft((value) => ({ ...value, priority: event.target.value }))}>{PRIORITIES.map((value) => <option key={value} value={value}>{value}</option>)}</select>
-          <select value={draft.relatedEntityType} onChange={(event) => setDraft((value) => ({ ...value, relatedEntityType: event.target.value }))}>{RELATED_TYPES.map((value) => <option key={value} value={value}>{value}</option>)}</select>
-          <input value={draft.relatedEntityId} onChange={(event) => setDraft((value) => ({ ...value, relatedEntityId: event.target.value }))} placeholder="Related record UUID" />
-          <input type="datetime-local" value={draft.dueAt} onChange={(event) => setDraft((value) => ({ ...value, dueAt: event.target.value }))} aria-label="Due date" />
-          <input type="datetime-local" value={draft.reminderAt} onChange={(event) => setDraft((value) => ({ ...value, reminderAt: event.target.value }))} aria-label="Reminder date" />
+          <select title="Choose whether this is a task, meeting, call, email log, or note." value={draft.activityType} onChange={(event) => setDraft((value) => ({ ...value, activityType: event.target.value }))}>{TYPES.map((value) => <option key={value} value={value}>{value}</option>)}</select>
+          <input title="A short title for the work or conversation." value={draft.subject} onChange={(event) => setDraft((value) => ({ ...value, subject: event.target.value }))} placeholder="Subject" />
+          <select title="How urgent or important this activity is." value={draft.priority} onChange={(event) => setDraft((value) => ({ ...value, priority: event.target.value }))}>{PRIORITIES.map((value) => <option key={value} value={value}>{value}</option>)}</select>
+          <select title="The type of record this activity belongs to." value={draft.relatedEntityType} onChange={(event) => setDraft((value) => ({ ...value, relatedEntityType: event.target.value }))}>{RELATED_TYPES.map((value) => <option key={value} value={value}>{value}</option>)}</select>
+          <input title="The internal ID of the account, lead, contact, or opportunity this activity belongs to." value={draft.relatedEntityId} onChange={(event) => setDraft((value) => ({ ...value, relatedEntityId: event.target.value }))} placeholder="Related record UUID" />
+          <input title="When this work should be completed." type="datetime-local" value={draft.dueAt} onChange={(event) => setDraft((value) => ({ ...value, dueAt: event.target.value }))} aria-label="Due date" />
+          <input title="When Axiom should remind the owner." type="datetime-local" value={draft.reminderAt} onChange={(event) => setDraft((value) => ({ ...value, reminderAt: event.target.value }))} aria-label="Reminder date" />
         </div>
         {draft.activityType === "CALL" && <div className="activity-form-grid call-fields">
-          <select value={draft.direction} onChange={(event) => setDraft((value) => ({ ...value, direction: event.target.value }))}><option value="OUTBOUND">OUTBOUND</option><option value="INBOUND">INBOUND</option></select>
-          <input type="number" min={0} value={draft.durationMinutes} onChange={(event) => setDraft((value) => ({ ...value, durationMinutes: Number(event.target.value) }))} aria-label="Duration minutes" />
-          <input value={draft.disposition} onChange={(event) => setDraft((value) => ({ ...value, disposition: event.target.value.toUpperCase() }))} placeholder="Disposition" />
+          <select title="Whether your team made the call or received it." value={draft.direction} onChange={(event) => setDraft((value) => ({ ...value, direction: event.target.value }))}><option value="OUTBOUND">OUTBOUND</option><option value="INBOUND">INBOUND</option></select>
+          <input title="How long the call lasted, in minutes." type="number" min={0} value={draft.durationMinutes} onChange={(event) => setDraft((value) => ({ ...value, durationMinutes: Number(event.target.value) }))} aria-label="Duration minutes" />
+          <input title="Short call result, such as CONNECTED or LEFT_MESSAGE." value={draft.disposition} onChange={(event) => setDraft((value) => ({ ...value, disposition: event.target.value.toUpperCase() }))} placeholder="Disposition" />
         </div>}
-        <textarea value={draft.body} onChange={(event) => setDraft((value) => ({ ...value, body: event.target.value }))} placeholder="Notes, agenda, email summary, or call outcome detail" />
+        <textarea title="Add the useful details: notes, agenda, email summary, or call outcome." value={draft.body} onChange={(event) => setDraft((value) => ({ ...value, body: event.target.value }))} placeholder="Notes, agenda, email summary, or call outcome detail" />
         <button className="btn btn-primary btn-sm" disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>{createMutation.isPending ? "Saving..." : "Create activity"}</button>
       </section>
 
       {activitiesQ.isLoading && <GridLoader label="Reading engagement timeline" rows={6} columns={5} />}
       {activitiesQ.isError && <p className="empty-note">Activities failed to load{activitiesQ.error instanceof Error ? `: ${activitiesQ.error.message}` : "."}</p>}
       {activitiesQ.isSuccess && rows.length === 0 && <p className="empty-note">No activities match the current query.</p>}
-      {groupedView && grouped.map(([group, items]) => <section className="activity-group" key={group}>
+      {activeGroupColumns.length > 0 && grouped.map(([group, items]) => <section className="activity-group" key={group}>
         <h2>{group}</h2>
         {items.map((activity) => <article className={`activity-row activity-${activity.activityType.toLowerCase()}`} key={activity.id}>
           <span className={`activity-stripe priority-${activity.priority.toLowerCase()}`} aria-hidden />
@@ -178,7 +203,7 @@ export function ActivitiesPage() {
           }}>Complete</button>}
         </article>)}
       </section>)}
-      {!groupedView && rows.map((activity) => <article className={`activity-row activity-${activity.activityType.toLowerCase()}`} key={activity.id}>
+      {activeGroupColumns.length === 0 && rows.map((activity) => <article className={`activity-row activity-${activity.activityType.toLowerCase()}`} key={activity.id}>
         <span className={`activity-stripe priority-${activity.priority.toLowerCase()}`} aria-hidden />
         <div className="activity-main">
           <div className="activity-title"><strong>{activity.subject}</strong><span className={`chip chip-${activity.status.toLowerCase()}`}>{activity.status}</span></div>

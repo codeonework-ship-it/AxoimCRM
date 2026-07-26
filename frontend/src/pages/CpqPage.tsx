@@ -5,9 +5,12 @@ import { api, isUnreachable, type CpqPriceBook, type CpqProduct, type CpqQuote }
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataGridToolbar, saveDownloadedFile } from "../components/DataGridToolbar";
 import { DataViewFrame } from "../components/DataViewFrame";
+import { InfoTag } from "../components/InfoTag";
 import { GridLoader } from "../components/Loaders";
 import { useToasts } from "../components/Toasts";
 import { formatDate, formatMoney } from "../lib/format";
+import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
+import { usePersistedGridState } from "../lib/usePersistedGridState";
 
 type CpqSection = "products" | "price-books" | "quotes";
 
@@ -17,13 +20,35 @@ interface CpqPageProps {
 
 const QUOTE_STATUSES = ["DRAFT", "IN_APPROVAL", "SENT", "ACCEPTED", "REJECTED", "EXPIRED", "ORDERED"];
 const PRICE_BOOK_STATUSES = ["DRAFT", "ACTIVE", "ARCHIVED"];
+const PRODUCT_GROUP_COLUMNS: GroupColumn<CpqProduct>[] = [
+  { key: "code", label: "Code", value: (row) => row.code },
+  { key: "name", label: "Product", value: (row) => row.name },
+  { key: "category", label: "Category", value: (row) => row.category },
+  { key: "family", label: "Family", value: (row) => row.productFamily },
+  { key: "status", label: "Status", value: (row) => row.active ? "ACTIVE" : "INACTIVE" },
+];
+const PRICE_BOOK_GROUP_COLUMNS: GroupColumn<CpqPriceBook>[] = [
+  { key: "code", label: "Code", value: (row) => row.code },
+  { key: "name", label: "Name", value: (row) => row.name },
+  { key: "status", label: "Status", value: (row) => row.status },
+  { key: "currency", label: "Currency", value: (row) => row.currencyCode },
+  { key: "segment", label: "Segment", value: (row) => row.customerSegment ?? row.businessUnitCode },
+];
+const QUOTE_GROUP_COLUMNS: GroupColumn<CpqQuote>[] = [
+  { key: "quote", label: "Quote", value: (row) => row.quoteNumber },
+  { key: "name", label: "Name", value: (row) => row.name },
+  { key: "status", label: "Status", value: (row) => row.status },
+  { key: "account", label: "Account", value: (row) => row.accountName },
+  { key: "owner", label: "Owner", value: (row) => row.ownerName },
+  { key: "approval", label: "Approval", value: (row) => row.approvalStatus },
+];
 
 export function CpqPage({ section }: CpqPageProps) {
   const toasts = useToasts();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("");
-  const [grouped, setGrouped] = useState(false);
+  const [groupColumns, setGroupColumns, columnFilters, setColumnFilters] = usePersistedGridState(`cpq-${section}`);
 
   const productsQ = useQuery({
     queryKey: ["cpq", "products", page, search, filter],
@@ -51,9 +76,14 @@ export function CpqPage({ section }: CpqPageProps) {
   const pageData = activeQ.data;
   const total = pageData?.total ?? 0;
   const totalPages = pageData?.totalPages ?? 0;
-  const productRows = ((section === "products" ? pageData?.items : []) ?? []) as CpqProduct[];
-  const priceBookRows = ((section === "price-books" ? pageData?.items : []) ?? []) as CpqPriceBook[];
-  const quoteRows = ((section === "quotes" ? pageData?.items : []) ?? []) as CpqQuote[];
+  const productRows = filterRowsByColumns(((section === "products" ? pageData?.items : []) ?? []) as CpqProduct[], PRODUCT_GROUP_COLUMNS, columnFilters);
+  const priceBookRows = filterRowsByColumns(((section === "price-books" ? pageData?.items : []) ?? []) as CpqPriceBook[], PRICE_BOOK_GROUP_COLUMNS, columnFilters);
+  const quoteRows = filterRowsByColumns(((section === "quotes" ? pageData?.items : []) ?? []) as CpqQuote[], QUOTE_GROUP_COLUMNS, columnFilters);
+  const selectedProductGroups = selectedGroupColumns(PRODUCT_GROUP_COLUMNS, groupColumns);
+  const selectedPriceBookGroups = selectedGroupColumns(PRICE_BOOK_GROUP_COLUMNS, groupColumns);
+  const selectedQuoteGroups = selectedGroupColumns(QUOTE_GROUP_COLUMNS, groupColumns);
+  const toolbarGroupColumns = section === "products" ? PRODUCT_GROUP_COLUMNS : section === "price-books" ? PRICE_BOOK_GROUP_COLUMNS : QUOTE_GROUP_COLUMNS;
+  const toolbarGroupKeys = groupColumns.filter((key) => toolbarGroupColumns.some((column) => column.key === key));
 
   function resetFilters() {
     setSearch("");
@@ -94,10 +124,10 @@ export function CpqPage({ section }: CpqPageProps) {
     </div>
 
     <section className="list-controls" aria-label="CPQ search and filters">
-      <label><span>Search</span><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} placeholder={section === "quotes" ? "Quote, account, opportunity, owner" : "Code, name, family, segment"} /></label>
-      {section === "products" && <label><span>Category</span><input value={filter} onChange={(event) => { setFilter(event.target.value); setPage(0); }} placeholder="Exact category" /></label>}
-      {section === "price-books" && <label><span>Status</span><select value={filter} onChange={(event) => { setFilter(event.target.value); setPage(0); }}><option value="">All statuses</option>{PRICE_BOOK_STATUSES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>}
-      {section === "quotes" && <label><span>Status</span><select value={filter} onChange={(event) => { setFilter(event.target.value); setPage(0); }}><option value="">All statuses</option>{QUOTE_STATUSES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>}
+      <label><span>Search <InfoTag text="Type a few words to find the product, price book, or quote you need." label="CPQ search help" /></span><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} placeholder={section === "quotes" ? "Quote, account, opportunity, owner" : "Code, name, family, segment"} /></label>
+      {section === "products" && <label><span>Category <InfoTag text="Show only products in one category." label="Product category help" /></span><input value={filter} onChange={(event) => { setFilter(event.target.value); setPage(0); }} placeholder="Exact category" /></label>}
+      {section === "price-books" && <label><span>Status <InfoTag text="Show price books by draft, active, or archived state." label="Price book status help" /></span><select value={filter} onChange={(event) => { setFilter(event.target.value); setPage(0); }}><option value="">All statuses</option>{PRICE_BOOK_STATUSES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>}
+      {section === "quotes" && <label><span>Status <InfoTag text="Show quotes by where they are in the quote-to-order process." label="Quote status help" /></span><select value={filter} onChange={(event) => { setFilter(event.target.value); setPage(0); }}><option value="">All statuses</option>{QUOTE_STATUSES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>}
       <button className="btn btn-sm" onClick={resetFilters} disabled={!search && !filter}>Reset</button>
     </section>
 
@@ -105,9 +135,15 @@ export function CpqPage({ section }: CpqPageProps) {
       title={section === "products" ? "Product catalogue" : section === "price-books" ? "Price book register" : "Quote register"}
       actions={<DataGridToolbar
         gridName={section === "products" ? "Product catalogue" : section === "price-books" ? "Price book register" : "Quote register"}
-        grouped={grouped}
+        grouped={toolbarGroupKeys.length > 0}
         groupLabel={section === "products" ? "Category" : "Status"}
-        onToggleGroup={() => setGrouped((value) => !value)}
+        onToggleGroup={() => setGroupColumns((value) => value.length > 0 ? [] : [section === "products" ? "category" : "status"])}
+        groupColumns={toolbarGroupColumns.map(({ key, label }) => ({ key, label }))}
+        selectedGroupColumns={toolbarGroupKeys}
+        onGroupColumnsChange={setGroupColumns}
+        filterColumns={toolbarGroupColumns.map(({ key, label }) => ({ key, label }))}
+        columnFilters={columnFilters}
+        onColumnFiltersChange={setColumnFilters}
         auditEntityType={section === "products" ? "PRODUCT" : section === "price-books" ? "PRICE_BOOK" : "QUOTE"}
         exportFilename={`cpq-${section}`}
         exportRows={cpqExportRows(section, productRows, priceBookRows, quoteRows)}
@@ -116,9 +152,9 @@ export function CpqPage({ section }: CpqPageProps) {
     >
       {activeQ.isLoading && <GridLoader label="Reading governed CPQ records" rows={6} columns={6} />}
       {activeQ.isError && <p className="empty-note">CPQ records failed to load{activeQ.error instanceof Error ? `: ${activeQ.error.message}` : "."}</p>}
-      {activeQ.isSuccess && section === "products" && <ProductTable rows={grouped ? sortedBy(productRows, (row) => row.category ?? "Unclassified", (row) => row.name) : productRows} grouped={grouped} />}
-      {activeQ.isSuccess && section === "price-books" && <PriceBookTable rows={grouped ? sortedBy(priceBookRows, (row) => row.status, (row) => row.name) : priceBookRows} grouped={grouped} />}
-      {activeQ.isSuccess && section === "quotes" && <QuoteTable rows={grouped ? sortedBy(quoteRows, (row) => row.status, (row) => row.quoteNumber) : quoteRows} grouped={grouped} onDownload={downloadQuote} />}
+      {activeQ.isSuccess && section === "products" && <ProductTable rows={sortByGroups(productRows, selectedProductGroups, (row) => row.name)} groupColumns={selectedProductGroups} />}
+      {activeQ.isSuccess && section === "price-books" && <PriceBookTable rows={sortByGroups(priceBookRows, selectedPriceBookGroups, (row) => row.name)} groupColumns={selectedPriceBookGroups} />}
+      {activeQ.isSuccess && section === "quotes" && <QuoteTable rows={sortByGroups(quoteRows, selectedQuoteGroups, (row) => row.quoteNumber)} groupColumns={selectedQuoteGroups} onDownload={downloadQuote} />}
       {activeQ.isSuccess && <footer className="page-controls" aria-label="CPQ pagination">
         <span>Showing {pageData?.items.length ?? 0} of {total} records - 100 rows per page</span>
         <div>
@@ -131,14 +167,14 @@ export function CpqPage({ section }: CpqPageProps) {
   </>;
 }
 
-function ProductTable({ rows, grouped }: { rows: CpqProduct[]; grouped: boolean }) {
+function ProductTable({ rows, groupColumns }: { rows: CpqProduct[]; groupColumns: GroupColumn<CpqProduct>[] }) {
   let previousGroup = "";
   return <div className="table-wrap"><table className="data-table cpq-table">
     <thead><tr><th>Code</th><th>Product</th><th>Family</th><th>Category</th><th>UOM</th><th>Active prices</th><th>Status</th></tr></thead>
     <tbody>
       {rows.map((row) => {
-        const group = row.category ?? "Unclassified";
-        const showGroup = grouped && group !== previousGroup;
+        const group = groupColumns.length > 0 ? groupLabelFor(row, groupColumns) : "";
+        const showGroup = groupColumns.length > 0 && group !== previousGroup;
         previousGroup = group;
         return <Fragment key={row.id}>
           {showGroup && <tr className="group-row"><th colSpan={7}>{group}</th></tr>}
@@ -153,16 +189,17 @@ function ProductTable({ rows, grouped }: { rows: CpqProduct[]; grouped: boolean 
   </table></div>;
 }
 
-function PriceBookTable({ rows, grouped }: { rows: CpqPriceBook[]; grouped: boolean }) {
+function PriceBookTable({ rows, groupColumns }: { rows: CpqPriceBook[]; groupColumns: GroupColumn<CpqPriceBook>[] }) {
   let previousGroup = "";
   return <div className="table-wrap"><table className="data-table cpq-table">
     <thead><tr><th>Code</th><th>Name</th><th>Currency</th><th>Segment</th><th>Version</th><th>Entries</th><th>Status</th></tr></thead>
     <tbody>
       {rows.map((row) => {
-        const showGroup = grouped && row.status !== previousGroup;
-        previousGroup = row.status;
+        const group = groupColumns.length > 0 ? groupLabelFor(row, groupColumns) : "";
+        const showGroup = groupColumns.length > 0 && group !== previousGroup;
+        previousGroup = group;
         return <Fragment key={row.id}>
-          {showGroup && <tr className="group-row"><th colSpan={7}>{row.status}</th></tr>}
+          {showGroup && <tr className="group-row"><th colSpan={7}>{group}</th></tr>}
           <tr>
             <td className="mono">{row.code}</td><td>{row.name}{row.defaultBook && <span className="chip cpq-mini">DEFAULT</span>}</td><td>{row.currencyCode}</td><td>{row.customerSegment ?? row.businessUnitCode ?? "All"}</td><td>v{row.versionNumber}</td><td>{row.entryCount}</td>
             <td><span className={`chip chip-${row.status.toLowerCase()}`}>{row.status}</span><small>{row.activatedAt ? `Activated ${formatDate(row.activatedAt)}` : "Not activated"}</small></td>
@@ -174,16 +211,17 @@ function PriceBookTable({ rows, grouped }: { rows: CpqPriceBook[]; grouped: bool
   </table></div>;
 }
 
-function QuoteTable({ rows, grouped, onDownload }: { rows: CpqQuote[]; grouped: boolean; onDownload: (quote: CpqQuote, format: "PDF" | "DOCX" | "XLSX") => void }) {
+function QuoteTable({ rows, groupColumns, onDownload }: { rows: CpqQuote[]; groupColumns: GroupColumn<CpqQuote>[]; onDownload: (quote: CpqQuote, format: "PDF" | "DOCX" | "XLSX") => void }) {
   let previousGroup = "";
   return <div className="table-wrap"><table className="data-table cpq-table">
     <thead><tr><th>Quote</th><th>Account</th><th>Opportunity</th><th>Owner</th><th>Total</th><th>Margin</th><th>Status</th><th>Docs</th></tr></thead>
     <tbody>
       {rows.map((row) => {
-        const showGroup = grouped && row.status !== previousGroup;
-        previousGroup = row.status;
+        const group = groupColumns.length > 0 ? groupLabelFor(row, groupColumns) : "";
+        const showGroup = groupColumns.length > 0 && group !== previousGroup;
+        previousGroup = group;
         return <Fragment key={row.id}>
-          {showGroup && <tr className="group-row"><th colSpan={8}>{row.status}</th></tr>}
+          {showGroup && <tr className="group-row"><th colSpan={8}>{group}</th></tr>}
           <tr>
             <td><span className="mono">{row.quoteNumber}</span><small>{row.name} - v{row.versionNumber}</small></td>
             <td>{row.accountName}</td><td>{row.opportunityName ?? "-"}</td><td>{row.ownerName ?? "-"}</td>
@@ -197,10 +235,6 @@ function QuoteTable({ rows, grouped, onDownload }: { rows: CpqQuote[]; grouped: 
       {rows.length === 0 && <tr><td colSpan={8} className="empty-note">No quotes match the current query.</td></tr>}
     </tbody>
   </table></div>;
-}
-
-function sortedBy<T>(rows: T[], group: (row: T) => string, label: (row: T) => string): T[] {
-  return [...rows].sort((a, b) => group(a).localeCompare(group(b)) || label(a).localeCompare(label(b)));
 }
 
 function cpqExportRows(section: CpqSection, products: CpqProduct[], priceBooks: CpqPriceBook[], quotes: CpqQuote[]) {

@@ -1,12 +1,17 @@
 import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, isUnreachable, type WorkspaceRow } from "../api/client";
+import { api, isUnreachable, type WorkflowGateStatus, type WorkspaceRow } from "../api/client";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataGridToolbar } from "../components/DataGridToolbar";
+import { DataTable, type Column } from "../components/DataTable";
 import { DataViewFrame } from "../components/DataViewFrame";
+import { InfoTag } from "../components/InfoTag";
 import { GridLoader } from "../components/Loaders";
 import { useToasts } from "../components/Toasts";
+import { WorkflowGateDrawer } from "../components/WorkflowGateDrawer";
 import { formatDate, formatMoney } from "../lib/format";
+import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
+import { usePersistedGridState } from "../lib/usePersistedGridState";
 
 export type WorkspaceModule =
   | "forecast"
@@ -64,12 +69,39 @@ const EYEBROWS: Record<WorkspaceModule, string> = {
   bfsi: "Financial services pack",
   commodity: "Trading origination",
 };
+const WORKSPACE_GROUP_COLUMNS: GroupColumn<WorkspaceRow>[] = [
+  { key: "code", label: "Code", value: (row) => row.code },
+  { key: "record", label: "Record", value: (row) => row.title },
+  { key: "status", label: "Status", value: (row) => row.status },
+  { key: "owner", label: "Owner", value: (row) => row.ownerName },
+  { key: "amount", label: "Amount", value: (row) => row.amount },
+  { key: "target", label: "Target date", value: (row) => row.targetDate ? formatDate(row.targetDate) : null },
+];
+
+const WORKFLOW_GATE_COLUMNS: Column<WorkflowGateStatus>[] = [
+  { key: "objectType", header: "Object", value: (row) => row.objectType, filter: "enum", groupable: true, cellClass: "mono" },
+  { key: "recordId", header: "Record", value: (row) => row.recordId, filter: "text", groupable: false, cellClass: "mono" },
+  {
+    key: "gateStatus",
+    header: "Status",
+    value: (row) => row.gateStatus,
+    filter: "enum",
+    groupable: true,
+    render: (row) => <span className={`chip ${statusClass(row.gateStatus)}`}>{row.gateStatus}</span>,
+  },
+  { key: "missingCount", header: "Missing", value: (row) => row.missingCount, filter: "enum", groupable: true, cellClass: "num" },
+  { key: "processCode", header: "Process", value: (row) => row.processCode ?? "No process", filter: "enum", groupable: true },
+  { key: "currentState", header: "State", value: (row) => row.currentState ?? "No state", filter: "enum", groupable: true },
+  { key: "nextStep", header: "Next step", value: (row) => row.nextStep, filter: "text", groupable: false, cellClass: "workflow-next-step" },
+  { key: "evaluatedAt", header: "Checked", value: (row) => new Date(row.evaluatedAt).toLocaleString(), filter: "text", groupable: false },
+];
 
 export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
-  const [grouped, setGrouped] = useState(false);
+  const [gateResult, setGateResult] = useState<WorkflowGateStatus | null>(null);
+  const [groupColumns, setGroupColumns, columnFilters, setColumnFilters] = usePersistedGridState(`workspace-${module}`);
   const toasts = useToasts();
   const queryClient = useQueryClient();
   const workspaceQ = useQuery({
@@ -83,8 +115,25 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
       toasts.push("info", "Workspace action complete", result.message);
       void queryClient.invalidateQueries({ queryKey: ["workspace", module] });
       void queryClient.invalidateQueries({ queryKey: ["audit"] });
+      void queryClient.invalidateQueries({ queryKey: ["workflow-gate-console"] });
     },
     onError: (error) => toasts.push("error", "Workspace action failed", error instanceof Error ? error.message : "Action failed."),
+  });
+  const gateMutation = useMutation({
+    mutationFn: (row: WorkspaceRow) => {
+      const transition = workflowTransitionFor(module, row);
+      if (!transition) throw new Error("This record has no pending governed transition.");
+      return api.workflowTransitionGate(transition.objectType, row.id, transition.targetState);
+    },
+    onSuccess: (result) => {
+      setGateResult(result);
+      void queryClient.invalidateQueries({ queryKey: ["workflow-gate-console"] });
+      toasts.push(result.gateStatus === "READY" ? "info" : "warn",
+        result.gateStatus === "READY" ? "Workflow gate ready" : "Workflow gate needs attention",
+        result.nextStep);
+    },
+    onError: (error) => toasts.push("error", "Workflow gate check failed",
+      error instanceof Error ? error.message : "Gate check failed."),
   });
 
   if (isUnreachable(workspaceQ.error)) {
@@ -92,10 +141,10 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
   }
 
   const workspace = workspaceQ.data;
-  const rows = workspace?.rows.items ?? [];
-  const visibleRows = grouped
-    ? [...rows].sort((a, b) => a.status.localeCompare(b.status) || a.title.localeCompare(b.title))
-    : rows;
+  const rawRows = workspace?.rows.items ?? [];
+  const rows = filterRowsByColumns(rawRows, WORKSPACE_GROUP_COLUMNS, columnFilters);
+  const activeGroupColumns = selectedGroupColumns(WORKSPACE_GROUP_COLUMNS, groupColumns);
+  const visibleRows = sortByGroups(rows, activeGroupColumns, (row) => row.title);
   const total = workspace?.rows.total ?? 0;
   const totalPages = workspace?.rows.totalPages ?? 0;
 
@@ -124,13 +173,15 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
       </div>)}
     </div>
 
+    {module === "automation" && <WorkflowGateConsole />}
+
     <section className="list-controls" aria-label={`${titleFromModule(module)} search and filters`}>
       <label>
-        <span>Search</span>
+        <span>Search <InfoTag text="Type a code, title, owner, account, or context word to narrow this workspace." label="Workspace search help" /></span>
         <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} placeholder="Code, title, owner, account or context" />
       </label>
       <label>
-        <span>Status</span>
+        <span>Status <InfoTag text="Choose one status to focus the register on records at that point in the workflow." label="Workspace status help" /></span>
         <select value={status} onChange={(event) => { setStatus(event.target.value); setPage(0); }}>
           <option value="">All statuses</option>
           {STATUS_OPTIONS[module].map((value) => <option key={value} value={value}>{value}</option>)}
@@ -143,18 +194,40 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
       title={`${workspace?.title ?? titleFromModule(module)} register`}
       actions={<DataGridToolbar
         gridName={`${workspace?.title ?? titleFromModule(module)} register`}
-        grouped={grouped}
+        grouped={activeGroupColumns.length > 0}
         groupLabel="Status"
-        onToggleGroup={() => setGrouped((value) => !value)}
+        onToggleGroup={() => setGroupColumns((value) => value.length > 0 ? [] : ["status"])}
+        groupColumns={WORKSPACE_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
+        selectedGroupColumns={groupColumns}
+        onGroupColumnsChange={setGroupColumns}
+        filterColumns={WORKSPACE_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
+        columnFilters={columnFilters}
+        onColumnFiltersChange={setColumnFilters}
         auditEntityType={auditEntityFor(module)}
         exportFilename={`${module}-workspace`}
+        exportRows={visibleRows.map((row) => ({
+          code: row.code,
+          record: row.title,
+          status: row.status,
+          owner: row.ownerName ?? "",
+          amount: row.amount ?? "",
+          targetDate: row.targetDate ? formatDate(row.targetDate) : "",
+        }))}
         onExport={(format) => api.exportWorkspace(module, format, { page, search, status })}
-        note="100 rows/page - tenant/RLS governed"
+        note="Current filtered page - tenant/RLS governed"
       />}
     >
       {workspaceQ.isLoading && <GridLoader label="Reading operational workspace" rows={6} columns={6} />}
       {workspaceQ.isError && <p className="empty-note">Workspace failed to load{workspaceQ.error instanceof Error ? `: ${workspaceQ.error.message}` : "."}</p>}
-      {workspaceQ.isSuccess && <WorkspaceTable rows={visibleRows} grouped={grouped} module={module} busyId={actionMutation.variables?.id} onAction={(row) => actionMutation.mutate(row)} />}
+      {workspaceQ.isSuccess && <WorkspaceTable
+        rows={visibleRows}
+        groupColumns={activeGroupColumns}
+        module={module}
+        busyId={actionMutation.variables?.id}
+        gateBusyId={gateMutation.variables?.id}
+        onAction={(row) => actionMutation.mutate(row)}
+        onCheckGates={(row) => gateMutation.mutate(row)}
+      />}
       {workspaceQ.isSuccess && <footer className="page-controls" aria-label="Workspace pagination">
         <span>Showing {visibleRows.length} of {total} records - 100 rows per page</span>
         <div>
@@ -164,20 +237,99 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
         </div>
       </footer>}
     </DataViewFrame>
+    <WorkflowGateDrawer result={gateResult} onClose={() => setGateResult(null)} />
   </>;
 }
 
-function WorkspaceTable({ rows, grouped, module, busyId, onAction }: { rows: WorkspaceRow[]; grouped: boolean; module: WorkspaceModule; busyId?: string; onAction: (row: WorkspaceRow) => void }) {
-  let previousStatus = "";
+function WorkflowGateConsole() {
+  const [status, setStatus] = useState("");
+  const [selected, setSelected] = useState<WorkflowGateStatus | null>(null);
+  const gatesQ = useQuery({
+    queryKey: ["workflow-gate-console", status],
+    queryFn: () => api.workflowGates({ status: status || undefined, limit: 25 }),
+    retry: 1,
+  });
+  const rows = gatesQ.data ?? [];
+  const blocked = rows.filter((row) => row.gateStatus === "BLOCKED" || row.gateStatus === "UNKNOWN_STATE").length;
+
+  return (
+    <>
+      <section className="panel workflow-gate-console" aria-label="Workflow gate console">
+        <header className="workflow-gate-console-head">
+          <div>
+            <span className="eyebrow">Workflow gate console</span>
+            <h2>
+              Process prerequisites
+              <InfoTag
+                text="This shows the latest gate checks already evaluated by Pipeline or automation APIs. Use Review to see what is missing and the next step in plain language."
+                label="Workflow gate console help"
+              />
+            </h2>
+            <p>Track missing process steps across records without opening each record one by one.</p>
+          </div>
+          <div className="workflow-gate-console-controls">
+            <label>
+              <span>Status</span>
+              <select value={status} onChange={(event) => setStatus(event.target.value)}>
+                <option value="">All gate states</option>
+                <option value="BLOCKED">Blocked</option>
+                <option value="UNKNOWN_STATE">Unknown state</option>
+                <option value="READY">Ready</option>
+                <option value="COMPLETED">Completed</option>
+                <option value="NO_PROCESS">No process</option>
+              </select>
+            </label>
+            <button className="btn btn-sm" disabled={gatesQ.isFetching} onClick={() => void gatesQ.refetch()}>
+              {gatesQ.isFetching ? "Refreshing..." : "Refresh"}
+            </button>
+          </div>
+        </header>
+        <div className="workflow-gate-console-summary">
+          <span className={blocked > 0 ? "chip chip-cancelled" : "chip chip-active"}>{blocked} blocked</span>
+          <span className="chip">{rows.length} latest checks</span>
+        </div>
+        {gatesQ.isLoading && <GridLoader label="Reading workflow gate status" rows={3} columns={5} />}
+        {gatesQ.isError && <p className="empty-note">Workflow gate console failed to load{gatesQ.error instanceof Error ? `: ${gatesQ.error.message}` : "."}</p>}
+        {gatesQ.isSuccess && (
+          <DataTable
+            name="Workflow gate findings"
+            columns={WORKFLOW_GATE_COLUMNS}
+            rows={rows}
+            rowKey={(row) => `${row.objectType}:${row.recordId}`}
+            initialGroupBy="gateStatus"
+            empty="No workflow gate checks have been recorded yet. Use Check gates on Pipeline records, or evaluate a record through the automation API."
+            actions={(row) => <button className="btn btn-sm" onClick={() => setSelected(row)}>Review</button>}
+            actionsHeader="Review"
+            note="Use the column filters to focus on one object, state, process, or missing-step count. The same filtered and grouped view is used for Excel, Word, PDF, Copy view, Audit, and Full size."
+          />
+        )}
+      </section>
+      <WorkflowGateDrawer result={selected} onClose={() => setSelected(null)} />
+    </>
+  );
+}
+
+function WorkspaceTable({ rows, groupColumns, module, busyId, gateBusyId, onAction, onCheckGates }: {
+  rows: WorkspaceRow[];
+  groupColumns: GroupColumn<WorkspaceRow>[];
+  module: WorkspaceModule;
+  busyId?: string;
+  gateBusyId?: string;
+  onAction: (row: WorkspaceRow) => void;
+  onCheckGates: (row: WorkspaceRow) => void;
+}) {
+  let previousGroup = "";
   return <div className="table-wrap"><table className="data-table cpq-table epic-table">
     <thead><tr><th>Code</th><th>Record</th><th>Owner</th><th>Amount</th><th>Target</th><th>Status</th><th>Signals</th><th>Action</th></tr></thead>
     <tbody>
       {rows.map((row) => {
-        const showGroup = grouped && row.status !== previousStatus;
-        previousStatus = row.status;
+        const group = groupColumns.length > 0 ? groupLabelFor(row, groupColumns) : "";
+        const showGroup = groupColumns.length > 0 && group !== previousGroup;
+        previousGroup = group;
         const action = actionFor(module, row);
+        const gate = workflowTransitionFor(module, row);
         return <Fragment key={row.id}>
-          {showGroup && <tr className="group-row"><th colSpan={8}>{row.status}</th></tr>}
+          {showGroup && <tr className="group-row"><th colSpan={8}>{group}</th></tr>}
           <tr>
             <td className="mono">{row.code}</td>
             <td>{row.title}<small>{row.subtitle}</small></td>
@@ -186,15 +338,69 @@ function WorkspaceTable({ rows, grouped, module, busyId, onAction }: { rows: Wor
             <td>{formatDate(row.targetDate)}</td>
             <td><span className={`chip ${statusClass(row.status)}`}>{row.status}</span><small>Updated {formatDate(row.updatedAt)}</small></td>
             <td>{Object.entries(row.metrics ?? {}).slice(0, 3).map(([key, value]) => <span className="chip cpq-mini" key={key}>{humanize(key)}: {String(value)}</span>)}</td>
-            <td className="table-action">{action
-              ? <button className="btn btn-sm" disabled={busyId === row.id} onClick={() => onAction(row)}>{busyId === row.id ? "Working..." : action}</button>
-              : <span className="empty-note">No action</span>}</td>
+            <td className="table-action"><div className="workspace-row-actions">
+              {gate && <button className="btn btn-sm" disabled={gateBusyId === row.id || busyId === row.id}
+                onClick={() => onCheckGates(row)}>{gateBusyId === row.id ? "Checking..." : "Check gates"}</button>}
+              {action
+                ? <button className="btn btn-primary btn-sm" disabled={busyId === row.id || gateBusyId === row.id}
+                    onClick={() => onAction(row)}>{busyId === row.id ? "Working..." : action}</button>
+                : !gate && <span className="empty-note">No action</span>}
+            </div></td>
           </tr>
         </Fragment>;
       })}
       {rows.length === 0 && <tr><td colSpan={8} className="empty-note">No records match the current query.</td></tr>}
     </tbody>
   </table></div>;
+}
+
+function workflowTransitionFor(module: WorkspaceModule, row: WorkspaceRow): { objectType: string; targetState: string } | null {
+  if (module === "contracts" && ["DRAFT", "IN_REVIEW", "EXPIRING"].includes(row.status)) {
+    return { objectType: "CONTRACT", targetState: "ACTIVE" };
+  }
+  if (module === "forecast" && ["DRAFT", "MANAGER_ADJUSTED"].includes(row.status)) {
+    return { objectType: "FORECAST_SUBMISSION", targetState: "SUBMITTED" };
+  }
+  if (module === "campaigns" && !["COMPLETED", "CANCELLED"].includes(row.status)) {
+    return { objectType: "CAMPAIGN", targetState: "COMPLETED" };
+  }
+  if (module === "cases" && !["RESOLVED", "CLOSED"].includes(row.status)) {
+    return { objectType: "CASE", targetState: "RESOLVED" };
+  }
+  if (module === "partners" && ["ONBOARDING", "SUSPENDED"].includes(row.status)) {
+    return { objectType: "PARTNER_ACCOUNT", targetState: "ACTIVE" };
+  }
+  if (module === "automation" && row.status !== "RETIRED") {
+    return { objectType: "AUTOMATION_RULE", targetState: "true" };
+  }
+  if (module === "analytics" && row.status === "ACTIVE") {
+    return { objectType: "ANALYTICS_DASHBOARD", targetState: "ACTIVE" };
+  }
+  if (module === "copilot" && row.status === "READY") {
+    return { objectType: "COPILOT_RECOMMENDATION", targetState: "ACCEPTED" };
+  }
+  if (module === "integrations" && !["DEPRECATED", "RETIRED"].includes(row.status)) {
+    return { objectType: "INTEGRATION_CONTRACT", targetState: "ACTIVE" };
+  }
+  if (module === "migration" && !["IMPORTED", "ROLLED_BACK"].includes(row.status)) {
+    return { objectType: "IMPORT_BATCH", targetState: "VALIDATING" };
+  }
+  if (module === "sandbox" && !["ARCHIVED", "PROVISIONING"].includes(row.status)) {
+    return { objectType: "SANDBOX", targetState: "ACTIVE" };
+  }
+  if (module === "audit" && row.status === "READY") {
+    return { objectType: "AUDIT_EVIDENCE_PACK", targetState: "EXPORTED" };
+  }
+  if (module === "mobile" && row.status === "ACTIVE") {
+    return { objectType: "DEVICE_SESSION", targetState: "ACTIVE" };
+  }
+  if (module === "bfsi" && !["CLEARED", "REJECTED"].includes(row.status)) {
+    return { objectType: "BFSI_ONBOARDING", targetState: "CLEARED" };
+  }
+  if (module === "commodity" && ["RECEIVED", "PRICING"].includes(row.status)) {
+    return { objectType: "COMMODITY_ENQUIRY", targetState: "OFFERED" };
+  }
+  return null;
 }
 
 function actionFor(module: WorkspaceModule, row: WorkspaceRow): string | null {

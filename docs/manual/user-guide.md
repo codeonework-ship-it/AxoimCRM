@@ -49,6 +49,11 @@ If something here doesn't match what you see on screen, your administrator may h
 10. [Keyboard shortcuts](#keyboard-shortcuts)
 11. [Troubleshooting and FAQ](#troubleshooting-and-faq)
 12. [Glossary](#glossary)
+13. [Connectors and outbound messages (for administrators)](#connectors-and-outbound-messages-for-administrators)
+    - [What a connector is](#what-a-connector-is)
+    - [When a connector says "paused"](#when-a-connector-says-paused)
+    - [The undelivered list, and how to retry](#the-undelivered-list-and-how-to-retry)
+    - [Why you can't see a saved password](#why-you-cant-see-a-saved-password)
 
 ---
 
@@ -150,6 +155,14 @@ Modules are gathered into eight groups. Click a group heading to fold it away if
 | **Integrations** | The connections to your other systems — email, calendar, accounting, phones. |
 | **Migration** | Bringing your data across from Salesforce, Zoho or HubSpot, with a rehearsal run before anything is written. |
 | **Mobile** | The phone and tablet experience, including working with no signal. |
+
+The Automation workspace includes a **Workflow gate console**. It shows the latest gate checks already evaluated by Pipeline or automation APIs: the record, gate status, missing prerequisite count and the next step in plain language. The console uses the same governed Data Grid controls as the rest of Axiom: column filters, spread-out grouping options, Excel/Word/PDF export, Copy view, Audit and Full size/Restore. Use **Review** to open the full gate drawer and see every missing field or condition.
+
+The Contracts, Forecast, Campaigns, Cases and Partners registers also show **Check gates** beside a pending business action. Select it before acting to preview the exact next transition. Axiom tells you whether the record is ready, what is missing and what to fill in. The real action checks the same gate again on the server; direct API, import, automation and database writers cannot skip the process because the lifecycle is also enforced in PostgreSQL.
+
+The same **Check gates** control now covers Automation simulations, Analytics refreshes, Copilot recommendation acceptance, Integration contract verification and Migration validation. Migration batches visibly pass through **Validating** before success or failure, and repeated checks retain their observations for operational review.
+
+Sandbox refresh, Audit evidence export, Mobile sync acknowledgement, BFSI clearance and Commodity offer now use **Check gates** too. The review explains missing record fields in everyday language, while the action also verifies related evidence such as compliance screenings, counterparty credit and approved term sheets. This means a green gate is never permission to bypass the final business-control check.
 
 #### Governance — control and proof
 
@@ -263,11 +276,21 @@ Won or lost, closing asks for a reason from your organization's list, and for lo
 
 ### Lists, exports and governed master data
 
-Accounts and Leads use server-side search, filtering and pagination. Each page returns 100 records; exports use the same active search and filter values, so Excel, Word and PDF downloads match the working list rather than a stale client-side subset.
+Accounts and Leads use server-side search, filtering and pagination. Each page returns 100 records. You can then narrow the visible page further with **Column search** fields under the grid toolbar — for example, search only Owner, Status, Industry or Company without changing the main page search.
+
+Exports follow the view you are actually working with. If you apply column searches or grouping, Excel, Word and PDF downloads use the same visible rows instead of a stale unfiltered subset. Current-view downloads also include a small header with the grid name, generated time, row count, active groups and active column filters, so someone opening the file later can understand what view produced it. Axiom records export evidence before the file is saved, including the object/table type, format, row count and filter/group context.
+
+Use **Copy view** when you do not need a file but want to share what you are seeing. It copies the grid name, generated time, row count, groups and column filters to your clipboard, which is useful for support tickets, audit notes or a quick chat with an administrator.
+
+Administration and security tables use the same idea. Their **Copy view** output also includes the current sort direction and collapsed group count, so a role-review or user-activity question can be reproduced without asking for a screenshot. Those tables also provide **Export Excel**, **Export Word** and **Export PDF** from the currently visible table view, including the same view context header used by the rest of the product. Each table now carries its own sticky table workspace header with a plain-language help tag, visible export scope, **Audit** access and **Full size / Restore view** controls for large permission or activity reviews.
+
+Axiom remembers your grid layout choices in your browser. If you group a grid by Owner, add a Status column search, or tune a security table's column filters, those preferences come back when you return to that screen. Use **Clear** or **Reset view** on the grid when you want to start fresh. If several screens feel confusing after experimentation, open your avatar menu and choose **Reset grid views** to clear saved grouping and column-search preferences across this browser.
+
+When column filters are active, Axiom shows them as small chips under the filter row. Each chip names the column and the value being searched. Click the **×** on a chip to remove just that one filter without losing the rest of your view.
 
 The master toolbar provides:
 
-- **Group** to group the current page by the main master field.
+- **Group** to choose one or more columns as spread-out checkbox chips. Tick the columns you want; untick them to restore a flat list.
 - **Audit** to open immutable master activity.
 - **Export Excel**, **Export Word** and **Export PDF** for governed downloads.
 - **Download template** and **Bulk upload** for roles allowed to import master data.
@@ -527,6 +550,89 @@ A: Yes — the full product works in a tablet or phone browser, and native mobil
 | **Digest** | One batched notification email instead of many — Axiom's default for anything that isn't action-required. |
 | **Quiet hours** | Your do-not-disturb window. Notifications wait; the bell accrues. |
 | **Tenant** | Your organization's own isolated instance of Axiom. Nobody outside it can ever see in. |
+
+---
+
+## Connectors and outbound messages (for administrators)
+
+This section is for whoever administers your workspace. Everyone else can skip it. You'll find these
+screens at **Integrations → Dispatch** (`/integrations/dispatch`).
+
+### What a connector is
+
+A connector is Axiom's link to another system — your accounting package, an e-signature service, a
+marketing tool, or just a web address one of your own systems listens on.
+
+Nothing goes out of a connector automatically. You tell it *which* changes to send by adding one or
+more **subscriptions**, each naming a kind of event: `lead.converted`, `opportunity.*` for everything
+that happens to an opportunity, or `*` for all of it. From that point on, whenever someone in Axiom
+makes that kind of change, the connector receives a message about it.
+
+Two things worth knowing:
+
+- **Sending happens in the background, a moment after the change.** A slow or broken external system
+  can never slow down or block someone saving a record in Axiom. That is deliberate.
+- **A subscription only applies from the moment you add it.** Axiom does not send the history of
+  everything that happened before, because arriving one morning to ten thousand messages about last
+  year is nobody's idea of a working integration.
+
+### When a connector says "paused"
+
+There are two different kinds of paused, and the screen tells you which:
+
+- **Paused by you** — you pressed Pause. Nothing new is queued for it until you press Resume.
+- **Paused after repeated failures** — Axiom did this by itself. When a connector fails several times
+  in a row, Axiom stops hammering it and puts the messages in a queue instead. The connector shows
+  **PAUSED** and its breaker shows **OPEN**.
+
+The second kind is a safety measure, not a punishment. A system that has just come back up does not
+need every message you have been holding thrown at it at once. After a short wait Axiom quietly sends
+one test message (the connector shows **PROBING**). If that one works, the connector goes back to
+normal and everything queued behind it goes out. If it fails, Axiom waits again.
+
+You do not have to sit and watch for this. When a connector is paused this way, Axiom sends a
+notification to every administrator in the workspace. **An integration that fails quietly is treated
+as a fault in Axiom, not as normal.** One connector being paused never affects any other connector —
+each one is judged on its own.
+
+### The undelivered list, and how to retry
+
+When a message has been retried the maximum number of times and still cannot be delivered, Axiom stops
+trying and moves it to the **Dead letters** tab. Think of it as the "undelivered post" tray.
+
+Nothing in this tray has been thrown away. Each entry keeps the whole message exactly as it was going
+to be sent, along with the reason it failed — a rejection from the far end, a wrong address, a system
+that never answered. Click the event name to see the message itself.
+
+The normal sequence is: fix the receiving system (or fix the connector's settings), then press
+**Retry** on the affected entries, or **Retry all** to send the whole tray again. If the queue grows
+past a handful of messages, administrators get a notification about that too.
+
+Pressing Retry twice on the same message is harmless. Axiom recognises a message it has already
+queued and will not send a duplicate — every message carries an identity the receiving system can
+also use to spot a repeat.
+
+### Why you can't see a saved password
+
+Passwords, keys and tokens live under the **Credentials** tab, and once you save one, Axiom will never
+show it to you again. The screen shows the name you gave it, what it is for, when it was last changed
+and when it was last used — and eight asterisks where the value would be.
+
+This is not an oversight. A value that can be displayed can be read over a shoulder, copied into a
+support ticket or pulled out of a screenshot. Storing it so that not even Axiom's own screens can
+retrieve it is the whole point, and it is what lets us say plainly that a saved credential cannot leak
+through the product.
+
+Practically, this means two things:
+
+- **Keep your own copy** wherever your organization normally keeps such things, at the moment you save
+  it. There is no "show me again" later.
+- **If you lose it or suspect it has been exposed, replace it rather than looking it up.** Press
+  **Replace value**, paste the new one, and every connector that refers to that credential by name
+  starts using it immediately — you do not have to edit each connector.
+
+Connectors never contain a password themselves. They refer to a credential *by its name*, which is why
+rotating one is a single action rather than a hunt.
 
 ---
 

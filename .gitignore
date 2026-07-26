@@ -7,3 +7,23 @@ electron-client/release/
 *.log
 .DS_Store
 Thumbs.db
+# ---------------------------------------------------------------------------
+# Environment credentials — DELIBERATELY NOT IGNORED.
+#
+# .env.dev / .env.qa / .env.uat / .env.prod are committed on purpose, matching
+# the convention already used by the sibling Octane platform: one file per
+# environment, versioned so a new machine is reproducible without out-of-band
+# setup. Do not add them to this file.
+#
+# The reference below was originally written here as prose. Prose is not a glob
+# pattern, so it never ignored anything — it is preserved verbatim as a comment
+# because the information is useful, and is documented properly in
+# docs/architecture/environments-and-credentials.md.
+#
+#   AxiomCrmdb_Dev, AxiomCrmdb_QA, AxiomCrmdb_UAT, AxiomCrmdb_Prod
+#   with db user : Axiom
+#   password: Axiom@12345
+#
+# Rotate the production values and move them to a secret manager before any
+# real production deployment.
+# ---------------------------------------------------------------------------

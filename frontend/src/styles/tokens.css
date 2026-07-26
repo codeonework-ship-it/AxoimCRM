@@ -199,3 +199,64 @@
 
   color-scheme: dark;
 }
+
+/* ============================================================================
+   THE GRID — Tron suite.
+   Black void, circuit lines, and light that comes from the UI itself rather
+   than from any illumination in the room.
+
+   Two decisions define this theme:
+
+   1. It is the only theme with a TRUE BLACK ground (#000). Tron's look depends
+      on emissive light against absolute void — on a near-black like #050709 the
+      lightcycle glow reads as a lit surface instead of a light source.
+
+   2. Its accent is CYAN, like Command Deck, but the two are not
+      interchangeable: Command Deck is a lit console with cyan trim, whereas The
+      Grid is darkness with cyan edges. The separation comes from surfaces —
+      near-black panels, circuit-trace borders — not from hue.
+
+   Orange is the antagonist signal, which maps naturally onto danger. Gold keeps
+   its product-wide job as the AI-provenance mark and is nudged toward amber so
+   it does not read as the same signal as the orange.
+   ============================================================================ */
+
+:root[data-theme="tron"] {
+  --bg: #000000;          /* the void */
+  --bg-raise: #05080c;
+  --panel: #070c12;       /* barely-there plate */
+  --panel-2: #0a1119;
+  --line-m: #12283a;      /* dormant circuit trace */
+  --line-bright: #1d4a68; /* energised trace */
+
+  /* Lightcycle cyan — emissive, high chroma. 11.9:1 on --panel. */
+  --cyan: #6ff9ff;
+  --cyan-deep: #0a94a8;
+  --cyan-dim: rgba(111, 249, 255, 0.1);
+
+  /* Program amber — AI provenance only, per the product-wide rule. */
+  --amber: #ffcf5c;
+  --gold-500: #ffcf5c;
+  --gold-600: #ffe08f;
+  --gold-100: rgba(255, 207, 92, 0.09);
+  --gold-border: rgba(255, 207, 92, 0.38);
+
+  /* Antagonist orange — danger and destructive actions. */
+  --red: #ff7a35;
+  --green: #45f0c0;
+
+  --text: #e9fbff;        /* cool white, faintly cyan-shifted */
+  --muted: #8fa8b8;       /* 7.4:1 on --panel */
+  --ink-soft: #c5dfe9;
+  --slate-faint: #5e7686;
+
+  --steel-900: #000000;
+  --steel-800: #08131c;
+  --ion-500: #9dfcff;
+  --info: #7ea8ff;
+
+  /* The strongest glow of any theme — here light IS the design. */
+  --glow: 0 0 22px rgba(111, 249, 255, 0.55);
+
+  color-scheme: dark;
+}

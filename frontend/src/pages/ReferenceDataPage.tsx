@@ -6,9 +6,12 @@ import { useAuth } from "../auth/AuthContext";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataGridToolbar } from "../components/DataGridToolbar";
 import { DataViewFrame } from "../components/DataViewFrame";
+import { InfoTag } from "../components/InfoTag";
 import { canManageMasters } from "../components/MasterToolbar";
 import { useToasts } from "../components/Toasts";
 import { GridLoader, LoaderStatus } from "../components/Loaders";
+import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
+import { usePersistedGridState } from "../lib/usePersistedGridState";
 
 /**
  * Master / reference data workspace.
@@ -25,6 +28,13 @@ import { GridLoader, LoaderStatus } from "../components/Loaders";
  */
 
 const EMPTY_DRAFT = { code: "", label: "", sortOrder: 100 };
+const REFERENCE_GROUP_COLUMNS: GroupColumn<ReferenceEntry>[] = [
+  { key: "code", label: "Code", value: (row) => row.code },
+  { key: "label", label: "Label", value: (row) => row.label },
+  { key: "order", label: "Order", value: (row) => row.sortOrder },
+  { key: "status", label: "Status", value: (row) => row.active ? "Active" : "Inactive" },
+  { key: "systemManaged", label: "System managed", value: (row) => row.systemManaged },
+];
 
 function tabDomId(apiName: string): string {
   return `master-tab-${apiName}`;
@@ -43,7 +53,6 @@ export function ReferenceDataPage() {
   const [searchParams] = useSearchParams();
   const [draft, setDraft] = useState(EMPTY_DRAFT);
   const [counts, setCounts] = useState<Record<string, number>>({});
-  const [grouped, setGrouped] = useState(false);
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
   const pendingFocus = useRef<string | null>(null);
   const canManage = canManageMasters(user?.role);
@@ -57,6 +66,7 @@ export function ReferenceDataPage() {
   const activeSet = matchedSet ?? sets[0];
   const selectedApiName = activeSet?.apiName ?? "";
   const urlIsCanonical = !!matchedSet && params.setCode === requested;
+  const [groupColumns, setGroupColumns, columnFilters, setColumnFilters] = usePersistedGridState(`reference-${selectedApiName || "value-set"}`);
 
   const entriesQ = useQuery({
     queryKey: ["reference", "entries", selectedApiName],
@@ -123,6 +133,12 @@ export function ReferenceDataPage() {
     },
     onError: (error) => toasts.push("error", "Reference update failed", error instanceof Error ? error.message : "Update failed."),
   });
+  const activeGroupColumns = selectedGroupColumns(REFERENCE_GROUP_COLUMNS, groupColumns);
+  const visibleEntries = sortByGroups(
+    filterRowsByColumns(entriesQ.data ?? [], REFERENCE_GROUP_COLUMNS, columnFilters),
+    activeGroupColumns,
+    (entry) => entry.label,
+  );
 
   if (isUnreachable(setsQ.error)) return <ApiUnreachable onRetry={() => void setsQ.refetch()} retrying={setsQ.isFetching} />;
 
@@ -173,12 +189,18 @@ export function ReferenceDataPage() {
       title="Reference value-set console"
       actions={<DataGridToolbar
         gridName="Reference value-set console"
-        grouped={grouped}
+        grouped={activeGroupColumns.length > 0}
         groupLabel="Status"
-        onToggleGroup={() => setGrouped((value) => !value)}
+        onToggleGroup={() => setGroupColumns((value) => value.length > 0 ? [] : ["status"])}
+        groupColumns={REFERENCE_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
+        selectedGroupColumns={groupColumns}
+        onGroupColumnsChange={setGroupColumns}
+        filterColumns={REFERENCE_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
+        columnFilters={columnFilters}
+        onColumnFiltersChange={setColumnFilters}
         auditEntityType="REFERENCE_VALUE_SET"
         exportFilename={`reference-${selectedApiName || "value-set"}`}
-        exportRows={(entriesQ.data ?? []).map((entry) => ({
+        exportRows={visibleEntries.map((entry) => ({
           valueSet: activeSet?.label ?? selectedApiName,
           code: entry.code,
           label: entry.label,
@@ -223,34 +245,32 @@ export function ReferenceDataPage() {
           <div><span className="eyebrow">{activeSet.module}</span><h2>{activeSet.label}</h2><p>{activeSet.description ?? "Tenant-scoped governed values."}</p></div>
         </header>
         {canManage && <div className="reference-entry-form">
-          <input value={draft.code} onChange={(event) => setDraft((value) => ({ ...value, code: event.target.value.toUpperCase() }))} placeholder="CODE" aria-label="Reference code" />
-          <input value={draft.label} onChange={(event) => setDraft((value) => ({ ...value, label: event.target.value }))} placeholder="Display label" aria-label="Reference label" />
-          <input type="number" value={draft.sortOrder} onChange={(event) => setDraft((value) => ({ ...value, sortOrder: Number(event.target.value) }))} aria-label="Sort order" />
+          <span className="reference-form-help"><InfoTag text="Add a new dropdown value. Codes are system-friendly names; labels are what users read." label="Reference value form help" /></span>
+          <input title="Short system code for this value, usually uppercase." value={draft.code} onChange={(event) => setDraft((value) => ({ ...value, code: event.target.value.toUpperCase() }))} placeholder="CODE" aria-label="Reference code" />
+          <input title="Friendly label users will see in dropdowns and reports." value={draft.label} onChange={(event) => setDraft((value) => ({ ...value, label: event.target.value }))} placeholder="Display label" aria-label="Reference label" />
+          <input title="Lower numbers appear earlier in lists." type="number" value={draft.sortOrder} onChange={(event) => setDraft((value) => ({ ...value, sortOrder: Number(event.target.value) }))} aria-label="Sort order" />
           <button className="btn btn-primary btn-sm" disabled={createMutation.isPending || !selectedApiName} onClick={createEntry}>{createMutation.isPending ? "Saving..." : "Add value"}</button>
         </div>}
         {entriesQ.isLoading && <GridLoader label="Reading value set" rows={5} columns={5} />}
         {entriesQ.isError && <p className="empty-note">Entries failed to load{entriesQ.error instanceof Error ? `: ${entriesQ.error.message}` : "."}</p>}
         {entriesQ.isSuccess && <div className="table-wrap"><table className="data-table"><thead><tr><th>Code</th><th>Label</th><th>Order</th><th>Status</th>{canManage && <th className="table-action">Action</th>}</tr></thead>
-          <tbody>{sortEntries(entriesQ.data, grouped).map((entry, index, all) => {
+          <tbody>{visibleEntries.map((entry, index, all) => {
             const group = entry.active ? "Active" : "Inactive";
             const previous = all[index - 1];
-            const showGroup = grouped && (!previous || (previous.active ? "Active" : "Inactive") !== group);
+            const groupText = activeGroupColumns.length > 0 ? groupLabelFor(entry, activeGroupColumns) : group;
+            const previousGroupText = previous && activeGroupColumns.length > 0 ? groupLabelFor(previous, activeGroupColumns) : "";
+            const showGroup = activeGroupColumns.length > 0 && previousGroupText !== groupText;
             return <Fragment key={entry.id}>
-              {showGroup && <tr className="group-row"><th colSpan={canManage ? 5 : 4}>{group}</th></tr>}
+              {showGroup && <tr className="group-row"><th colSpan={canManage ? 5 : 4}>{groupText}</th></tr>}
               <tr>
                 <td>{entry.code}</td><td>{entry.label}</td><td>{entry.sortOrder}</td><td>{group}</td>
                 {canManage && <td className="table-action"><button className="link-btn" disabled={updateMutation.isPending || entry.systemManaged} onClick={() => updateMutation.mutate(entry)}>{entry.active ? "Deactivate" : "Activate"}</button></td>}
               </tr>
             </Fragment>;
           })}
-          {entriesQ.data.length === 0 && <tr><td colSpan={canManage ? 5 : 4} className="empty-note">No entries in this value set.</td></tr>}</tbody>
+          {visibleEntries.length === 0 && <tr><td colSpan={canManage ? 5 : 4} className="empty-note">No entries match the current value-set filters.</td></tr>}</tbody>
         </table></div>}
       </section>}
     </DataViewFrame>}
   </>;
-}
-
-function sortEntries(entries: ReferenceEntry[], grouped: boolean): ReferenceEntry[] {
-  if (!grouped) return entries;
-  return [...entries].sort((a, b) => Number(b.active) - Number(a.active) || a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
 }

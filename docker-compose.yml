@@ -1,24 +1,17 @@
-# Axiom CRM — local stack (skeleton). `docker compose up -d --build`
-# Postgres (RLS-enforced shared schema, ADR-001) + Kafka (outbox relay target,
-# ADR-003) + the modular-monolith API (ADR-006).
+# Axiom CRM — local stack.
+#
+# The DATABASE IS NOT IN DOCKER. PostgreSQL 17 runs on the host and owns the
+# four environment databases (AxiomCrmdb_Dev/QA/UAT/Prod), so data persists
+# independently of any container lifecycle and `docker compose down` can never
+# destroy it. Containers reach it via host.docker.internal.
+#
+# This also resolves a real conflict: the old postgres service published 5432,
+# the same port the host PostgreSQL already binds.
+#
+# Runs here: Kafka (outbox relay target, ADR-003) + the modular-monolith API
+# (ADR-006) + the web client.
 
 services:
-  postgres:
-    image: ${AXIOM_POSTGRES_IMAGE:-postgres:17-alpine}
-    environment:
-      POSTGRES_DB: ${AXIOM_DB_NAME:-AxiomCRMDB_Dev}
-      POSTGRES_USER: ${AXIOM_DB_USER:-AxiomCRM}
-      POSTGRES_PASSWORD: ${AXIOM_DB_PASSWORD:-AxiomCRM@12345}
-    ports:
-      - "${AXIOM_DB_PORT:-5432}:5432"
-    volumes:
-      - axiom-pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${AXIOM_DB_USER:-AxiomCRM} -d ${AXIOM_DB_NAME:-AxiomCRMDB_Dev}"]
-      interval: 5s
-      timeout: 5s
-      retries: 12
-
   kafka:
     image: ${AXIOM_KAFKA_IMAGE:-apache/kafka:3.7.0}
     environment:
@@ -46,27 +39,25 @@ services:
   api:
     build: ./backend
     depends_on:
-      postgres:
-        condition: service_healthy
       kafka:
         condition: service_healthy
     environment:
       # Runtime traffic: least-privilege axiom_app, subject to RLS (ADR-001).
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
       AXIOM_ENVIRONMENT: ${AXIOM_ENVIRONMENT:-dev}
-      AXIOM_DB_NAME: ${AXIOM_DB_NAME:-AxiomCRMDB_Dev}
-      AXIOM_DB_USER: ${AXIOM_DB_USER:-AxiomCRM}
-      AXIOM_DB_PASSWORD: ${AXIOM_DB_PASSWORD:-AxiomCRM@12345}
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${AXIOM_DB_NAME:-AxiomCRMDB_Dev}
+      AXIOM_DB_NAME: ${AXIOM_DB_NAME:-AxiomCrmdb_Dev}
+      AXIOM_DB_USER: ${AXIOM_DB_USER:-Axiom}
+      AXIOM_DB_PASSWORD: ${AXIOM_DB_PASSWORD:-Axiom@12345}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://${AXIOM_DB_HOST:-host.docker.internal}:${AXIOM_DB_PORT:-5432}/${AXIOM_DB_NAME:-AxiomCrmdb_Dev}
       SPRING_DATASOURCE_USERNAME: axiom_app
       SPRING_DATASOURCE_PASSWORD: axiom_app_dev_password
       # Migrations run as postgres superuser (owns schema, defines policies).
-      FLYWAY_URL: jdbc:postgresql://postgres:5432/${AXIOM_DB_NAME:-AxiomCRMDB_Dev}
-      FLYWAY_USER: ${AXIOM_DB_USER:-AxiomCRM}
-      FLYWAY_PASSWORD: ${AXIOM_DB_PASSWORD:-AxiomCRM@12345}
+      FLYWAY_URL: jdbc:postgresql://${AXIOM_DB_HOST:-host.docker.internal}:${AXIOM_DB_PORT:-5432}/${AXIOM_DB_NAME:-AxiomCrmdb_Dev}
+      FLYWAY_USER: ${AXIOM_DB_USER:-Axiom}
+      FLYWAY_PASSWORD: ${AXIOM_DB_PASSWORD:-Axiom@12345}
       # Outbox relay: dedicated role that may read/update outbox_event across
       # tenants and nothing else (V3__outbox_relay_role.sql).
-      AXIOM_RELAY_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${AXIOM_DB_NAME:-AxiomCRMDB_Dev}
+      AXIOM_RELAY_DATASOURCE_URL: jdbc:postgresql://${AXIOM_DB_HOST:-host.docker.internal}:${AXIOM_DB_PORT:-5432}/${AXIOM_DB_NAME:-AxiomCrmdb_Dev}
       AXIOM_RELAY_DATASOURCE_USERNAME: axiom_relay
       AXIOM_RELAY_DATASOURCE_PASSWORD: axiom_relay_dev_password
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -82,7 +73,3 @@ services:
     ports:
       - "${AXIOM_WEB_PORT:-4280}:80"
     restart: unless-stopped
-
-
-volumes:
-  axiom-pgdata:

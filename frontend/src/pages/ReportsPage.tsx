@@ -1,16 +1,31 @@
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { api, isUnreachable } from "../api/client";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataGridToolbar, saveDownloadedFile } from "../components/DataGridToolbar";
 import { DataViewFrame } from "../components/DataViewFrame";
 import { useToasts } from "../components/Toasts";
+import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
+import { usePersistedGridState } from "../lib/usePersistedGridState";
+
+type ReportRow = Awaited<ReturnType<typeof api.reports>>[number];
+
+const REPORT_GROUP_COLUMNS: GroupColumn<ReportRow>[] = [
+  { key: "code", label: "Code", value: (row) => row.code },
+  { key: "label", label: "Report", value: (row) => row.label },
+  { key: "description", label: "Description", value: (row) => row.description },
+  { key: "family", label: "Format family", value: (row) => row.allowedFormats.includes("PDF") ? "Jasper document reports" : "Data extracts" },
+  { key: "status", label: "Status", value: (row) => row.active ? "Active" : "Inactive" },
+  { key: "formats", label: "Formats", value: (row) => row.allowedFormats.join(", ") },
+];
 
 export function ReportsPage() {
   const toasts = useToasts();
-  const [grouped, setGrouped] = useState(false);
+  const [groupColumns, setGroupColumns, columnFilters, setColumnFilters] = usePersistedGridState("reports");
   const reportsQ = useQuery({ queryKey: ["reports"], queryFn: api.reports, retry: 1 });
   if (isUnreachable(reportsQ.error)) return <ApiUnreachable onRetry={() => void reportsQ.refetch()} retrying={reportsQ.isFetching} />;
+  const activeGroupColumns = selectedGroupColumns(REPORT_GROUP_COLUMNS, groupColumns);
+  const reports = sortByGroups(filterRowsByColumns(reportsQ.data ?? [], REPORT_GROUP_COLUMNS, columnFilters), activeGroupColumns, (row) => row.label);
 
   async function download(code: string, format: "PDF" | "XLSX" | "DOCX") {
     try {
@@ -30,12 +45,18 @@ export function ReportsPage() {
       title="Report catalogue"
       actions={<DataGridToolbar
         gridName="Report catalogue"
-        grouped={grouped}
+        grouped={activeGroupColumns.length > 0}
         groupLabel="Format family"
-        onToggleGroup={() => setGrouped((value) => !value)}
+        onToggleGroup={() => setGroupColumns((value) => value.length > 0 ? [] : ["family"])}
+        groupColumns={REPORT_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
+        selectedGroupColumns={groupColumns}
+        onGroupColumnsChange={setGroupColumns}
+        filterColumns={REPORT_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
+        columnFilters={columnFilters}
+        onColumnFiltersChange={setColumnFilters}
         auditEntityType="REPORT_DEFINITION"
         exportFilename="report-catalogue"
-        exportRows={(reportsQ.data ?? []).map((report) => ({
+        exportRows={reports.map((report) => ({
           code: report.code,
           label: report.label,
           description: report.description,
@@ -48,12 +69,12 @@ export function ReportsPage() {
       {reportsQ.isLoading && <p className="loading-note">Loading reports...</p>}
       {reportsQ.isError && <p className="empty-note">Reports failed to load{reportsQ.error instanceof Error ? `: ${reportsQ.error.message}` : "."}</p>}
       {reportsQ.isSuccess && <div className="report-grid">
-        {reportsQ.data.map((report, index, all) => {
-          const group = report.allowedFormats.includes("PDF") ? "Jasper document reports" : "Data extracts";
+        {reports.map((report, index, all) => {
+          const group = activeGroupColumns.length > 0 ? groupLabelFor(report, activeGroupColumns) : "";
           const previous = index > 0 ? all[index - 1] : undefined;
-          const previousGroup = previous?.allowedFormats.includes("PDF") ? "Jasper document reports" : "Data extracts";
+          const previousGroup = previous && activeGroupColumns.length > 0 ? groupLabelFor(previous, activeGroupColumns) : "";
           return <Fragment key={report.id}>
-            {grouped && group !== previousGroup && <div className="grid-card-group">{group}</div>}
+            {activeGroupColumns.length > 0 && group !== previousGroup && <div className="grid-card-group">{group}</div>}
             <article className="report-card">
               <div><span className="eyebrow">{report.code}</span><h2>{report.label}</h2><p>{report.description}</p></div>
               <div className="report-actions">

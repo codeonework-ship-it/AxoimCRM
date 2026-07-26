@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { CommandRail } from "./CommandRail";
 import { TopBar } from "./TopBar";
+import { preloadRoute } from "../routes/preload";
 import { NotificationsProvider } from "./notifications";
 import { CommandPalette } from "./CommandPalette";
 import { HelpDrawer } from "./HelpDrawer";
@@ -12,6 +13,17 @@ export function AppShell() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
   const [railCollapsed, setRailCollapsed] = useState(false);
+  const [showTronLoader, setShowTronLoader] = useState(() => {
+    const shouldShow = sessionStorage.getItem("axiom.tronLoginLoader") === "1";
+    if (shouldShow) sessionStorage.removeItem("axiom.tronLoginLoader");
+    return shouldShow;
+  });
+
+  useEffect(() => {
+    if (!showTronLoader) return;
+    const timer = window.setTimeout(() => setShowTronLoader(false), 1200);
+    return () => window.clearTimeout(timer);
+  }, [showTronLoader]);
 
   useEffect(() => {
     let goPrefix = false;
@@ -46,7 +58,10 @@ export function AppShell() {
         const routes: Record<string, string> = { h: "/", p: "/pipeline", a: "/accounts", l: "/leads", e: "/activities", r: "/reference-data", t: "/reports", u: "/admin" };
         const route = routes[event.key.toLowerCase()];
         goPrefix = false;
-        if (route) navigate(route);
+        if (route) {
+          preloadRoute(route);
+          navigate(route);
+        }
       }
     };
     window.addEventListener("keydown", onKey);
@@ -78,6 +93,18 @@ export function AppShell() {
       {navOpen && <button className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} />}
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} onOpenHelp={() => setHelpOpen(true)} />
       <HelpDrawer open={helpOpen} onClose={() => setHelpOpen(false)} />
+      {showTronLoader && (
+        <div className="tron-login-loader" role="status" aria-live="polite" aria-label="Entering Axiom workspace">
+          <div className="tron-loader-core">
+            <span className="eyebrow">The Grid</span>
+            <strong>Entering Axiom</strong>
+            <p>Synchronizing tenant command surface</p>
+            <div className="loader-rail" aria-hidden="true">
+              <i />
+            </div>
+          </div>
+        </div>
+      )}
     </NotificationsProvider>
   );
 }

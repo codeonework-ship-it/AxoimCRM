@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { InfoTag, screenInfo } from "./InfoTag";
 
 interface DataViewFrameProps {
   title: string;
@@ -13,7 +14,10 @@ export function DataViewFrame({ title, children, actions }: DataViewFrameProps) 
       <header className="data-view-head">
         <div>
           <span className="eyebrow">Data workspace</span>
-          <h2>{title}</h2>
+          <h2 className="data-view-title">
+            <span>{title}</span>
+            <InfoTag text={screenInfo(title)} label={`${title} help`} />
+          </h2>
         </div>
         <div className="data-view-actions">
           {actions}

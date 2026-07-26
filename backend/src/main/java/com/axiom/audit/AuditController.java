@@ -1,6 +1,8 @@
 package com.axiom.audit;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.PositiveOrZero;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -10,6 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -92,6 +95,20 @@ public class AuditController {
         return exportAudit.list(limit);
     }
 
+    /**
+     * Records governed evidence for exports generated in the browser from the
+     * current visible grid/table view. Server-generated exports call
+     * {@link ExportAuditService#recordExport} directly from their producer path;
+     * this endpoint closes the other half of the product, where filtering,
+     * grouping and export file generation are intentionally client-side.
+     */
+    @PostMapping("/exports")
+    public void recordExport(@Valid @RequestBody ClientExportAuditRequest request) {
+        exportAudit.recordExport(request.objectType(), request.filterCriteria(), request.rowCount(),
+                request.destination() == null || request.destination().isBlank() ? "CURRENT_VIEW_DOWNLOAD" : request.destination(),
+                request.format());
+    }
+
     @GetMapping("/authentication")
     public List<AuthenticationAuditService.AuthEvent> authentication(@RequestParam(defaultValue = "100") int limit) {
         GovernanceAccess.requireRead();
@@ -116,4 +133,11 @@ public class AuditController {
         GovernanceAccess.requireWrite();
         return retention.update(request);
     }
+
+    public record ClientExportAuditRequest(
+            @NotBlank String objectType,
+            Map<String, Object> filterCriteria,
+            @PositiveOrZero Long rowCount,
+            String destination,
+            @NotBlank String format) {}
 }

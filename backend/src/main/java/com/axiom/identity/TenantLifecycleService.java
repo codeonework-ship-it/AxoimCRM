@@ -340,21 +340,46 @@ public class TenantLifecycleService {
         return ids.isEmpty() ? null : ids.get(0);
     }
 
+    /**
+     * Seeds the tenant's default pipeline and its stages.
+     *
+     * <p>The pipeline row comes first and deliberately mirrors what V60 created
+     * for tenants that already existed — same api_name, same name, is_default —
+     * so a tenant provisioned today is indistinguishable from one migrated then.
+     * V60 also made {@code pipeline_stage.pipeline_id} NOT NULL, which is why
+     * every stage insert below carries it: stages are owned by a pipeline, and a
+     * stage with no pipeline is not a valid record in any tenant.
+     *
+     * <p>Probability and forecast category are set rather than left to their
+     * column defaults. A pipeline where every stage forecasts at 0% and sits in
+     * PIPELINE gives a new tenant a forecast that is technically valid and
+     * practically useless, which is worse than an obviously empty one.
+     */
     private void seedPipeline(UUID tenantId) {
+        UUID pipelineId = UUID.randomUUID();
+        jdbc.update("""
+                insert into pipeline.pipeline (id, tenant_id, api_name, name, description, is_default)
+                values (?, ?, 'default_pipeline', 'Default Pipeline',
+                        'Standard B2B sales pipeline created when the workspace was provisioned.', true)
+                """, pipelineId, tenantId);
+
         Object[][] stages = {
-                {"Qualifying", 1, false, false, false},
-                {"Proposal", 2, false, false, false},
-                {"Negotiation", 3, false, false, true},
-                {"Commit", 4, false, false, true},
-                {"Closed Won", 5, true, true, false},
-                {"Closed Lost", 6, true, false, false},
+                // name, sort, closed, won, needs economic buyer, probability, forecast category
+                {"Qualifying", 1, false, false, false, 10, "PIPELINE"},
+                {"Proposal", 2, false, false, false, 30, "PIPELINE"},
+                {"Negotiation", 3, false, false, true, 60, "BEST_CASE"},
+                {"Commit", 4, false, false, true, 85, "COMMIT"},
+                {"Closed Won", 5, true, true, false, 100, "CLOSED"},
+                {"Closed Lost", 6, true, false, false, 0, "OMITTED"},
         };
         for (Object[] stage : stages) {
             jdbc.update("""
                     insert into crm.pipeline_stage
-                      (tenant_id, name, sort_order, is_closed, is_won, requires_economic_buyer)
-                    values (?, ?, ?, ?, ?, ?)
-                    """, tenantId, stage[0], stage[1], stage[2], stage[3], stage[4]);
+                      (tenant_id, pipeline_id, name, sort_order, is_closed, is_won,
+                       requires_economic_buyer, probability, forecast_category)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, tenantId, pipelineId, stage[0], stage[1], stage[2], stage[3],
+                    stage[4], stage[5], stage[6]);
         }
     }
 

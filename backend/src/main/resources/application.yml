@@ -8,7 +8,7 @@ spring:
     default: dev
 
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${AXIOM_DB_HOST:localhost}:${AXIOM_DB_PORT:5432}/${AXIOM_DB_NAME:AxiomCRMDB_Dev}}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${AXIOM_DB_HOST:localhost}:${AXIOM_DB_PORT:5432}/${AXIOM_DB_NAME:AxiomCrmdb_Dev}}
     username: ${SPRING_DATASOURCE_USERNAME:axiom_app}
     password: ${SPRING_DATASOURCE_PASSWORD:axiom_app_dev_password}
     hikari:
@@ -31,6 +31,13 @@ spring:
     password: ${FLYWAY_PASSWORD:${AXIOM_DB_PASSWORD:AxiomCRM@12345}}
     baseline-on-migrate: true
     connect-retries: 10
+    # Parallel delivery streams own disjoint version ranges (V220s reporting,
+    # V250s automation, V260s migration, V300s access, V310s security …), so a
+    # lower version can legitimately land after a higher one — V240 applied
+    # before V220 here. Flyway rejects that by default and refuses to start.
+    # Version ranges are allocated per stream precisely so the ordering between
+    # them carries no meaning; only order WITHIN a range does.
+    out-of-order: true
 
   kafka:
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}

@@ -1,6 +1,7 @@
 package com.axiom.workspaces;
 
 import com.axiom.audit.AuditService;
+import com.axiom.automation.WorkflowGateService;
 import com.axiom.auth.CrmRole;
 import com.axiom.common.ConflictException;
 import com.axiom.common.NotFoundException;
@@ -28,11 +29,14 @@ public class WorkspaceActionService {
     private final JdbcTemplate jdbc;
     private final AuditService audit;
     private final OutboxWriter outbox;
+    private final WorkflowGateService workflowGates;
 
-    public WorkspaceActionService(JdbcTemplate jdbc, AuditService audit, OutboxWriter outbox) {
+    public WorkspaceActionService(JdbcTemplate jdbc, AuditService audit, OutboxWriter outbox,
+                                  WorkflowGateService workflowGates) {
         this.jdbc = jdbc;
         this.audit = audit;
         this.outbox = outbox;
+        this.workflowGates = workflowGates;
     }
 
     public record ActionResult(UUID id, String module, String status, String message, Map<String, Object> details) {}
@@ -66,6 +70,11 @@ public class WorkspaceActionService {
             throw new ConflictException("Forecast period is not open");
         }
         String note = clean(request == null ? null : request.managerNote());
+        Map<String, Object> proposedForecast = note == null
+                ? Map.of("status", "SUBMITTED", "submitted_at", java.time.Instant.now())
+                : Map.of("status", "SUBMITTED", "submitted_at", java.time.Instant.now(),
+                        "manager_note", note);
+        requireWorkflowTransition("FORECAST_SUBMISSION", id, "SUBMITTED", proposedForecast);
         jdbc.update("""
                 update forecasting.forecast_submission
                 set status = 'SUBMITTED', submitted_at = now(),
@@ -93,6 +102,7 @@ public class WorkspaceActionService {
         audit.recordWithReason("FORECAST_SUBMIT", "FORECAST_SUBMISSION", id,
                 "Submitted forecast " + row.get("period_code"), note, details);
         outbox.write("forecast_submission", id, "forecast.submitted", details);
+        workflowGates.evaluate("FORECAST_SUBMISSION", id);
         return new ActionResult(id, "forecast", "SUBMITTED", "Forecast submitted and snapshot captured.", details);
     }
 
@@ -111,6 +121,8 @@ public class WorkspaceActionService {
         }
         String outcome = clean(request == null ? null : request.outcome());
         if (outcome == null) throw new ConflictException("Case resolution requires an outcome");
+        requireWorkflowTransition("CASE", id, "RESOLVED", Map.of(
+                "status", "RESOLVED", "closed_at", java.time.Instant.now()));
         jdbc.update("""
                 update service.case_record
                 set status = 'RESOLVED', closed_at = now()
@@ -129,6 +141,7 @@ public class WorkspaceActionService {
         audit.recordWithReason("CASE_RESOLVE", "CASE", id,
                 "Resolved case " + row.get("case_number"), outcome, details);
         outbox.write("case", id, "case.resolved", details);
+        workflowGates.evaluate("CASE", id);
         return new ActionResult(id, "cases", "RESOLVED", "Case resolved and open SLA milestones closed.", details);
     }
 
@@ -149,6 +162,8 @@ public class WorkspaceActionService {
         Integer stepCount = jdbc.queryForObject("""
                 select count(*) from automation.automation_step where tenant_id = ? and rule_id = ?
                 """, Integer.class, tenantId(), id);
+        requireWorkflowTransition("AUTOMATION_RULE", id, "true", Map.of(
+                "simulation_passed", true, "last_run_at", java.time.Instant.now()));
         UUID runId = UUID.randomUUID();
         String runNumber = "SIM-" + runId.toString().substring(0, 8).toUpperCase(Locale.ROOT);
         jdbc.update("""
@@ -173,6 +188,7 @@ public class WorkspaceActionService {
         audit.record("AUTOMATION_SIMULATE", "AUTOMATION_RULE", id,
                 "Simulated automation rule " + row.get("rule_code"), details);
         outbox.write("automation_rule", id, "automation.simulated", details);
+        workflowGates.evaluate("AUTOMATION_RULE", id);
         return new ActionResult(runId, "automation", "SIMULATED", "Automation dry-run completed without mutations.", details);
     }
 
@@ -189,6 +205,12 @@ public class WorkspaceActionService {
         if ("IMPORTED".equals(status) || "ROLLED_BACK".equals(status)) {
             throw new ConflictException("Imported or rolled-back batches cannot be revalidated");
         }
+        requireWorkflowTransition("IMPORT_BATCH", id, "VALIDATING", Map.of("status", "VALIDATING"));
+        jdbc.update("""
+                update migration.import_batch
+                set status = 'VALIDATING', completed_at = null
+                where tenant_id = ? and id = ?
+                """, tenantId(), id);
         Map<String, Object> counts = jdbc.queryForMap("""
                 select count(*) filter (where severity = 'ERROR') as errors,
                        count(*) filter (where severity = 'WARNING') as warnings
@@ -214,6 +236,7 @@ public class WorkspaceActionService {
         audit.record("MIGRATION_VALIDATE", "IMPORT_BATCH", id,
                 "Validated import batch " + row.get("batch_number"), details);
         outbox.write("import_batch", id, "migration.validated", details);
+        workflowGates.evaluate("IMPORT_BATCH", id);
         return new ActionResult(id, "migration", nextStatus,
                 errors == 0 ? "Import batch is ready to import." : "Import batch failed validation.", details);
     }
@@ -230,6 +253,8 @@ public class WorkspaceActionService {
         if (!"ACTIVE".equals(text(row.get("status")))) {
             throw new ConflictException("Only active device sessions can acknowledge sync");
         }
+        requireWorkflowTransition("DEVICE_SESSION", deviceSessionId, "ACTIVE", Map.of(
+                "status", "ACTIVE", "last_sync_at", java.time.Instant.now(), "offline_queue_count", 0));
         int packagesSynced = jdbc.update("""
                 update mobile.offline_sync_package
                 set status = 'SYNCED', applied_at = now()
@@ -247,6 +272,7 @@ public class WorkspaceActionService {
         audit.record("MOBILE_SYNC_ACK", "DEVICE_SESSION", deviceSessionId,
                 "Acknowledged mobile sync for " + row.get("device_label"), details);
         outbox.write("device_session", deviceSessionId, "mobile.sync.acknowledged", details);
+        workflowGates.evaluate("DEVICE_SESSION", deviceSessionId);
         return new ActionResult(deviceSessionId, "mobile", "SYNCED", "Device sync acknowledged and offline queue cleared.", details);
     }
 
@@ -266,6 +292,8 @@ public class WorkspaceActionService {
         String signedRef = clean(request == null ? null : request.signedDocumentRef());
         if (signedRef == null) signedRef = clean(text(row.get("signed_document_ref")));
         if (signedRef == null) throw new ConflictException("Contract activation requires a signed document reference");
+        requireWorkflowTransition("CONTRACT", id, "ACTIVE", Map.of(
+                "status", "ACTIVE", "signed_document_ref", signedRef));
         jdbc.update("""
                 update contracting.contract_record
                 set status = 'ACTIVE', signed_document_ref = ?, updated_at = now()
@@ -278,6 +306,7 @@ public class WorkspaceActionService {
         audit.recordWithReason("CONTRACT_ACTIVATE", "CONTRACT", id,
                 "Activated contract " + row.get("contract_number"), signedRef, details);
         outbox.write("contract", id, "contract.activated", details);
+        workflowGates.evaluate("CONTRACT", id);
         return new ActionResult(id, "contracts", "ACTIVE", "Contract activated with signed document evidence.", details);
     }
 
@@ -302,6 +331,8 @@ public class WorkspaceActionService {
                 from marketing.campaign_member
                 where tenant_id = ? and campaign_id = ?
                 """, tenantId(), id);
+        requireWorkflowTransition("CAMPAIGN", id, "COMPLETED", Map.of(
+                "status", "COMPLETED", "end_date", java.time.LocalDate.now()));
         jdbc.update("""
                 update marketing.campaign
                 set status = 'COMPLETED',
@@ -317,6 +348,7 @@ public class WorkspaceActionService {
         audit.recordWithReason("CAMPAIGN_COMPLETE", "CAMPAIGN", id,
                 "Completed campaign " + row.get("code"), outcome, details);
         outbox.write("campaign", id, "campaign.completed", details);
+        workflowGates.evaluate("CAMPAIGN", id);
         return new ActionResult(id, "campaigns", "COMPLETED", "Campaign completed with response evidence.", details);
     }
 
@@ -342,6 +374,7 @@ public class WorkspaceActionService {
         if (openConflicts != null && openConflicts > 0) {
             throw new ConflictException("Partner has open channel conflicts and cannot be activated");
         }
+        requireWorkflowTransition("PARTNER_ACCOUNT", id, "ACTIVE", Map.of("status", "ACTIVE"));
         jdbc.update("""
                 update channel.partner_account
                 set status = 'ACTIVE'
@@ -354,6 +387,7 @@ public class WorkspaceActionService {
         audit.record("PARTNER_ACTIVATE", "PARTNER_ACCOUNT", id,
                 "Activated partner " + row.get("partner_code"), details);
         outbox.write("partner_account", id, "partner.activated", details);
+        workflowGates.evaluate("PARTNER_ACCOUNT", id);
         return new ActionResult(id, "partners", "ACTIVE", "Partner activated after conflict gate passed.", details);
     }
 
@@ -386,6 +420,7 @@ public class WorkspaceActionService {
             throw new ConflictException("Copilot recommendation cannot be accepted without grounding citations");
         }
         String note = clean(request == null ? null : request.note());
+        requireWorkflowTransition("COPILOT_RECOMMENDATION", id, "ACCEPTED", Map.of("status", "ACCEPTED"));
         jdbc.update("""
                 update ai.copilot_recommendation
                 set status = 'ACCEPTED'
@@ -399,6 +434,7 @@ public class WorkspaceActionService {
         audit.recordWithReason("COPILOT_ACCEPT", "COPILOT_RECOMMENDATION", id,
                 "Accepted copilot recommendation " + row.get("recommendation_number"), note, details);
         outbox.write("copilot_recommendation", id, "copilot.recommendation.accepted", details);
+        workflowGates.evaluate("COPILOT_RECOMMENDATION", id);
         return new ActionResult(id, "copilot", "ACCEPTED", "Copilot recommendation accepted with citation evidence.", details);
     }
 
@@ -431,6 +467,8 @@ public class WorkspaceActionService {
         }
         String note = clean(request == null ? null : request.note());
         if (note == null) throw new ConflictException("BFSI clearance requires a compliance note");
+        requireWorkflowTransition("BFSI_ONBOARDING", id, "CLEARED", Map.of(
+                "kyc_status", "CLEARED", "completed_at", java.time.Instant.now()));
         jdbc.update("""
                 update bfsi.client_onboarding
                 set kyc_status = 'CLEARED', completed_at = now()
@@ -444,6 +482,7 @@ public class WorkspaceActionService {
         audit.recordWithReason("BFSI_ONBOARDING_CLEAR", "BFSI_ONBOARDING", id,
                 "Cleared BFSI onboarding " + row.get("onboarding_number"), note, details);
         outbox.write("bfsi_onboarding", id, "bfsi.onboarding.cleared", details);
+        workflowGates.evaluate("BFSI_ONBOARDING", id);
         return new ActionResult(id, "bfsi", "CLEARED", "BFSI onboarding cleared after screening gate passed.", details);
     }
 
@@ -462,6 +501,8 @@ public class WorkspaceActionService {
         Long widgets = jdbc.queryForObject("""
                 select count(*) from reporting.dashboard_widget where tenant_id = ? and dashboard_id = ?
                 """, Long.class, tenantId(), id);
+        requireWorkflowTransition("ANALYTICS_DASHBOARD", id, "ACTIVE", Map.of(
+                "status", "ACTIVE", "last_refreshed_at", java.time.Instant.now()));
         jdbc.update("""
                 update reporting.analytics_dashboard
                 set last_refreshed_at = now()
@@ -480,6 +521,7 @@ public class WorkspaceActionService {
         audit.recordWithReason("DASHBOARD_REFRESH", "ANALYTICS_DASHBOARD", id,
                 "Refreshed dashboard " + row.get("dashboard_code"), note, details);
         outbox.write("analytics_dashboard", id, "dashboard.refreshed", details);
+        workflowGates.evaluate("ANALYTICS_DASHBOARD", id);
         return new ActionResult(id, "analytics", "REFRESHED", "Analytics dashboard refreshed and KPI timestamps updated.", details);
     }
 
@@ -496,6 +538,8 @@ public class WorkspaceActionService {
         if ("RETIRED".equals(status) || "DEPRECATED".equals(status)) {
             throw new ConflictException("Retired or deprecated integration contracts cannot be verified");
         }
+        requireWorkflowTransition("INTEGRATION_CONTRACT", id, "ACTIVE", Map.of(
+                "status", "ACTIVE", "last_verified_at", java.time.Instant.now(), "failure_count", 0));
         jdbc.update("""
                 update integration.endpoint_contract
                 set status = 'ACTIVE', last_verified_at = now(), failure_count = 0
@@ -510,6 +554,7 @@ public class WorkspaceActionService {
         audit.record("INTEGRATION_CONTRACT_VERIFY", "INTEGRATION_CONTRACT", id,
                 "Verified integration contract " + row.get("contract_code"), details);
         outbox.write("integration_contract", id, "integration.contract.verified", details);
+        workflowGates.evaluate("INTEGRATION_CONTRACT", id);
         return new ActionResult(id, "integrations", "ACTIVE", "Integration contract verified; vendor execution remains pending.", details);
     }
 
@@ -528,6 +573,9 @@ public class WorkspaceActionService {
         }
         String reason = clean(request == null ? null : request.reason());
         if (reason == null) throw new ConflictException("Sandbox refresh requires a reason");
+        requireWorkflowTransition("SANDBOX", id, "ACTIVE", Map.of(
+                "status", "ACTIVE", "last_refreshed_at", java.time.Instant.now(),
+                "expires_at", java.time.Instant.now().plus(java.time.Duration.ofDays(30))));
         jdbc.update("""
                 update platform.sandbox_environment
                 set status = 'ACTIVE', last_refreshed_at = now(),
@@ -542,6 +590,7 @@ public class WorkspaceActionService {
         audit.recordWithReason("SANDBOX_REFRESH", "SANDBOX", id,
                 "Refreshed sandbox " + row.get("sandbox_code"), reason, details);
         outbox.write("sandbox", id, "sandbox.refreshed", details);
+        workflowGates.evaluate("SANDBOX", id);
         return new ActionResult(id, "sandbox", "ACTIVE", "Sandbox refresh completed with release evidence.", details);
     }
 
@@ -560,6 +609,8 @@ public class WorkspaceActionService {
         }
         String destination = clean(request == null ? null : request.destination());
         if (destination == null) destination = "SECURE_DOWNLOAD";
+        requireWorkflowTransition("AUDIT_EVIDENCE_PACK", id, "EXPORTED", Map.of(
+                "status", "EXPORTED", "generated_at", java.time.Instant.now()));
         jdbc.update("""
                 update governance.audit_evidence_pack
                 set status = 'EXPORTED', generated_at = coalesce(generated_at, now())
@@ -575,6 +626,7 @@ public class WorkspaceActionService {
         audit.record("EVIDENCE_PACK", "AUDIT_EVIDENCE_PACK", id,
                 "Exported audit evidence pack " + row.get("pack_code"), details);
         outbox.write("audit_evidence_pack", id, "audit.evidence_pack.exported", details);
+        workflowGates.evaluate("AUDIT_EVIDENCE_PACK", id);
         return new ActionResult(id, "audit", "EXPORTED", "Audit evidence pack marked exported with export audit projection.", details);
     }
 
@@ -610,6 +662,7 @@ public class WorkspaceActionService {
         if (approvedTerms == null || approvedTerms == 0) {
             throw new ConflictException("Commodity offer requires an approved term sheet");
         }
+        requireWorkflowTransition("COMMODITY_ENQUIRY", id, "OFFERED", Map.of("status", "OFFERED"));
         jdbc.update("""
                 update commodity.trade_enquiry
                 set status = 'OFFERED'
@@ -629,6 +682,7 @@ public class WorkspaceActionService {
         audit.record("COMMODITY_OFFER", "COMMODITY_ENQUIRY", id,
                 "Offered commodity enquiry " + row.get("enquiry_number"), details);
         outbox.write("commodity_enquiry", id, "commodity.enquiry.offered", details);
+        workflowGates.evaluate("COMMODITY_ENQUIRY", id);
         return new ActionResult(id, "commodity", "OFFERED", "Commodity enquiry offered after credit and term-sheet gates.", details);
     }
 
@@ -644,6 +698,19 @@ public class WorkspaceActionService {
     private void requireWrite(String action) {
         if (CrmRole.current(TenantContext.get().role()).readOnly()) {
             throw new com.axiom.common.ForbiddenException("Your role cannot " + action);
+        }
+    }
+
+    private void requireWorkflowTransition(String objectType, UUID recordId, String targetState,
+                                           Map<String, Object> proposedValues) {
+        WorkflowGateService.GateStatus gate = workflowGates.evaluateTransition(
+                objectType, recordId, targetState, proposedValues);
+        assertWorkflowGateReady(gate);
+    }
+
+    static void assertWorkflowGateReady(WorkflowGateService.GateStatus gate) {
+        if ("BLOCKED".equals(gate.gateStatus()) || "UNKNOWN_STATE".equals(gate.gateStatus())) {
+            throw new ConflictException("Workflow gate blocked this action. " + gate.nextStep());
         }
     }
 

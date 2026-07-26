@@ -1,6 +1,8 @@
 package com.axiom.workspaces;
 
 import com.axiom.audit.AuditService;
+import com.axiom.automation.WorkflowGateService;
+import com.axiom.common.ConflictException;
 import com.axiom.common.ForbiddenException;
 import com.axiom.outbox.OutboxWriter;
 import com.axiom.tenancy.TenantContext;
@@ -10,6 +12,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.UUID;
+import java.time.Instant;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
@@ -20,7 +24,8 @@ class WorkspaceActionServiceTest {
 
     @BeforeEach void setUp() {
         service = new WorkspaceActionService(
-                mock(JdbcTemplate.class), mock(AuditService.class), mock(OutboxWriter.class));
+                mock(JdbcTemplate.class), mock(AuditService.class), mock(OutboxWriter.class),
+                mock(WorkflowGateService.class));
         TenantContext.set(new TenantContext.Principal(
                 UUID.randomUUID(), UUID.randomUUID(), "SUPER_AUDIT", "Auditor", "audit@example.test"));
     }
@@ -97,5 +102,26 @@ class WorkspaceActionServiceTest {
 
     @Test void readOnlyRoleCannotOfferCommodityEnquiry() {
         assertThrows(ForbiddenException.class, () -> service.offerCommodityEnquiry(id));
+    }
+
+    @Test void blockedWorkflowGateRefusesTheBusinessCommandWithNextStep() {
+        WorkflowGateService.GateStatus blocked = new WorkflowGateService.GateStatus(
+                UUID.randomUUID(), "CONTRACT", id, "PRC-CONTRACT-LIFECYCLE", "DRAFT",
+                "BLOCKED", 1, "Add the signed document reference.", List.of(), Instant.now());
+
+        assertThrows(ConflictException.class,
+                () -> WorkspaceActionService.assertWorkflowGateReady(blocked));
+    }
+
+    @Test void readyAndNoProcessGateStatesRemainCompatible() {
+        WorkflowGateService.GateStatus ready = new WorkflowGateService.GateStatus(
+                UUID.randomUUID(), "CONTRACT", id, "PRC-CONTRACT-LIFECYCLE", "DRAFT",
+                "READY", 0, "Ready to activate.", List.of(), Instant.now());
+        WorkflowGateService.GateStatus noProcess = new WorkflowGateService.GateStatus(
+                UUID.randomUUID(), "CONTRACT", id, null, "DRAFT",
+                "NO_PROCESS", 0, "No process configured.", List.of(), Instant.now());
+
+        WorkspaceActionService.assertWorkflowGateReady(ready);
+        WorkspaceActionService.assertWorkflowGateReady(noProcess);
     }
 }

@@ -1,0 +1,92 @@
+{
+  "key": "axiom-sample",
+  "label": "Axiom sample data (evaluation and training)",
+  "connectedAs": "sample-data@axiom.internal",
+  "objects": [
+    {
+      "apiName": "Account",
+      "label": "Account",
+      "custom": false,
+      "proposedTarget": "ACCOUNT",
+      "references": { "ParentId": "Account" },
+      "fields": [
+        { "apiName": "Id", "label": "Record Id", "dataType": "ID", "custom": false, "nullable": false },
+        { "apiName": "Name", "label": "Account Name", "dataType": "TEXT", "custom": false, "nullable": false },
+        { "apiName": "Industry", "label": "Industry", "dataType": "PICKLIST", "custom": false, "nullable": true },
+        { "apiName": "AnnualRevenue", "label": "Annual Revenue", "dataType": "CURRENCY", "custom": false, "nullable": true },
+        { "apiName": "Website", "label": "Website", "dataType": "URL", "custom": false, "nullable": true },
+        { "apiName": "ParentId", "label": "Parent Account", "dataType": "REFERENCE", "custom": false, "nullable": true }
+      ],
+      "records": [
+        {
+          "id": "SAMPLE-ACC-1", "wave": 1, "label": "[SAMPLE] Larkfield Components",
+          "createdAt": "2026-02-01T09:00:00Z", "modifiedAt": "2026-02-01T09:00:00Z", "actor": "sample-data@axiom.internal",
+          "values": {
+            "Name": "[SAMPLE] Larkfield Components", "Industry": "Industrial",
+            "AnnualRevenue": "5400000", "Website": "https://larkfield.example", "ParentId": ""
+          }
+        },
+        {
+          "id": "SAMPLE-ACC-2", "wave": 1, "label": "[SAMPLE] Orrin Pumps",
+          "createdAt": "2026-02-01T09:00:00Z", "modifiedAt": "2026-02-01T09:00:00Z", "actor": "sample-data@axiom.internal",
+          "values": {
+            "Name": "[SAMPLE] Orrin Pumps", "Industry": "Industrial",
+            "AnnualRevenue": "2100000", "Website": "https://orrin-pumps.example", "ParentId": "SAMPLE-ACC-1"
+          }
+        }
+      ]
+    },
+    {
+      "apiName": "Contact",
+      "label": "Contact",
+      "custom": false,
+      "proposedTarget": "CONTACT",
+      "references": { "AccountId": "Account" },
+      "fields": [
+        { "apiName": "Id", "label": "Record Id", "dataType": "ID", "custom": false, "nullable": false },
+        { "apiName": "FirstName", "label": "First Name", "dataType": "TEXT", "custom": false, "nullable": false },
+        { "apiName": "LastName", "label": "Last Name", "dataType": "TEXT", "custom": false, "nullable": false },
+        { "apiName": "Email", "label": "Email", "dataType": "EMAIL", "custom": false, "nullable": true },
+        { "apiName": "Title", "label": "Title", "dataType": "TEXT", "custom": false, "nullable": true },
+        { "apiName": "AccountId", "label": "Account", "dataType": "REFERENCE", "custom": false, "nullable": true }
+      ],
+      "records": [
+        {
+          "id": "SAMPLE-CON-1", "wave": 1, "label": "[SAMPLE] Rhea Lamont",
+          "createdAt": "2026-02-01T09:00:00Z", "modifiedAt": "2026-02-01T09:00:00Z", "actor": "sample-data@axiom.internal",
+          "values": {
+            "FirstName": "[SAMPLE] Rhea", "LastName": "Lamont", "Email": "rhea.lamont@larkfield.example",
+            "Title": "Buyer", "AccountId": "SAMPLE-ACC-1"
+          }
+        }
+      ]
+    },
+    {
+      "apiName": "Opportunity",
+      "label": "Opportunity",
+      "custom": false,
+      "proposedTarget": "OPPORTUNITY",
+      "references": { "AccountId": "Account", "PrimaryContactId": "Contact" },
+      "moneyFields": ["Amount"],
+      "fields": [
+        { "apiName": "Id", "label": "Record Id", "dataType": "ID", "custom": false, "nullable": false },
+        { "apiName": "Name", "label": "Opportunity Name", "dataType": "TEXT", "custom": false, "nullable": false },
+        { "apiName": "Amount", "label": "Amount", "dataType": "CURRENCY", "custom": false, "nullable": true },
+        { "apiName": "CloseDate", "label": "Close Date", "dataType": "DATE", "custom": false, "nullable": true },
+        { "apiName": "StageName", "label": "Stage", "dataType": "PICKLIST", "custom": false, "nullable": true },
+        { "apiName": "AccountId", "label": "Account", "dataType": "REFERENCE", "custom": false, "nullable": false },
+        { "apiName": "PrimaryContactId", "label": "Primary Contact", "dataType": "REFERENCE", "custom": false, "nullable": true }
+      ],
+      "records": [
+        {
+          "id": "SAMPLE-OPP-1", "wave": 1, "label": "[SAMPLE] Larkfield — pilot order",
+          "createdAt": "2026-02-01T09:00:00Z", "modifiedAt": "2026-02-01T09:00:00Z", "actor": "sample-data@axiom.internal",
+          "values": {
+            "Name": "[SAMPLE] Larkfield — pilot order", "Amount": "36000.00", "CloseDate": "2026-10-31",
+            "StageName": "Qualifying", "AccountId": "SAMPLE-ACC-1", "PrimaryContactId": "SAMPLE-CON-1"
+          }
+        }
+      ]
+    }
+  ]
+}

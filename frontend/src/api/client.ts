@@ -63,6 +63,14 @@ export interface DownloadedFile {
   filename: string;
 }
 
+export interface ClientExportAuditRequest {
+  objectType: string;
+  filterCriteria?: Record<string, unknown>;
+  rowCount?: number;
+  destination?: string;
+  format: "XLSX" | "DOCX" | "PDF";
+}
+
 export interface PageResult<T> {
   items: T[];
   page: number;
@@ -491,6 +499,28 @@ export interface WorkspaceActionResult {
   details: Record<string, unknown>;
 }
 
+export interface WorkflowGateIssue {
+  code: string;
+  gate: string;
+  field: string | null;
+  message: string;
+  nextAction: string;
+  targetState: string | null;
+}
+
+export interface WorkflowGateStatus {
+  id: string | null;
+  objectType: string;
+  recordId: string;
+  processCode: string | null;
+  currentState: string | null;
+  gateStatus: "NO_PROCESS" | "READY" | "BLOCKED" | "COMPLETED" | "UNKNOWN_STATE" | string;
+  missingCount: number;
+  nextStep: string;
+  issues: WorkflowGateIssue[];
+  evaluatedAt: string;
+}
+
 /* ------------------------------------------------------------------ */
 /* Errors                                                              */
 /* ------------------------------------------------------------------ */
@@ -666,6 +696,10 @@ export const api = {
     return request<AuditEvent[]>("GET", `/audit${query}`);
   },
 
+  recordClientExportAudit(payload: ClientExportAuditRequest): Promise<void> {
+    return request<void>("POST", "/audit/exports", payload);
+  },
+
   masterTemplate(master: string): Promise<DownloadedFile> {
     return fileRequest(`/master-data/${encodeURIComponent(master)}/template`);
   },
@@ -760,6 +794,22 @@ export const api = {
       `/opportunities/${encodeURIComponent(opportunityId)}/stage`,
       { stageId },
     );
+  },
+
+  workflowGate(objectType: string, recordId: string): Promise<WorkflowGateStatus> {
+    return request<WorkflowGateStatus>("GET",
+      `/automation/workflow-gates/${encodeURIComponent(objectType)}/${encodeURIComponent(recordId)}`);
+  },
+
+  workflowTransitionGate(objectType: string, recordId: string, targetState: string,
+                         proposedValues: Record<string, unknown> = {}): Promise<WorkflowGateStatus> {
+    return request<WorkflowGateStatus>("POST",
+      `/automation/workflow-gates/${encodeURIComponent(objectType)}/${encodeURIComponent(recordId)}`
+      + `/transitions/${encodeURIComponent(targetState)}/check`, proposedValues);
+  },
+
+  workflowGates(params?: { objectType?: string; status?: string; limit?: number }): Promise<WorkflowGateStatus[]> {
+    return request<WorkflowGateStatus[]>("GET", `/automation/workflow-gates${queryString(params ?? {})}`);
   },
 
   dashboardSummary(): Promise<DashboardSummary> {

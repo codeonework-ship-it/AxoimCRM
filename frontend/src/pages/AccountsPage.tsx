@@ -4,12 +4,21 @@ import { api, isUnreachable, type Account, type AccountDetail, type AccountHiera
 import { useAuth } from "../auth/AuthContext";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataViewFrame } from "../components/DataViewFrame";
+import { InfoTag } from "../components/InfoTag";
 import { MasterToolbar, canManageMasters } from "../components/MasterToolbar";
 import { useToasts } from "../components/Toasts";
 import { GridLoader } from "../components/Loaders";
+import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
+import { usePersistedGridState } from "../lib/usePersistedGridState";
+
+const ACCOUNT_GROUP_COLUMNS: GroupColumn<Account>[] = [
+  { key: "name", label: "Name", value: (row) => row.name },
+  { key: "industry", label: "Industry", value: (row) => row.industry },
+  { key: "owner", label: "Owner", value: (row) => row.ownerName },
+];
 
 export function AccountsPage() {
-  const [grouped, setGrouped] = useState(false);
+  const [groupColumns, setGroupColumns, columnFilters, setColumnFilters] = usePersistedGridState("accounts");
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [industryFilter, setIndustryFilter] = useState("");
@@ -47,9 +56,9 @@ export function AccountsPage() {
 
   if (isUnreachable(accountsQ.error)) return <ApiUnreachable onRetry={() => void accountsQ.refetch()} retrying={accountsQ.isFetching} />;
 
-  const accounts = accountsQ.data ? [...accountsQ.data.items].sort((a, b) => grouped
-    ? (a.industry ?? "Unclassified").localeCompare(b.industry ?? "Unclassified") || a.name.localeCompare(b.name)
-    : a.name.localeCompare(b.name)) : [];
+  const activeGroupColumns = selectedGroupColumns(ACCOUNT_GROUP_COLUMNS, groupColumns);
+  const filteredAccounts = accountsQ.data ? filterRowsByColumns(accountsQ.data.items, ACCOUNT_GROUP_COLUMNS, columnFilters) : [];
+  const accounts = sortByGroups(filteredAccounts, activeGroupColumns, (row) => row.name);
   const total = accountsQ.data?.total ?? 0;
   const totalPages = accountsQ.data?.totalPages ?? 0;
   let previousGroup = "";
@@ -66,20 +75,41 @@ export function AccountsPage() {
     <div className="page-head"><div><span className="eyebrow">Customer intelligence</span><h1>Accounts</h1><p>Organizations, ownership, and relationship context.</p></div>
       {accountsQ.isSuccess && <span className="count">{total} total</span>}</div>
     <section className="list-controls" aria-label="Account search and filters">
-      <label><span>Search</span><input value={search} onChange={(event) => updateSearch(event.target.value)} placeholder="Name, industry, or owner" /></label>
-      <label><span>Industry filter</span><input value={industryFilter} onChange={(event) => updateIndustry(event.target.value)} placeholder="Exact industry" /></label>
+      <label><span>Search <InfoTag text="Type part of a name, industry, or owner to narrow the account list." label="Account search help" /></span><input value={search} onChange={(event) => updateSearch(event.target.value)} placeholder="Name, industry, or owner" /></label>
+      <label><span>Industry filter <InfoTag text="Enter one industry to show only accounts in that industry." label="Industry filter help" /></span><input value={industryFilter} onChange={(event) => updateIndustry(event.target.value)} placeholder="Exact industry" /></label>
       <button className="btn btn-sm" onClick={resetFilters} disabled={!search && !industryFilter}>Reset</button>
     </section>
     <DataViewFrame
       title="Accounts results"
-      actions={<MasterToolbar master="accounts" entityType="ACCOUNT" search={search} filter={industryFilter} grouped={grouped} groupLabel="Industry" onToggleGroup={() => setGrouped((value) => !value)} onChanged={() => void accountsQ.refetch()} />}
+      actions={<MasterToolbar
+        master="accounts"
+        entityType="ACCOUNT"
+        search={search}
+        filter={industryFilter}
+        grouped={activeGroupColumns.length > 0}
+        groupLabel="Industry"
+        onToggleGroup={() => setGroupColumns((value) => value.length > 0 ? [] : ["industry"])}
+        groupColumns={ACCOUNT_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
+        selectedGroupColumns={groupColumns}
+        onGroupColumnsChange={setGroupColumns}
+        filterColumns={ACCOUNT_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
+        columnFilters={columnFilters}
+        onColumnFiltersChange={setColumnFilters}
+        exportFilename="accounts-current-view"
+        exportRows={accounts.map((account) => ({
+          name: account.name,
+          industry: account.industry ?? "",
+          owner: account.ownerName ?? "",
+        }))}
+        onChanged={() => void accountsQ.refetch()}
+      />}
     >
       {accountsQ.isLoading && <GridLoader label="Reading client register" rows={6} columns={4} />}
       {accountsQ.isError && <p className="empty-note">Accounts failed to load{accountsQ.error instanceof Error ? `: ${accountsQ.error.message}` : "."}</p>}
       {accountsQ.isSuccess && <div className="table-wrap"><table className="data-table"><thead><tr><th>Name</th><th>Industry</th><th>Owner</th><th className="table-action">Action</th></tr></thead>
       <tbody>{accounts.map((account) => {
-        const group = account.industry ?? "Unclassified";
-        const showGroup = grouped && group !== previousGroup; previousGroup = group;
+        const group = activeGroupColumns.length > 0 ? groupLabelFor(account, activeGroupColumns) : "";
+        const showGroup = activeGroupColumns.length > 0 && group !== previousGroup; previousGroup = group;
         return <Fragment key={account.id}>{showGroup && <tr className="group-row"><th colSpan={4}>{group}</th></tr>}
           <tr><td>{account.name}</td><td>{account.industry ?? "-"}</td><td>{account.ownerName ?? "-"}</td>
             <td className="table-action"><button className="link-btn" onClick={() => setSelectedId(account.id)}>View 360</button>{canManageMasters(user?.role) && <button className="link-btn danger-link" disabled={deleteMutation.isPending} onClick={() => remove(account)}>Delete</button>}</td></tr></Fragment>;

@@ -615,6 +615,45 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
 }
 .user-signout:hover { background: var(--red); color: #2a0a0a; }
 
+.user-menu-action {
+  display: flex;
+  min-height: 48px;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 8px 11px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  font-family: var(--mono);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--speed) var(--ease), color var(--speed) var(--ease), background var(--speed) var(--ease);
+}
+
+.user-menu-action span {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.user-menu-action small {
+  color: var(--muted);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+}
+
+.user-menu-action:hover {
+  border-color: var(--cyan);
+  background: rgba(55, 226, 255, 0.08);
+  color: var(--cyan);
+}
+
 /* Narrow headers: keep the avatar, drop the name block. */
 @media (max-width: 860px) {
   .user-id { display: none; }
@@ -641,6 +680,7 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
 .btn-sm,
 .icon-btn,
 .user-trigger,
+.user-menu-action,
 .user-signout {
   clip-path: none;
   border-radius: 0;
@@ -919,7 +959,8 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   top: calc(100% + 8px);
   right: 0;
   z-index: 80;
-  width: 288px;
+  width: 332px;
+  max-width: calc(100vw - 24px);
   padding: 12px;
   display: grid;
   gap: 4px;
@@ -945,6 +986,8 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   background: none;
   color: var(--text);
   text-align: left;
+  min-width: 0;
+  overflow: hidden;
   cursor: pointer;
   transition: border-color var(--speed) var(--ease), background var(--speed) var(--ease);
 }
@@ -956,16 +999,426 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
 .theme-swatch { flex: 0 0 auto; display: flex; border: 1px solid var(--line-bright); }
 .theme-swatch i { display: block; width: 12px; height: 22px; }
 
-.theme-meta { display: flex; flex-direction: column; min-width: 0; }
-.theme-meta strong { font-size: 0.78rem; font-weight: 650; }
+.theme-meta { display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
+.theme-meta strong { font-size: 0.78rem; font-weight: 650; white-space: normal; }
 .theme-meta small {
   font-family: var(--mono);
   font-size: 0.56rem;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.06em;
+  line-height: 1.35;
   text-transform: uppercase;
   color: var(--muted);
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 680px) {
-  .theme-pop { right: 0; width: min(288px, calc(100vw - 16px)); }
+  .theme-pop { right: 0; width: min(332px, calc(100vw - 16px)); }
+}
+
+/* A divider above the FIRST group separates it from nothing, so it must never
+   render — in any theme. This sits last and is deliberately theme-agnostic:
+   the per-theme divider tints above have equal specificity to the earlier
+   first-child rule and were winning on source order, putting the stub back. */
+.shell.rail-collapsed .rail-group:first-child > .rail-section,
+:root[data-theme="ironman"] .shell.rail-collapsed .rail-group:first-child > .rail-section,
+:root[data-theme="light"] .shell.rail-collapsed .rail-group:first-child > .rail-section {
+  margin-top: 0;
+  background: none;
+}
+
+/* ============================================================================
+   THE GRID — Tron surface treatment
+   Emissive light on absolute void. Every edge is a circuit trace; the rail is
+   a lightcycle wall; panels are plates whose borders carry current.
+   ========================================================================== */
+
+/* The void, with a perspective circuit grid receding toward the horizon.
+   The grid is stronger here than in any other theme because in Tron the grid
+   IS the world, not a texture applied to it. */
+:root[data-theme="tron"] .app-ground {
+  background-color: #000;
+  background-image:
+    radial-gradient(1200px 520px at 50% -14%, rgba(111, 249, 255, 0.1), transparent 62%),
+    repeating-linear-gradient(0deg, rgba(111, 249, 255, 0.045) 0 1px, transparent 1px 48px),
+    repeating-linear-gradient(90deg, rgba(111, 249, 255, 0.045) 0 1px, transparent 1px 48px);
+}
+
+/* Plates: near-black with an energised edge and a light-bleed shadow. */
+:root[data-theme="tron"] .panel,
+:root[data-theme="tron"] .card {
+  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  border: 1px solid var(--line-bright);
+  box-shadow:
+    inset 0 0 0 1px rgba(111, 249, 255, 0.05),
+    0 0 22px rgba(111, 249, 255, 0.07),
+    0 12px 34px rgba(0, 0, 0, 0.8);
+}
+/* Corner brackets glow — they are the plate's power couplings. */
+:root[data-theme="tron"] .panel::before,
+:root[data-theme="tron"] .card::before,
+:root[data-theme="tron"] .panel::after,
+:root[data-theme="tron"] .card::after {
+  border-color: var(--cyan);
+  filter: drop-shadow(0 0 5px rgba(111, 249, 255, 0.9));
+}
+
+/* The rail is a lightcycle wall: void with a single running light down its edge. */
+:root[data-theme="tron"] .rail {
+  background: linear-gradient(180deg, #02060a 0%, #000 100%);
+  border-right: 1px solid var(--line-bright);
+  box-shadow: inset -1px 0 0 var(--cyan), -1px 0 26px rgba(111, 249, 255, 0.18);
+}
+:root[data-theme="tron"] .rail-brand strong { color: #eafdff; text-shadow: 0 0 14px rgba(111, 249, 255, 0.6); }
+:root[data-theme="tron"] .rail-brand small { color: var(--cyan); }
+:root[data-theme="tron"] .rail-section { color: #7d9cae; }
+:root[data-theme="tron"] .rail-section:hover { color: var(--cyan); }
+:root[data-theme="tron"] .rail-btn { color: #c2dbe6; }
+:root[data-theme="tron"] .rail-btn:hover { background: rgba(111, 249, 255, 0.09); color: #fff; }
+:root[data-theme="tron"] .rail-btn.active {
+  color: var(--cyan);
+  background: linear-gradient(90deg, rgba(111, 249, 255, 0.2), transparent 85%);
+  border-left-color: var(--cyan);
+  text-shadow: 0 0 10px rgba(111, 249, 255, 0.55);
+}
+:root[data-theme="tron"] .rail-btn.active::before {
+  background: var(--cyan);
+  box-shadow: 0 0 14px var(--cyan);
+}
+:root[data-theme="tron"] .rail-btn.is-planned { color: #6a8493; }
+:root[data-theme="tron"] .rail-avatar { background: var(--cyan-dim); color: var(--cyan); }
+/* Divider is a dormant trace that energises toward its centre. */
+:root[data-theme="tron"] .shell.rail-collapsed .rail-section,
+:root[data-theme="tron"] .rail-group + .rail-group > .rail-section::after {
+  background: linear-gradient(90deg, transparent, rgba(111, 249, 255, 0.42) 22%,
+    rgba(111, 249, 255, 0.42) 78%, transparent);
+}
+
+:root[data-theme="tron"] .topbar {
+  background: rgba(0, 0, 0, 0.9);
+  border-bottom: 1px solid var(--line-bright);
+  box-shadow: 0 1px 14px rgba(111, 249, 255, 0.12);
+}
+
+/* Controls are light sources. The primary key is a solid emissive bar. */
+:root[data-theme="tron"] .btn-primary,
+:root[data-theme="tron"] .btn.btn-primary {
+  background: var(--cyan);
+  border-color: var(--cyan);
+  color: #001417;
+  box-shadow: 0 0 20px rgba(111, 249, 255, 0.45);
+}
+:root[data-theme="tron"] .btn-primary:hover { box-shadow: 0 0 30px rgba(111, 249, 255, 0.75); }
+:root[data-theme="tron"] .btn { border-color: var(--line-bright); }
+:root[data-theme="tron"] .btn:hover {
+  border-color: var(--cyan);
+  color: var(--cyan);
+  box-shadow: 0 0 14px rgba(111, 249, 255, 0.28);
+}
+:root[data-theme="tron"] .btn-danger { border-color: var(--red); color: var(--red); }
+:root[data-theme="tron"] .btn-danger:hover { background: var(--red); color: #1a0600; box-shadow: 0 0 18px rgba(255, 122, 53, 0.5); }
+
+:root[data-theme="tron"] .icon-btn { border-color: var(--line-bright); color: var(--ink-soft); }
+:root[data-theme="tron"] .icon-btn:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 12px rgba(111, 249, 255, 0.3); }
+
+:root[data-theme="tron"] thead th {
+  background: var(--panel-2);
+  border-bottom: 1px solid var(--line-bright);
+}
+:root[data-theme="tron"] tbody tr + tr td { border-top: 1px solid var(--line-m); }
+:root[data-theme="tron"] tbody tr:hover td { background: rgba(111, 249, 255, 0.06); }
+:root[data-theme="tron"] tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
+
+:root[data-theme="tron"] .eyebrow { text-shadow: 0 0 10px rgba(111, 249, 255, 0.4); }
+:root[data-theme="tron"] .master-tab[aria-selected="true"] {
+  color: var(--cyan);
+  border-bottom-color: var(--cyan);
+  box-shadow: 0 2px 14px -4px var(--cyan);
+}
+:root[data-theme="tron"] input:focus-visible,
+:root[data-theme="tron"] select:focus-visible,
+:root[data-theme="tron"] textarea:focus-visible {
+  box-shadow: 0 0 0 3px var(--cyan-dim), 0 0 22px rgba(111, 249, 255, 0.3);
+}
+
+/* ============================================================================
+   HEADER IDENTITY — typographic repair
+   Reported as "username and role don't have space". Two causes, both real:
+
+   1. `max-width: 15ch` clipped the name even on a 1600px display —
+      "Axiom Super Admin" became "Axiom Super Ad…". A truncated name sitting
+      directly above a role reads as one cramped block rather than two fields.
+   2. A flat 4px gap between an 11px name and a 9px role is optically tight,
+      because the role's uppercase letterforms carry no descenders to separate
+      the two lines visually.
+   ========================================================================== */
+
+.user-trigger {
+  gap: 10px;
+  padding-right: 12px;
+}
+
+.user-id {
+  gap: 3px;                 /* row-gap; the line-heights below do the rest */
+  justify-content: center;
+}
+
+.user-id strong {
+  max-width: 24ch;          /* fits a realistic full name without clipping */
+  font-size: 0.78rem;
+  line-height: 1.25;        /* was ~1.05 — the name needs its own air */
+  letter-spacing: 0.005em;
+}
+
+.user-id small {
+  font-size: 0.55rem;
+  line-height: 1.2;
+  letter-spacing: 0.18em;   /* uppercase needs tracking to stay legible small */
+  opacity: 0.92;
+}
+
+/* On a genuinely narrow header the name would still clip, so drop to the
+   avatar rather than showing a stub. */
+@media (max-width: 1080px) {
+  .user-id strong { max-width: 16ch; }
+}
+
+/* ---- Header rhythm --------------------------------------------------------
+   Every top-bar control now shares one vertical centre line and one gap, so
+   the row reads as a single band instead of a set of loosely-placed objects. */
+.topbar {
+  align-items: center;
+  gap: 10px;
+  padding-inline: 16px;
+}
+
+.topbar-context {
+  gap: 3px;
+  justify-content: center;
+}
+.topbar-title {
+  line-height: 1.2;
+  letter-spacing: 0.14em;
+  color: var(--ink-soft);
+}
+.topbar-tenant,
+.workspace-switch select {
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+}
+/* The select carries native padding that pushed its text off the title's left
+   edge; zero it so both lines share one optical margin. */
+.workspace-switch select {
+  padding-left: 0;
+  margin-left: -1px;        /* optical: the select's text box sits 1px in */
+}
+
+/* ---- Drawer header --------------------------------------------------------
+   Keep the close control square and stop the action row from stretching it. */
+.drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+.drawer-actions .icon-btn { flex: 0 0 auto; }
+
+/* ---------------------------------------------------------------------------
+   Header identity, at the specificity the control-sizing layer uses.
+   That layer pins `.user-trigger` to a fixed 184px, which is the actual reason
+   the name truncates — the container cannot grow to its content, so no
+   max-width on the name alone can fix it. Sizing to content within a ceiling
+   lets a real name render, and still degrades to the avatar when space runs out.
+   ------------------------------------------------------------------------- */
+:root body .user-trigger {
+  inline-size: auto;
+  min-inline-size: 0;
+  max-inline-size: 280px;
+  gap: 10px;
+  padding-inline: 7px 12px;
+}
+
+:root body .user-id {
+  gap: 5px;
+  justify-content: center;
+}
+
+:root body .user-id strong {
+  max-inline-size: none;
+  font-size: 0.78rem;
+  line-height: 1.22;
+  letter-spacing: 0.005em;
+}
+
+:root body .user-id small {
+  font-size: 0.55rem;
+  line-height: 1.15;
+  letter-spacing: 0.18em;
+  opacity: 0.92;
+}
+
+@media (max-width: 1180px) {
+  :root body .user-trigger { max-inline-size: 200px; }
+  :root body .user-id strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+
+/* The earlier -1px optical nudge overshot: measured delta went 0 → -1. The
+   select and the title already share a left edge, so no nudge is needed. */
+.workspace-switch select { margin-left: 0; }
+
+/* ============================================================================
+   LOGIN — SSO-first access, downloads on the brand side
+   The form column now does exactly one job: get the user in. Downloads moved
+   to the brand column because they are evaluation collateral, not a sign-in
+   step, and they were pushing the actual controls away from the eye's landing
+   point.
+   ========================================================================== */
+
+.login-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  justify-content: center;
+}
+
+.login-downloads {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 620px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.downloads-title { font-size: 0.9rem; font-weight: 700; }
+.downloads-sub { margin: 0; max-width: 52ch; color: var(--muted); font-size: 0.82rem; }
+
+.download-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin-top: 6px;
+}
+.download-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 11px 13px;
+  border: 1px solid var(--line-bright);
+  background: var(--panel);
+  color: var(--text);
+  transition: border-color var(--speed) var(--ease), background var(--speed) var(--ease);
+}
+.download-card:hover { border-color: var(--cyan); background: var(--cyan-dim); }
+.download-card span {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.download-card small { color: var(--muted); font-size: 0.68rem; }
+
+/* ---- Form column --------------------------------------------------------- */
+.login-form-side { display: grid; place-items: center; padding: 32px 24px; }
+.login-card { width: 100%; max-width: 400px; display: flex; flex-direction: column; gap: 12px; }
+.login-card h2 { margin: 0; font-size: 1.5rem; }
+.login-card .sub { margin: 0 0 4px; color: var(--muted); font-size: 0.85rem; line-height: 1.5; }
+.login-card form { display: flex; flex-direction: column; gap: 12px; }
+
+.btn-block { width: 100%; justify-content: center; }
+
+.login-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 4px 0;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.login-divider::before,
+.login-divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+
+.login-back { align-self: flex-start; margin-top: 2px; }
+.sso-hint { color: var(--cyan) !important; }
+
+/* A notice is guidance, not a failure — it must not look like the error state.
+   The SSO fallback path uses this constantly, and colouring it red would tell
+   the user something is broken when nothing is. */
+.form-notice {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line-bright);
+  border-left: 2px solid var(--cyan);
+  background: var(--cyan-dim);
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+.form-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--red);
+  border-left-width: 2px;
+  background: color-mix(in srgb, var(--red) 12%, transparent);
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+/* ---- Trial call-to-action ------------------------------------------------ */
+.login-trial {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-top: 10px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.login-trial p { margin: 0; color: var(--muted); font-size: 0.8rem; line-height: 1.5; }
+
+/* ---- Trial dialog -------------------------------------------------------- */
+.trial-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(3px);
+  overflow-y: auto;
+}
+.trial-dialog { width: min(680px, 100%); padding: 20px 22px 22px; }
+.trial-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  margin-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+.trial-head h2 { margin: 3px 0 0; font-size: 1.3rem; }
+.trial-intro { margin: 0 0 4px; color: var(--muted); font-size: 0.85rem; line-height: 1.55; }
+.trial-form { display: flex; flex-direction: column; gap: 14px; }
+.trial-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.trial-actions { display: flex; justify-content: flex-end; gap: 9px; padding-top: 4px; }
+.label .opt {
+  margin-left: 5px;
+  color: var(--slate-faint);
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+.trial-done { display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.trial-done p { margin: 0; font-size: 0.87rem; line-height: 1.55; }
+.trial-ref { font-size: 0.95rem !important; }
+.trial-note { color: var(--muted); }
+
+@media (max-width: 900px) {
+  .login { grid-template-columns: 1fr; }
+  .login-downloads { max-width: none; }
+  .trial-grid { grid-template-columns: 1fr; }
 }

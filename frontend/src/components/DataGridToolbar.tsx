@@ -1,16 +1,34 @@
 import { useState, type ReactNode } from "react";
-import { type DownloadedFile } from "../api/client";
+import { api, type DownloadedFile } from "../api/client";
 import { AuditDrawer } from "./AuditDrawer";
+import { GridColumnFilters } from "./GridColumnFilters";
+import { GroupColumnPicker, type GroupColumnOption } from "./GroupColumnPicker";
+import { InfoTag } from "./InfoTag";
 import { useToasts } from "./Toasts";
 
-type GridExportFormat = "XLSX" | "DOCX" | "PDF";
-type GridExportRow = Record<string, unknown>;
+export type GridExportFormat = "XLSX" | "DOCX" | "PDF";
+export type GridExportRow = Record<string, unknown>;
+
+export interface GridExportContext {
+  title?: string;
+  objectType?: string;
+  generatedAt?: Date;
+  rowCount?: number;
+  groups?: string[];
+  filters?: Array<{ label: string; value: string }>;
+}
 
 interface DataGridToolbarProps {
   gridName: string;
   grouped?: boolean;
   groupLabel?: string;
   onToggleGroup?: () => void;
+  groupColumns?: GroupColumnOption[];
+  selectedGroupColumns?: string[];
+  onGroupColumnsChange?: (next: string[]) => void;
+  filterColumns?: GroupColumnOption[];
+  columnFilters?: Record<string, string>;
+  onColumnFiltersChange?: (next: Record<string, string>) => void;
   auditEntityType?: string;
   auditTitle?: string;
   exportFilename?: string;
@@ -36,6 +54,12 @@ export function DataGridToolbar({
   grouped = false,
   groupLabel = "Group",
   onToggleGroup,
+  groupColumns,
+  selectedGroupColumns,
+  onGroupColumnsChange,
+  filterColumns,
+  columnFilters,
+  onColumnFiltersChange,
   auditEntityType,
   auditTitle,
   exportFilename,
@@ -47,12 +71,23 @@ export function DataGridToolbar({
   const toasts = useToasts();
   const [auditOpen, setAuditOpen] = useState(false);
   const canExport = !!onExport || !!exportRows;
+  const viewContext = gridExportContext({
+    title: `${gridName} current view`,
+    objectType: auditEntityType ?? exportObjectType(gridName),
+    rows: exportRows,
+    groupColumns,
+    selectedGroupColumns,
+    filterColumns,
+    columnFilters,
+  });
 
   async function download(format: GridExportFormat) {
     try {
-      const file = onExport
-        ? await onExport(format)
-        : createCurrentViewExport(format, exportRows ?? [], exportFilename ?? slug(gridName));
+      const file = exportRows
+        ? createCurrentViewExport(format, exportRows, exportFilename ?? slug(gridName), viewContext)
+        : await onExport?.(format);
+      if (!file) throw new Error("No export source is configured for this grid.");
+      if (exportRows) await recordCurrentViewExportAudit(format, viewContext);
       saveDownloadedFile(file);
       toasts.push("info", `Export ${formatLabel(format)} ready`, "The download reflects the current Data Grid view.");
     } catch (error) {
@@ -60,19 +95,54 @@ export function DataGridToolbar({
     }
   }
 
+  async function copyViewSummary() {
+    if (!viewContext) return;
+    try {
+      await writeClipboardText(gridViewSummaryText(viewContext));
+      toasts.push("info", "View summary copied", "Paste it into a ticket, chat or audit note to describe this exact grid view.");
+    } catch (error) {
+      toasts.push("error", "View summary not copied", error instanceof Error ? error.message : "Clipboard is unavailable.");
+    }
+  }
+
   return (
     <>
-      <div className="master-toolbar data-grid-toolbar" role="toolbar" aria-label={`${gridName} data grid tools`}>
-        <button className={`btn btn-sm${grouped ? " active" : ""}`} aria-pressed={grouped} disabled={!onToggleGroup} onClick={onToggleGroup}>
-          Group: {grouped ? groupLabel : "Off"}
-        </button>
-        <button className="btn btn-sm" disabled={!auditEntityType} onClick={() => setAuditOpen(true)}>Audit</button>
-        <span className="toolbar-divider" aria-hidden />
-        <button className="btn btn-sm" disabled={!canExport} onClick={() => void download("XLSX")}>Export Excel</button>
-        <button className="btn btn-sm" disabled={!canExport} onClick={() => void download("DOCX")}>Export Word</button>
-        <button className="btn btn-sm" disabled={!canExport} onClick={() => void download("PDF")}>Export PDF</button>
-        {children}
-        {note && <span className="cpq-note">{note}</span>}
+      <div className="data-grid-tools-stack">
+        <div className="master-toolbar data-grid-toolbar" role="toolbar" aria-label={`${gridName} data grid tools`}>
+          <InfoTag
+            text="Use these tools to group rows, search columns, view audit history, or download the current grid."
+            label={`${gridName} grid tools help`}
+          />
+          {groupColumns && onGroupColumnsChange ? (
+            <GroupColumnPicker
+              id={`${slug(gridName)}-toolbar`}
+              columns={groupColumns}
+              selected={selectedGroupColumns ?? []}
+              onChange={onGroupColumnsChange}
+            />
+          ) : (
+            <button className={`btn btn-sm${grouped ? " active" : ""}`} aria-pressed={grouped} disabled={!onToggleGroup} onClick={onToggleGroup}>
+              Group: {grouped ? groupLabel : "Off"}
+            </button>
+          )}
+          <button className="btn btn-sm" disabled={!auditEntityType} onClick={() => setAuditOpen(true)}>Audit</button>
+          <span className="toolbar-divider" aria-hidden />
+          <button className="btn btn-sm" disabled={!canExport} onClick={() => void download("XLSX")}>Export Excel</button>
+          <button className="btn btn-sm" disabled={!canExport} onClick={() => void download("DOCX")}>Export Word</button>
+          <button className="btn btn-sm" disabled={!canExport} onClick={() => void download("PDF")}>Export PDF</button>
+          <button className="btn btn-sm" disabled={!viewContext} onClick={() => void copyViewSummary()}>Copy view</button>
+          {children}
+          {viewContext && <span className="grid-view-summary" aria-live="polite">{viewSummary(viewContext)}</span>}
+          {note && <span className="cpq-note">{note}</span>}
+        </div>
+        {filterColumns && columnFilters && onColumnFiltersChange && (
+          <GridColumnFilters
+            id={`${slug(gridName)}-toolbar`}
+            columns={filterColumns}
+            filters={columnFilters}
+            onChange={onColumnFiltersChange}
+          />
+        )}
       </div>
       {auditEntityType && <AuditDrawer
         open={auditOpen}
@@ -85,24 +155,118 @@ export function DataGridToolbar({
   );
 }
 
-function createCurrentViewExport(format: GridExportFormat, rows: GridExportRow[], baseFilename: string): DownloadedFile {
+export function createCurrentViewExport(
+  format: GridExportFormat,
+  rows: GridExportRow[],
+  baseFilename: string,
+  context?: GridExportContext,
+): DownloadedFile {
+  return createCurrentViewExportWithContext(format, rows, baseFilename, context);
+}
+
+export function createCurrentViewExportWithContext(
+  format: GridExportFormat,
+  rows: GridExportRow[],
+  baseFilename: string,
+  context?: GridExportContext,
+): DownloadedFile {
   const normalized = normalizeRows(rows);
+  const exportContext = normalizeExportContext(context, rows.length, baseFilename);
   if (format === "XLSX") {
     return {
-      blob: new Blob([tableHtml(normalized)], { type: "application/vnd.ms-excel;charset=utf-8" }),
+      blob: new Blob([tableHtml(normalized, exportContext)], { type: "application/vnd.ms-excel;charset=utf-8" }),
       filename: `${baseFilename}.xls`,
     };
   }
   if (format === "DOCX") {
     return {
-      blob: new Blob([documentHtml(normalized)], { type: "application/msword;charset=utf-8" }),
+      blob: new Blob([documentHtml(normalized, exportContext)], { type: "application/msword;charset=utf-8" }),
       filename: `${baseFilename}.doc`,
     };
   }
   return {
-    blob: new Blob([pdfDocument(normalized)], { type: "application/pdf" }),
+    blob: new Blob([pdfDocument(normalized, exportContext)], { type: "application/pdf" }),
     filename: `${baseFilename}.pdf`,
   };
+}
+
+export function gridExportContext({
+  title,
+  objectType,
+  rows,
+  groupColumns,
+  selectedGroupColumns,
+  filterColumns,
+  columnFilters,
+}: {
+  title: string;
+  objectType?: string;
+  rows?: GridExportRow[];
+  groupColumns?: GroupColumnOption[];
+  selectedGroupColumns?: string[];
+  filterColumns?: GroupColumnOption[];
+  columnFilters?: Record<string, string>;
+}): GridExportContext | undefined {
+  if (!rows) return undefined;
+  const groupLabels = selectedGroupColumns
+    ?.map((key) => lookupColumnLabel(key, groupColumns))
+    .filter((value): value is string => !!value) ?? [];
+  const filters = Object.entries(columnFilters ?? {})
+    .map(([key, value]) => ({ label: lookupColumnLabel(key, filterColumns) ?? label(key), value: value.trim() }))
+    .filter((entry) => entry.value.length > 0);
+  return {
+    title,
+    objectType,
+    rowCount: rows.length,
+    generatedAt: new Date(),
+    groups: groupLabels,
+    filters,
+  };
+}
+
+export function gridViewSummaryText(context: GridExportContext): string {
+  const normalized = normalizeExportContext(context, context.rowCount ?? 0, context.title ?? "Data Grid");
+  return [
+    normalized.title,
+    `Generated: ${formatDateTime(normalized.generatedAt)}`,
+    `Rows: ${normalized.rowCount}`,
+    `Groups: ${normalized.groups.length ? normalized.groups.join(" > ") : "None"}`,
+    `Column filters: ${normalized.filters.length ? normalized.filters.map((filter) => `${filter.label}: ${filter.value}`).join("; ") : "None"}`,
+  ].join("\n");
+}
+
+export async function writeClipboardText(value: string): Promise<void> {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(value);
+    return;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = value;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  textarea.style.top = "0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  const copied = document.execCommand("copy");
+  textarea.remove();
+  if (!copied) throw new Error("Clipboard permission was denied by the browser.");
+}
+
+export async function recordCurrentViewExportAudit(format: GridExportFormat, context: GridExportContext | undefined): Promise<void> {
+  const normalized = normalizeExportContext(context, context?.rowCount ?? 0, context?.title ?? "current-view");
+  await api.recordClientExportAudit({
+    objectType: normalized.objectType,
+    rowCount: normalized.rowCount,
+    format,
+    destination: "CURRENT_VIEW_DOWNLOAD",
+    filterCriteria: {
+      title: normalized.title,
+      groups: normalized.groups,
+      filters: normalized.filters.map((filter) => `${filter.label}: ${filter.value}`),
+    },
+  });
 }
 
 function normalizeRows(rows: GridExportRow[]) {
@@ -116,20 +280,28 @@ function normalizeRows(rows: GridExportRow[]) {
   };
 }
 
-function tableHtml(data: { headers: string[]; rows: string[][] }) {
-  return `<!doctype html><html><head><meta charset="utf-8"></head><body><table border="1">${tableMarkup(data)}</table></body></html>`;
+function tableHtml(data: { headers: string[]; rows: string[][] }, context: Required<GridExportContext>) {
+  return `<!doctype html><html><head><meta charset="utf-8"></head><body>${metadataHtml(context)}<table border="1">${tableMarkup(data)}</table></body></html>`;
 }
 
-function documentHtml(data: { headers: string[]; rows: string[][] }) {
-  return `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif}table{border-collapse:collapse;width:100%}th,td{border:1px solid #999;padding:6px;text-align:left}th{background:#eef3f8}</style></head><body><h1>Data Grid Export</h1><table>${tableMarkup(data)}</table></body></html>`;
+function documentHtml(data: { headers: string[]; rows: string[][] }, context: Required<GridExportContext>) {
+  return `<!doctype html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;color:#172235}table{border-collapse:collapse;width:100%;margin-top:14px}th,td{border:1px solid #999;padding:6px;text-align:left}th{background:#eef3f8}.meta{margin:0 0 12px}.meta dt{font-weight:bold}.meta dd{margin:0 0 6px}</style></head><body>${metadataHtml(context)}<table>${tableMarkup(data)}</table></body></html>`;
 }
 
 function tableMarkup(data: { headers: string[]; rows: string[][] }) {
   return `<thead><tr>${data.headers.map((header) => `<th>${escapeHtml(label(header))}</th>`).join("")}</tr></thead><tbody>${data.rows.map((row) => `<tr>${row.map((value) => `<td>${escapeHtml(value)}</td>`).join("")}</tr>`).join("")}</tbody>`;
 }
 
-function pdfDocument(data: { headers: string[]; rows: string[][] }): string {
-  const lines = [data.headers.map(label).join(" | "), ...data.rows.map((row) => row.join(" | "))];
+function pdfDocument(data: { headers: string[]; rows: string[][] }, context: Required<GridExportContext>): string {
+  const metadata = [
+    context.title,
+    `Generated: ${formatDateTime(context.generatedAt)}`,
+    `Rows: ${context.rowCount}`,
+    `Groups: ${context.groups.length ? context.groups.join(" > ") : "None"}`,
+    `Filters: ${context.filters.length ? context.filters.map((filter) => `${filter.label}=${filter.value}`).join("; ") : "None"}`,
+    "",
+  ];
+  const lines = [...metadata, data.headers.map(label).join(" | "), ...data.rows.map((row) => row.join(" | "))];
   const wrapped = lines.flatMap((line) => wrap(line || "-", 95)).slice(0, 46);
   const content = [
     "BT",
@@ -190,4 +362,48 @@ function pdfEscape(value: string) {
 
 function formatLabel(format: GridExportFormat) {
   return format === "XLSX" ? "Excel" : format === "DOCX" ? "Word" : "PDF";
+}
+
+function normalizeExportContext(context: GridExportContext | undefined, rowCount: number, baseFilename: string): Required<GridExportContext> {
+  return {
+    title: context?.title ?? label(baseFilename),
+    objectType: context?.objectType ?? exportObjectType(baseFilename),
+    generatedAt: context?.generatedAt ?? new Date(),
+    rowCount: context?.rowCount ?? rowCount,
+    groups: context?.groups ?? [],
+    filters: context?.filters ?? [],
+  };
+}
+
+function exportObjectType(value: string) {
+  return slug(value).replace(/-/g, "_").toUpperCase();
+}
+
+function metadataHtml(context: Required<GridExportContext>) {
+  const filters = context.filters.length
+    ? context.filters.map((filter) => `${filter.label}: ${filter.value}`).join("; ")
+    : "None";
+  const groups = context.groups.length ? context.groups.join(" > ") : "None";
+  return `<h1>${escapeHtml(context.title)}</h1><dl class="meta"><dt>Generated</dt><dd>${escapeHtml(formatDateTime(context.generatedAt))}</dd><dt>Rows</dt><dd>${context.rowCount}</dd><dt>Groups</dt><dd>${escapeHtml(groups)}</dd><dt>Column filters</dt><dd>${escapeHtml(filters)}</dd></dl>`;
+}
+
+function lookupColumnLabel(key: string, columns?: GroupColumnOption[]) {
+  return columns?.find((column) => column.key === key)?.label;
+}
+
+function viewSummary(context: GridExportContext) {
+  const parts = [`${context.rowCount ?? 0} rows`];
+  if (context.filters?.length) parts.push(`${context.filters.length} filters`);
+  if (context.groups?.length) parts.push(`${context.groups.length} groups`);
+  return parts.join(" · ");
+}
+
+function formatDateTime(value: Date) {
+  return value.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }

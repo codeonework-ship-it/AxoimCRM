@@ -61,7 +61,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             "/api/v1/auth/service-token");
 
     /** Unauthenticated prefixes: sign-in branding is read before anyone signs in. */
-    private static final List<String> UNGUARDED_PREFIXES = List.of("/api/v1/branding/");
+    private static final List<String> UNGUARDED_PREFIXES = List.of("/api/v1/branding/", "/api/v1/public/");
 
     /**
      * OPTIONALLY authenticated prefixes — a distinct category from

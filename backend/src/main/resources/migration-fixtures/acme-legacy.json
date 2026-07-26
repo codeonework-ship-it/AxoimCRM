@@ -1,0 +1,331 @@
+{
+  "key": "acme-legacy",
+  "label": "Acme Legacy CRM (deterministic fixture)",
+  "connectedAs": "migration-readonly@acme-legacy.example",
+  "objects": [
+    {
+      "apiName": "Account",
+      "label": "Account",
+      "custom": false,
+      "proposedTarget": "ACCOUNT",
+      "references": { "ParentId": "Account" },
+      "fields": [
+        { "apiName": "Id", "label": "Record Id", "dataType": "ID", "custom": false, "nullable": false },
+        { "apiName": "Name", "label": "Account Name", "dataType": "TEXT", "custom": false, "nullable": false },
+        { "apiName": "Industry", "label": "Industry", "dataType": "PICKLIST", "custom": false, "nullable": true },
+        { "apiName": "AnnualRevenue", "label": "Annual Revenue", "dataType": "CURRENCY", "custom": false, "nullable": true },
+        { "apiName": "NumberOfEmployees", "label": "Employees", "dataType": "NUMBER", "custom": false, "nullable": true },
+        { "apiName": "Website", "label": "Website", "dataType": "URL", "custom": false, "nullable": true },
+        { "apiName": "Phone", "label": "Phone", "dataType": "PHONE", "custom": false, "nullable": true },
+        { "apiName": "ParentId", "label": "Parent Account", "dataType": "REFERENCE", "custom": false, "nullable": true },
+        { "apiName": "AccountNumber", "label": "Account Number", "dataType": "TEXT", "custom": false, "nullable": true },
+        { "apiName": "BillingCity", "label": "Billing City", "dataType": "TEXT", "custom": false, "nullable": true },
+        { "apiName": "SicCode", "label": "SIC Code", "dataType": "TEXT", "custom": false, "nullable": true },
+        { "apiName": "LegacyRegionCode__c", "label": "Legacy Region Code", "dataType": "TEXT", "custom": true, "nullable": true },
+        { "apiName": "AccountHealthLegacy__c", "label": "Legacy Health Rating", "dataType": "PICKLIST", "custom": true, "nullable": true }
+      ],
+      "records": [
+        {
+          "id": "ACC-1", "wave": 1, "label": "Kestrel Industrial Group",
+          "createdAt": "2021-04-12T09:15:00Z", "modifiedAt": "2026-01-10T08:00:00Z", "actor": "jane.okoro@acme-legacy.example",
+          "values": {
+            "Name": "Kestrel Industrial Group", "Industry": "Industrial", "AnnualRevenue": "92000000",
+            "NumberOfEmployees": "1450", "Website": "https://kestrel-industrial.example", "Phone": "+91 22 4000 1100",
+            "ParentId": "", "AccountNumber": "KIG-0001", "BillingCity": "Mumbai", "SicCode": "3441",
+            "LegacyRegionCode__c": "APAC-W3", "AccountHealthLegacy__c": "GREEN"
+          }
+        },
+        {
+          "id": "ACC-2", "wave": 1, "label": "Kestrel Fabrication Pvt Ltd",
+          "createdAt": "2021-06-02T11:00:00Z", "modifiedAt": "2026-01-10T08:05:00Z", "actor": "jane.okoro@acme-legacy.example",
+          "values": {
+            "Name": "Kestrel Fabrication Pvt Ltd", "Industry": "Industrial", "AnnualRevenue": "34000000",
+            "NumberOfEmployees": "620", "Website": "https://kestrel-fab.example", "Phone": "+91 20 6600 2200",
+            "ParentId": "ACC-1", "AccountNumber": "KIG-0002", "BillingCity": "Pune", "SicCode": "3441",
+            "LegacyRegionCode__c": "APAC-W3", "AccountHealthLegacy__c": "GREEN"
+          }
+        },
+        {
+          "id": "ACC-3", "wave": 1, "label": "Halden Alloys Ltd",
+          "createdAt": "2022-01-19T14:30:00Z", "modifiedAt": "2026-01-10T08:10:00Z", "actor": "sam.reeve@acme-legacy.example",
+          "values": {
+            "Name": "Halden Alloys Ltd", "Industry": "Industrial", "AnnualRevenue": "12500000",
+            "NumberOfEmployees": "210", "Website": "https://halden-alloys.example", "Phone": "+44 161 555 0134",
+            "ParentId": "", "AccountNumber": "HAL-0007", "BillingCity": "Manchester", "SicCode": "3339",
+            "LegacyRegionCode__c": "EMEA-N1", "AccountHealthLegacy__c": "AMBER"
+          }
+        },
+        {
+          "id": "ACC-4", "wave": 1, "label": "Kestrel Manufacturing",
+          "createdAt": "2020-11-05T09:00:00Z", "modifiedAt": "2026-01-10T08:15:00Z", "actor": "sam.reeve@acme-legacy.example",
+          "values": {
+            "Name": "Kestrel Manufacturing", "Industry": "Industrial", "AnnualRevenue": "58000000",
+            "NumberOfEmployees": "900", "Website": "https://kestrel-mfg.example", "Phone": "+91 22 4000 9000",
+            "ParentId": "", "AccountNumber": "KM-0100", "BillingCity": "Mumbai", "SicCode": "3441",
+            "LegacyRegionCode__c": "APAC-W3", "AccountHealthLegacy__c": "GREEN"
+          }
+        },
+        {
+          "id": "ACC-5", "wave": 1, "label": "Verity Castings SA",
+          "createdAt": "2023-02-28T07:45:00Z", "modifiedAt": "2026-01-10T08:20:00Z", "actor": "jane.okoro@acme-legacy.example",
+          "values": {
+            "Name": "Verity Castings SA", "Industry": "Industrial", "AnnualRevenue": "7400000",
+            "NumberOfEmployees": "140", "Website": "https://verity-castings.example", "Phone": "+33 4 72 55 0199",
+            "ParentId": "ACC-901", "AccountNumber": "VC-0044", "BillingCity": "Lyon", "SicCode": "3325",
+            "LegacyRegionCode__c": "EMEA-S2", "AccountHealthLegacy__c": "AMBER"
+          }
+        },
+        {
+          "id": "ACC-6", "wave": 2, "label": "Tessellate Metals GmbH",
+          "createdAt": "2026-06-01T10:00:00Z", "modifiedAt": "2026-06-01T10:00:00Z", "actor": "sam.reeve@acme-legacy.example",
+          "values": {
+            "Name": "Tessellate Metals GmbH", "Industry": "Industrial", "AnnualRevenue": "18800000",
+            "NumberOfEmployees": "305", "Website": "https://tessellate-metals.example", "Phone": "+49 89 5555 0170",
+            "ParentId": "ACC-1", "AccountNumber": "TM-0021", "BillingCity": "Munich", "SicCode": "3341",
+            "LegacyRegionCode__c": "EMEA-C1", "AccountHealthLegacy__c": "GREEN"
+          }
+        }
+      ]
+    },
+    {
+      "apiName": "Contact",
+      "label": "Contact",
+      "custom": false,
+      "proposedTarget": "CONTACT",
+      "references": { "AccountId": "Account", "ReportsToId": "Contact" },
+      "fields": [
+        { "apiName": "Id", "label": "Record Id", "dataType": "ID", "custom": false, "nullable": false },
+        { "apiName": "FirstName", "label": "First Name", "dataType": "TEXT", "custom": false, "nullable": false },
+        { "apiName": "LastName", "label": "Last Name", "dataType": "TEXT", "custom": false, "nullable": false },
+        { "apiName": "Email", "label": "Email", "dataType": "EMAIL", "custom": false, "nullable": true },
+        { "apiName": "Title", "label": "Title", "dataType": "TEXT", "custom": false, "nullable": true },
+        { "apiName": "Phone", "label": "Phone", "dataType": "PHONE", "custom": false, "nullable": true },
+        { "apiName": "MobilePhone", "label": "Mobile", "dataType": "PHONE", "custom": false, "nullable": true },
+        { "apiName": "Department", "label": "Department", "dataType": "TEXT", "custom": false, "nullable": true },
+        { "apiName": "AccountId", "label": "Account", "dataType": "REFERENCE", "custom": false, "nullable": true },
+        { "apiName": "ReportsToId", "label": "Reports To", "dataType": "REFERENCE", "custom": false, "nullable": true },
+        { "apiName": "LinkedInHandle__c", "label": "LinkedIn Handle", "dataType": "TEXT", "custom": true, "nullable": true },
+        { "apiName": "PreferredPronoun__c", "label": "Preferred Pronoun", "dataType": "TEXT", "custom": true, "nullable": true }
+      ],
+      "records": [
+        {
+          "id": "CON-1", "wave": 1, "label": "Ana Bhattacharya",
+          "createdAt": "2021-04-14T09:00:00Z", "modifiedAt": "2026-01-10T08:30:00Z", "actor": "jane.okoro@acme-legacy.example",
+          "values": {
+            "FirstName": "Ana", "LastName": "Bhattacharya", "Email": "ana.bhattacharya@kestrel-industrial.example",
+            "Title": "Group Procurement Director", "Phone": "+91 22 4000 1101", "MobilePhone": "+91 98200 11221",
+            "Department": "Procurement", "AccountId": "ACC-1", "ReportsToId": "",
+            "LinkedInHandle__c": "anabhatt", "PreferredPronoun__c": "she/her"
+          }
+        },
+        {
+          "id": "CON-2", "wave": 1, "label": "Devan Rao",
+          "createdAt": "2021-06-08T09:00:00Z", "modifiedAt": "2026-01-10T08:31:00Z", "actor": "jane.okoro@acme-legacy.example",
+          "values": {
+            "FirstName": "Devan", "LastName": "Rao", "Email": "devan.rao@kestrel-fab.example",
+            "Title": "Plant Manager", "Phone": "+91 20 6600 2201", "MobilePhone": "+91 98220 33445",
+            "Department": "Operations", "AccountId": "ACC-2", "ReportsToId": "CON-1",
+            "LinkedInHandle__c": "devanrao", "PreferredPronoun__c": "he/him"
+          }
+        },
+        {
+          "id": "CON-3", "wave": 1, "label": "Marta Feld",
+          "createdAt": "2022-03-03T09:00:00Z", "modifiedAt": "2026-01-10T08:32:00Z", "actor": "sam.reeve@acme-legacy.example",
+          "values": {
+            "FirstName": "Marta", "LastName": "Feld", "Email": "marta.feld@ghost-holdings.example",
+            "Title": "Head of Sourcing", "Phone": "+49 30 5555 0101", "MobilePhone": "",
+            "Department": "Sourcing", "AccountId": "ACC-404", "ReportsToId": "",
+            "LinkedInHandle__c": "martafeld", "PreferredPronoun__c": ""
+          }
+        },
+        {
+          "id": "CON-4", "wave": 1, "label": "Unnamed record",
+          "createdAt": "2023-08-21T09:00:00Z", "modifiedAt": "2026-01-10T08:33:00Z", "actor": "sam.reeve@acme-legacy.example",
+          "values": {
+            "FirstName": "Priyanka", "LastName": "", "Email": "p.unknown@halden-alloys.example",
+            "Title": "", "Phone": "", "MobilePhone": "",
+            "Department": "", "AccountId": "ACC-3", "ReportsToId": "",
+            "LinkedInHandle__c": "", "PreferredPronoun__c": ""
+          }
+        },
+        {
+          "id": "CON-2", "wave": 2, "label": "Devan Rao",
+          "createdAt": "2021-06-08T09:00:00Z", "modifiedAt": "2026-06-04T11:30:00Z", "actor": "jane.okoro@acme-legacy.example",
+          "values": {
+            "FirstName": "Devan", "LastName": "Rao", "Email": "devan.rao@kestrel-fab.example",
+            "Title": "Director of Operations", "Phone": "+91 20 6600 2201", "MobilePhone": "+91 98220 33445",
+            "Department": "Operations", "AccountId": "ACC-2", "ReportsToId": "CON-1",
+            "LinkedInHandle__c": "devanrao", "PreferredPronoun__c": "he/him"
+          }
+        },
+        {
+          "id": "CON-5", "wave": 2, "label": "Ingrid Sollberg",
+          "createdAt": "2026-06-02T09:00:00Z", "modifiedAt": "2026-06-02T09:00:00Z", "actor": "sam.reeve@acme-legacy.example",
+          "values": {
+            "FirstName": "Ingrid", "LastName": "Sollberg", "Email": "ingrid.sollberg@tessellate-metals.example",
+            "Title": "Commercial Lead", "Phone": "+49 89 5555 0171", "MobilePhone": "",
+            "Department": "Commercial", "AccountId": "ACC-6", "ReportsToId": "",
+            "LinkedInHandle__c": "isollberg", "PreferredPronoun__c": "she/her"
+          }
+        }
+      ]
+    },
+    {
+      "apiName": "Opportunity",
+      "label": "Opportunity",
+      "custom": false,
+      "proposedTarget": "OPPORTUNITY",
+      "references": { "AccountId": "Account", "PrimaryContactId": "Contact" },
+      "moneyFields": ["Amount"],
+      "fields": [
+        { "apiName": "Id", "label": "Record Id", "dataType": "ID", "custom": false, "nullable": false },
+        { "apiName": "Name", "label": "Opportunity Name", "dataType": "TEXT", "custom": false, "nullable": false },
+        { "apiName": "Amount", "label": "Amount", "dataType": "CURRENCY", "custom": false, "nullable": true },
+        { "apiName": "CurrencyIsoCode", "label": "Currency", "dataType": "TEXT", "custom": false, "nullable": true },
+        { "apiName": "CloseDate", "label": "Close Date", "dataType": "DATE", "custom": false, "nullable": true },
+        { "apiName": "StageName", "label": "Stage", "dataType": "PICKLIST", "custom": false, "nullable": true },
+        { "apiName": "Probability", "label": "Probability", "dataType": "PERCENT", "custom": false, "nullable": true },
+        { "apiName": "NextStep", "label": "Next Step", "dataType": "TEXT", "custom": false, "nullable": true },
+        { "apiName": "AccountId", "label": "Account", "dataType": "REFERENCE", "custom": false, "nullable": false },
+        { "apiName": "PrimaryContactId", "label": "Primary Contact", "dataType": "REFERENCE", "custom": false, "nullable": true },
+        { "apiName": "LegacyDealScore__c", "label": "Legacy Deal Score", "dataType": "NUMBER", "custom": true, "nullable": true },
+        { "apiName": "CompetitorNotes__c", "label": "Competitor Notes", "dataType": "TEXTAREA", "custom": true, "nullable": true }
+      ],
+      "records": [
+        {
+          "id": "OPP-1", "wave": 1, "label": "Kestrel — press line retrofit",
+          "createdAt": "2025-09-01T09:00:00Z", "modifiedAt": "2026-01-10T09:00:00Z", "actor": "jane.okoro@acme-legacy.example",
+          "values": {
+            "Name": "Kestrel — press line retrofit", "Amount": "250000.00", "CurrencyIsoCode": "INR",
+            "CloseDate": "2026-09-30", "StageName": "Proposal", "Probability": "45",
+            "NextStep": "Site survey scheduled", "AccountId": "ACC-1", "PrimaryContactId": "CON-1",
+            "LegacyDealScore__c": "78", "CompetitorNotes__c": "Incumbent vendor under review"
+          }
+        },
+        {
+          "id": "OPP-2", "wave": 1, "label": "Kestrel Fab — CNC cell expansion",
+          "createdAt": "2025-11-14T09:00:00Z", "modifiedAt": "2026-01-10T09:05:00Z", "actor": "jane.okoro@acme-legacy.example",
+          "values": {
+            "Name": "Kestrel Fab — CNC cell expansion", "Amount": "87500.50", "CurrencyIsoCode": "INR",
+            "CloseDate": "2026-08-15", "StageName": "Negotiation", "Probability": "65",
+            "NextStep": "Commercial terms with procurement", "AccountId": "ACC-2", "PrimaryContactId": "CON-2",
+            "LegacyDealScore__c": "84", "CompetitorNotes__c": ""
+          }
+        },
+        {
+          "id": "OPP-3", "wave": 1, "label": "Unattached renewal",
+          "createdAt": "2025-12-02T09:00:00Z", "modifiedAt": "2026-01-10T09:10:00Z", "actor": "sam.reeve@acme-legacy.example",
+          "values": {
+            "Name": "Unattached renewal", "Amount": "42000.00", "CurrencyIsoCode": "INR",
+            "CloseDate": "2026-07-31", "StageName": "Qualifying", "Probability": "20",
+            "NextStep": "", "AccountId": "ACC-902", "PrimaryContactId": "",
+            "LegacyDealScore__c": "31", "CompetitorNotes__c": ""
+          }
+        },
+        {
+          "id": "OPP-4", "wave": 2, "label": "Tessellate — alloy supply agreement",
+          "createdAt": "2026-06-03T09:00:00Z", "modifiedAt": "2026-06-03T09:00:00Z", "actor": "sam.reeve@acme-legacy.example",
+          "values": {
+            "Name": "Tessellate — alloy supply agreement", "Amount": "133000.00", "CurrencyIsoCode": "INR",
+            "CloseDate": "2026-11-20", "StageName": "Qualifying", "Probability": "25",
+            "NextStep": "Technical qualification", "AccountId": "ACC-6", "PrimaryContactId": "CON-5",
+            "LegacyDealScore__c": "58", "CompetitorNotes__c": ""
+          }
+        }
+      ]
+    },
+    {
+      "apiName": "Lead",
+      "label": "Lead",
+      "custom": false,
+      "proposedTarget": "LEAD",
+      "references": {},
+      "fields": [
+        { "apiName": "Id", "label": "Record Id", "dataType": "ID", "custom": false, "nullable": false },
+        { "apiName": "FirstName", "label": "First Name", "dataType": "TEXT", "custom": false, "nullable": false },
+        { "apiName": "LastName", "label": "Last Name", "dataType": "TEXT", "custom": false, "nullable": false },
+        { "apiName": "Company", "label": "Company", "dataType": "TEXT", "custom": false, "nullable": false },
+        { "apiName": "Email", "label": "Email", "dataType": "EMAIL", "custom": false, "nullable": true },
+        { "apiName": "Phone", "label": "Phone", "dataType": "PHONE", "custom": false, "nullable": true },
+        { "apiName": "Title", "label": "Title", "dataType": "TEXT", "custom": false, "nullable": true },
+        { "apiName": "LeadSource", "label": "Lead Source", "dataType": "PICKLIST", "custom": false, "nullable": true },
+        { "apiName": "Rating", "label": "Rating", "dataType": "PICKLIST", "custom": false, "nullable": true },
+        { "apiName": "LegacyCampaignTag__c", "label": "Legacy Campaign Tag", "dataType": "TEXT", "custom": true, "nullable": true }
+      ],
+      "records": [
+        {
+          "id": "LEAD-1", "wave": 1, "label": "Owen Trask — Brightfold Tooling",
+          "createdAt": "2026-01-04T09:00:00Z", "modifiedAt": "2026-01-10T09:20:00Z", "actor": "sam.reeve@acme-legacy.example",
+          "values": {
+            "FirstName": "Owen", "LastName": "Trask", "Company": "Brightfold Tooling",
+            "Email": "owen.trask@brightfold.example", "Phone": "+44 121 555 0188", "Title": "Operations Head",
+            "LeadSource": "TRADE_SHOW", "Rating": "WARM", "LegacyCampaignTag__c": "MACHTOOL-26"
+          }
+        },
+        {
+          "id": "LEAD-2", "wave": 1, "label": "Sana Qureshi — Ridgeline Systems",
+          "createdAt": "2026-01-06T09:00:00Z", "modifiedAt": "2026-01-10T09:21:00Z", "actor": "sam.reeve@acme-legacy.example",
+          "values": {
+            "FirstName": "Sana", "LastName": "Qureshi", "Company": "Ridgeline Systems",
+            "Email": "sana.qureshi@ridgeline.example", "Phone": "+91 80 4444 0122", "Title": "Procurement Lead",
+            "LeadSource": "WEB", "Rating": "HOT", "LegacyCampaignTag__c": "INBOUND-Q1"
+          }
+        }
+      ]
+    },
+    {
+      "apiName": "LegacyServiceNote__c",
+      "label": "Legacy Service Note",
+      "custom": true,
+      "proposedTarget": "ACTIVITY",
+      "references": { "RelatedAccountId": "Account" },
+      "fields": [
+        { "apiName": "Id", "label": "Record Id", "dataType": "ID", "custom": false, "nullable": false },
+        { "apiName": "Subject", "label": "Subject", "dataType": "TEXT", "custom": true, "nullable": false },
+        { "apiName": "Body", "label": "Note Body", "dataType": "TEXTAREA", "custom": true, "nullable": true },
+        { "apiName": "LoggedAt", "label": "Logged At", "dataType": "DATETIME", "custom": true, "nullable": false },
+        { "apiName": "LoggedByName", "label": "Logged By", "dataType": "TEXT", "custom": true, "nullable": true },
+        { "apiName": "RelatedAccountId", "label": "Related Account", "dataType": "REFERENCE", "custom": true, "nullable": false },
+        { "apiName": "LegacyChannel__c", "label": "Legacy Channel", "dataType": "PICKLIST", "custom": true, "nullable": true }
+      ],
+      "records": [
+        {
+          "id": "NOTE-1", "wave": 1, "label": "Annual maintenance review",
+          "createdAt": "2025-05-18T13:20:00Z", "modifiedAt": "2026-01-10T09:30:00Z", "actor": "hina.patel@acme-legacy.example",
+          "values": {
+            "Subject": "Annual maintenance review",
+            "Body": "Reviewed the press line maintenance contract. Customer wants the retrofit quoted before renewal.",
+            "LoggedAt": "2025-05-18T13:20:00Z", "LoggedByName": "Hina Patel",
+            "RelatedAccountId": "ACC-1", "LegacyChannel__c": "ONSITE"
+          },
+          "attachments": [
+            { "fileName": "maintenance-review-2025.pdf", "contentType": "application/pdf", "byteSize": 284310,
+              "externalRef": "acme-legacy://attachment/ATT-9001", "author": "Hina Patel", "createdAt": "2025-05-18T13:25:00Z" }
+          ]
+        },
+        {
+          "id": "NOTE-2", "wave": 1, "label": "CNC cell scoping call",
+          "createdAt": "2025-11-20T10:05:00Z", "modifiedAt": "2026-01-10T09:31:00Z", "actor": "hina.patel@acme-legacy.example",
+          "values": {
+            "Subject": "CNC cell scoping call",
+            "Body": "Scoped the CNC cell expansion. Devan confirmed budget approval sits with group procurement.",
+            "LoggedAt": "2025-11-20T10:05:00Z", "LoggedByName": "Hina Patel",
+            "RelatedAccountId": "ACC-2", "LegacyChannel__c": "PHONE"
+          },
+          "attachments": []
+        },
+        {
+          "id": "NOTE-3", "wave": 1, "label": "Orphaned service escalation",
+          "createdAt": "2025-07-02T08:00:00Z", "modifiedAt": "2026-01-10T09:32:00Z", "actor": "hina.patel@acme-legacy.example",
+          "values": {
+            "Subject": "Orphaned service escalation",
+            "Body": "Escalation logged against an account that no longer exists in the source export.",
+            "LoggedAt": "2025-07-02T08:00:00Z", "LoggedByName": "Hina Patel",
+            "RelatedAccountId": "ACC-903", "LegacyChannel__c": "EMAIL"
+          },
+          "attachments": []
+        }
+      ]
+    }
+  ]
+}

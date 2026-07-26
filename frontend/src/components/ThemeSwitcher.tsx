@@ -11,7 +11,7 @@ import { ChevronIcon, SunMoonIcon } from "./icons";
  * each theme carry a one-line description, which is what actually helps someone
  * choose between two dark themes.
  */
-export type ThemeId = "dark" | "light" | "ironman";
+export type ThemeId = "dark" | "light" | "ironman" | "tron";
 
 export const THEMES: { id: ThemeId; name: string; blurb: string; swatch: string[] }[] = [
   {
@@ -32,12 +32,18 @@ export const THEMES: { id: ThemeId; name: string; blurb: string; swatch: string[
     blurb: "Hot-rod red, gold trim, arc-reactor glow",
     swatch: ["#1a1010", "#5fd3ee", "#f5b32a"],
   },
+  {
+    id: "tron",
+    name: "The Grid",
+    blurb: "True black, circuit traces, emissive cyan",
+    swatch: ["#000000", "#6ff9ff", "#ff7a35"],
+  },
 ];
 
 export const DEFAULT_THEME: ThemeId = "dark";
 
 export function isThemeId(value: unknown): value is ThemeId {
-  return value === "dark" || value === "light" || value === "ironman";
+  return THEMES.some((theme) => theme.id === value);
 }
 
 export function applyTheme(id: ThemeId) {

@@ -1,18 +1,22 @@
+# Axiom CRM — prod profile.
+# Values come from .env.prod at the repository root; the defaults below keep a
+# bare `mvn spring-boot:run` working on a developer machine.
 spring:
   config:
     activate:
       on-profile: prod
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${AXIOM_DB_HOST:localhost}:${AXIOM_DB_PORT:5435}/${AXIOM_DB_NAME:AxiomCRMDB_Prod}}
-    hikari:
-      maximum-pool-size: ${AXIOM_DB_POOL_SIZE:30}
-  jpa:
-    properties:
-      hibernate:
-        format_sql: false
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://${AXIOM_DB_HOST:localhost}:${AXIOM_DB_PORT:5432}/${AXIOM_DB_NAME:AxiomCrmdb_Prod}}
+    username: ${SPRING_DATASOURCE_USERNAME:axiom_app}
+    password: ${SPRING_DATASOURCE_PASSWORD:axiom_app_dev_password}
+  flyway:
+    url: ${FLYWAY_URL:jdbc:postgresql://${AXIOM_DB_HOST:localhost}:${AXIOM_DB_PORT:5432}/${AXIOM_DB_NAME:AxiomCrmdb_Prod}}
+    user: ${FLYWAY_USER:${AXIOM_DB_USER:Axiom}}
+    password: ${FLYWAY_PASSWORD:${AXIOM_DB_PASSWORD:Axiom@12345}}
 
 axiom:
   environment:
     name: prod
-  jwt:
-    ttl-minutes: ${AXIOM_JWT_TTL_MINUTES:60}
+  relay:
+    datasource:
+      url: ${AXIOM_RELAY_DATASOURCE_URL:jdbc:postgresql://${AXIOM_DB_HOST:localhost}:${AXIOM_DB_PORT:5432}/${AXIOM_DB_NAME:AxiomCrmdb_Prod}}
