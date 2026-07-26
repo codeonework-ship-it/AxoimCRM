@@ -1,14 +1,15 @@
 import { Fragment, useMemo, useState, type ReactNode } from "react";
 import {
   createCurrentViewExport,
+  copyGridSnapshot,
   recordCurrentViewExportAudit,
   saveDownloadedFile,
-  writeClipboardText,
   type GridExportContext,
   type GridExportFormat,
   type GridExportRow,
 } from "./DataGridToolbar";
 import { AuditDrawer } from "./AuditDrawer";
+import { GridFilterRow } from "./GridFilterRow";
 import { GroupColumnPicker } from "./GroupColumnPicker";
 import { InfoTag } from "./InfoTag";
 import { useToasts } from "./Toasts";
@@ -88,16 +89,6 @@ function text(value: CellValue): string {
   if (value === null || value === undefined) return "";
   if (typeof value === "boolean") return value ? "Yes" : "No";
   return String(value);
-}
-
-function formatDateTime(value: Date): string {
-  return value.toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
 }
 
 function slug(value: string): string {
@@ -263,10 +254,14 @@ export function DataTable<T>({
 
   async function copyTableView() {
     try {
-      await writeClipboardText(tableViewSummaryText());
-      toasts.push("info", "Table view copied", "Paste it into a ticket, chat or audit note to describe this exact table view.");
+      const result = await copyGridSnapshot(tableExportRows(), tableExportContext(), `${slug(name)}-table-view-snapshot`);
+      if (result === "clipboard") {
+        toasts.push("info", "Grid snapshot copied", "The image includes the current columns, rows, filters, grouping, sort and timestamp.");
+      } else {
+        toasts.push("info", "Grid snapshot downloaded", "This browser blocked image clipboard access, so the complete PNG snapshot was downloaded instead.");
+      }
     } catch (error) {
-      toasts.push("error", "Table view not copied", error instanceof Error ? error.message : "Clipboard is unavailable.");
+      toasts.push("error", "Grid snapshot not created", error instanceof Error ? error.message : "The snapshot could not be created.");
     }
   }
 
@@ -307,19 +302,6 @@ export function DataTable<T>({
       ],
       filters: activeFilters.map((filter) => ({ label: filter.label, value: filter.value })),
     };
-  }
-
-  function tableViewSummaryText(): string {
-    const context = tableExportContext();
-    return [
-      context.title ?? `${name} table view`,
-      `Generated: ${formatDateTime(context.generatedAt ?? new Date())}`,
-      `Rows: ${sorted.length}${sorted.length !== rows.length ? ` of ${rows.length}` : ""}`,
-      `Groups: ${groupColumns.length ? groupColumns.map((column) => column.header).join(" > ") : "None"}`,
-      `Collapsed groups: ${collapsed.size}`,
-      `Sort: ${sortColumn ? `${sortColumn.header} ${sort?.direction === 1 ? "ascending" : "descending"}` : "None"}`,
-      `Column filters: ${activeFilters.length ? activeFilters.map((filter) => `${filter.label}: ${filter.value}`).join("; ") : "None"}`,
-    ].join("\n");
   }
 
   function tableViewScope(): string {
@@ -367,64 +349,76 @@ export function DataTable<T>({
         </div>
         <span className="grid-view-summary" aria-live="polite">{tableViewScope()}</span>
       </header>
-      <div className="page-controls">
-        <div>
-          <button
-            type="button"
-            className="btn btn-sm"
-            aria-expanded={filtersOpen}
-            onClick={() => setFiltersOpen((open) => !open)}
-          >
-            {filtersOpen ? "Hide column filters" : "Column filters"}
-            {activeFilterCount > 0 && <span className="chip">{activeFilterCount}</span>}
-          </button>
-          <GroupColumnPicker
-            id={`${name}-group-by`}
-            columns={columns.filter((column) => column.groupable !== false).map((column) => ({ key: column.key, label: column.header }))}
-            selected={groupBy}
-            onChange={(next) => {
-              setGroupBy(next);
-              setCollapsed(new Set());
-            }}
-            helpText="Tick the columns you want to group by. Rows will be grouped using the selected columns in the order you picked them."
-          />
-          {(activeFilterCount > 0 || groupBy.length > 0 || sort) && (
+      {/*
+        The same Actions / Group rows every other data workspace uses. This
+        table previously laid its controls out as one flex line with the group
+        picker embedded among the buttons, which put its label at a different
+        left edge from the identical picker on the pages beside it.
+      */}
+      <div className="data-grid-tools-stack">
+        <div className="grid-tool-row" role="toolbar" aria-label={`${name} table tools`}>
+          <div className="grid-tool-label"><span>Actions</span></div>
+          <div className="grid-tool-controls">
             <button
               type="button"
-              className="link-btn"
-              onClick={() => {
-                setFilters({});
-                setGroupBy([]);
-                setSort(null);
-                setCollapsed(new Set());
-              }}
+              className="btn btn-sm"
+              aria-expanded={filtersOpen}
+              onClick={() => setFiltersOpen((open) => !open)}
             >
-              Reset view
+              {filtersOpen ? "Hide column filters" : "Column filters"}
+              {activeFilterCount > 0 && <span className="chip">{activeFilterCount}</span>}
             </button>
-          )}
-          <button type="button" className="btn btn-sm" onClick={() => void exportTableView("XLSX")}>
-            Export Excel
-          </button>
-          <button type="button" className="btn btn-sm" onClick={() => void exportTableView("DOCX")}>
-            Export Word
-          </button>
-          <button type="button" className="btn btn-sm" onClick={() => void exportTableView("PDF")}>
-            Export PDF
-          </button>
-          <button type="button" className="btn btn-sm" onClick={() => void copyTableView()}>
-            Copy view
-          </button>
-          <button type="button" className="btn btn-sm" onClick={() => setAuditOpen(true)}>
-            Audit
-          </button>
-          <button type="button" className="btn btn-sm" onClick={() => setFull((value) => !value)}>
-            {full ? "Restore view" : "Full size"}
-          </button>
+            <span className="toolbar-divider" aria-hidden />
+            <button type="button" className="btn btn-sm" onClick={() => void exportTableView("XLSX")}>
+              Export Excel
+            </button>
+            <button type="button" className="btn btn-sm" onClick={() => void exportTableView("DOCX")}>
+              Export Word
+            </button>
+            <button type="button" className="btn btn-sm" onClick={() => void exportTableView("PDF")}>
+              Export PDF
+            </button>
+            <button type="button" className="btn btn-sm" onClick={() => void copyTableView()}>
+              Copy view
+            </button>
+            <button type="button" className="btn btn-sm" onClick={() => setAuditOpen(true)}>
+              Audit
+            </button>
+            <button type="button" className="btn btn-sm" onClick={() => setFull((value) => !value)}>
+              {full ? "Restore view" : "Full size"}
+            </button>
+          </div>
+          <div className="grid-tool-trailing">
+            {(activeFilterCount > 0 || groupBy.length > 0 || sort) && (
+              <button
+                type="button"
+                className="link-btn"
+                onClick={() => {
+                  setFilters({});
+                  setGroupBy([]);
+                  setSort(null);
+                  setCollapsed(new Set());
+                }}
+              >
+                Reset view
+              </button>
+            )}
+            <span className="count">
+              {sorted.length}
+              {sorted.length !== rows.length ? ` of ${rows.length}` : ""} rows
+            </span>
+          </div>
         </div>
-        <span className="count">
-          {sorted.length}
-          {sorted.length !== rows.length ? ` of ${rows.length}` : ""} rows
-        </span>
+        <GroupColumnPicker
+          id={`${name}-group-by`}
+          columns={columns.filter((column) => column.groupable !== false).map((column) => ({ key: column.key, label: column.header }))}
+          selected={groupBy}
+          onChange={(next) => {
+            setGroupBy(next);
+            setCollapsed(new Set());
+          }}
+          helpText="Tick the columns you want to group by. Rows will be grouped using the selected columns in the order you picked them."
+        />
       </div>
 
       {activeFilters.length > 0 && (
@@ -473,49 +467,23 @@ export function DataTable<T>({
               })}
               {actions && <th className="table-action">{actionsHeader}</th>}
             </tr>
+            {/*
+              The same in-header filter row every other grid now uses. This
+              table had its own copy inline; sharing it means "contains" is
+              defined in exactly one place rather than once per table.
+            */}
             {filtersOpen && (
-              <tr>
-                {columns.map((column) => (
-                  <th key={column.key}>
-                    {column.filter === "none" ? null : column.filter === "boolean" ? (
-                      <select
-                        aria-label={`Filter ${column.header}`}
-                        title={`Show rows where ${column.header} is yes, no, or any value.`}
-                        value={filters[column.key] ?? "any"}
-                        onChange={(event) => setFilter(column.key, event.target.value)}
-                      >
-                        <option value="any">Any</option>
-                        <option value="yes">Yes</option>
-                        <option value="no">No</option>
-                      </select>
-                    ) : column.filter === "enum" ? (
-                      <select
-                        aria-label={`Filter ${column.header}`}
-                        title={`Show rows where ${column.header} matches one option.`}
-                        value={filters[column.key] ?? ""}
-                        onChange={(event) => setFilter(column.key, event.target.value)}
-                      >
-                        <option value="">Any</option>
-                        {(enumOptions[column.key] ?? []).map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        type="search"
-                        aria-label={`Filter ${column.header}`}
-                        title={`Type text to show rows where ${column.header} contains it.`}
-                        placeholder="contains"
-                        value={filters[column.key] ?? ""}
-                        onChange={(event) => setFilter(column.key, event.target.value)}
-                      />
-                    )}
-                  </th>
-                ))}
-                {actions && <th className="table-action" />}
-              </tr>
+              <GridFilterRow
+                columns={columns.map((column) => ({
+                  key: column.key,
+                  label: column.header,
+                  kind: column.filter ?? "text",
+                  options: enumOptions[column.key] ?? [],
+                }))}
+                filters={filters}
+                onChange={setFilters}
+                trailing={actions ? 1 : 0}
+              />
             )}
           </thead>
           <tbody>

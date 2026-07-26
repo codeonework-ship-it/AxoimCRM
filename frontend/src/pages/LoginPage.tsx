@@ -1,14 +1,18 @@
 import { useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
-import { ApiError, isUnreachable } from "../api/client";
+import { api, ApiError, isUnreachable } from "../api/client";
 import { beginSso, discoverIdp, type IdpRoute } from "../api/access";
 import { InlineLoader } from "../components/Loaders";
-import { applyTheme, DEFAULT_THEME, isThemeId, THEMES, type ThemeId } from "../components/ThemeSwitcher";
+import {
+  applyTheme, DEFAULT_THEME, FALLBACK_THEMES, isThemeId, type ThemeId,
+} from "../components/ThemeSwitcher";
 import { TrialRequestDialog } from "./TrialRequestDialog";
 import { InfoLabel } from "../components/InfoTag";
 
 type Mode = "choose" | "credentials";
+const DEFAULT_TENANT_SLUG = (import.meta.env.VITE_DEFAULT_TENANT_SLUG as string | undefined)?.trim() || "meridian";
 
 export function LoginPage() {
   const { login, isAuthenticated } = useAuth();
@@ -16,7 +20,6 @@ export function LoginPage() {
   const location = useLocation();
 
   const [mode, setMode] = useState<Mode>("choose");
-  const [tenantSlug, setTenantSlug] = useState("meridian");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +31,24 @@ export function LoginPage() {
     const current = document.documentElement.dataset.theme;
     return isThemeId(current) ? current : DEFAULT_THEME;
   });
+
+  /*
+   * The catalogue comes from the public route: there is no token on this screen,
+   * so there is no preference to read — only the list of what exists. A theme
+   * picked here is cached in the browser and attached to the user by the
+   * TopBar switcher once they are signed in.
+   *
+   * The fallback pair keeps the strip usable when the API is unreachable, which
+   * on the SIGN-IN screen is the likely case rather than an edge one: this is
+   * exactly where someone lands when the backend is down.
+   */
+  const themesQ = useQuery({
+    queryKey: ["public-ui-themes"],
+    queryFn: api.publicUiThemes,
+    staleTime: 30 * 60 * 1000,
+    retry: 1,
+  });
+  const themes = themesQ.data ?? FALLBACK_THEMES;
 
   if (isAuthenticated) return <Navigate to="/" replace />;
 
@@ -53,11 +74,11 @@ export function LoginPage() {
     setError(null);
     setNotice(null);
     try {
-      const route = await discoverIdp(tenantSlug.trim(), email.trim());
+      const route = await discoverIdp(DEFAULT_TENANT_SLUG, email.trim());
       if (!route) {
         setMode("credentials");
         setNotice(
-          `No single sign-on is configured for “${tenantSlug.trim()}”. Sign in with your Axiom credentials instead.`,
+          "No single sign-on is configured for this account. Sign in with your Axiom credentials instead.",
         );
         return;
       }
@@ -67,7 +88,7 @@ export function LoginPage() {
         setNotice(route.message);
         return;
       }
-      const { redirectUrl } = await beginSso(route.id, tenantSlug.trim());
+      const { redirectUrl } = await beginSso(route.id, DEFAULT_TENANT_SLUG);
       window.location.assign(redirectUrl);
     } catch (err) {
       setMode("credentials");
@@ -86,7 +107,7 @@ export function LoginPage() {
     setError(null);
     setBusy(true);
     try {
-      await login({ tenantSlug: tenantSlug.trim(), email: email.trim(), password });
+      await login({ tenantSlug: DEFAULT_TENANT_SLUG, email: email.trim(), password });
       sessionStorage.setItem("axiom.tronLoginLoader", "1");
       const from = (location.state as { from?: string } | null)?.from ?? "/";
       navigate(from, { replace: true });
@@ -167,7 +188,7 @@ export function LoginPage() {
       {/* ---- Right: one task — get in ---- */}
       <section className="login-form-side app-ground">
         <div className="login-card">
-          <span className="eyebrow">Secure workspace</span>
+          <span className="eyebrow">Secure access</span>
           <h2>Sign in to Axiom</h2>
 
           {notice && <p className="form-notice" role="status">{notice}</p>}
@@ -181,11 +202,6 @@ export function LoginPage() {
               </p>
 
               <form onSubmit={continueWithSso}>
-                <div className="field">
-                  <InfoLabel className="label" htmlFor="tenant">Workspace</InfoLabel>
-                  <input id="tenant" value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)}
-                    autoComplete="organization" required />
-                </div>
                 <div className="field">
                   <InfoLabel className="label" htmlFor="sso-email">Work email</InfoLabel>
                   <input id="sso-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
@@ -207,16 +223,9 @@ export function LoginPage() {
             </>
           ) : (
             <>
-              <p className="sub">
-                Use your workspace credentials. The demo workspace is <strong>meridian</strong>.
-              </p>
+              <p className="sub">Use your Axiom credentials to continue.</p>
 
               <form onSubmit={signIn}>
-                <div className="field">
-                  <InfoLabel className="label" htmlFor="c-tenant">Workspace</InfoLabel>
-                  <input id="c-tenant" value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)}
-                    autoComplete="organization" required />
-                </div>
                 <div className="field">
                   <InfoLabel className="label" htmlFor="c-email">Email</InfoLabel>
                   <input id="c-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)}
@@ -241,7 +250,7 @@ export function LoginPage() {
 
           <div className="login-trial">
             <span className="eyebrow">No account yet?</span>
-            <p>Evaluate the full product for 30 days with your own workspace and demo data.</p>
+            <p>Evaluate the full product for 30 days with an isolated company environment and demo data.</p>
             <button className="btn btn-block" type="button" onClick={() => setTrialOpen(true)}>
               Request 30-day trial access
             </button>
@@ -250,19 +259,22 @@ export function LoginPage() {
       </section>
 
       <div className="login-theme-strip" aria-label="Theme selection">
-        {THEMES.map((theme) => (
+        {themes.map((theme) => (
           <button
-            key={theme.id}
+            key={theme.code}
             type="button"
-            className={`login-theme-chip${theme.id === activeTheme ? " is-active" : ""}`}
+            className={`login-theme-chip${theme.code === activeTheme ? " is-active" : ""}`}
             aria-label={`Use ${theme.name} theme`}
-            aria-pressed={theme.id === activeTheme}
+            aria-pressed={theme.code === activeTheme}
             title={theme.name}
-            onClick={() => chooseTheme(theme.id)}
+            onClick={() => chooseTheme(theme.code)}
           >
             <span className="theme-swatch" aria-hidden>
-              {theme.swatch.map((colour) => (
-                <i key={colour} style={{ background: colour }} />
+              {/* Keyed by position, not by colour: two stops in one swatch can
+                  legitimately be the same hex, and a duplicate key would drop
+                  one of them. */}
+              {theme.swatch.map((colour, index) => (
+                <i key={`${theme.code}-${index}`} style={{ background: colour }} />
               ))}
             </span>
           </button>

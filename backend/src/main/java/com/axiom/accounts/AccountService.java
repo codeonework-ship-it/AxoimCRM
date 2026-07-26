@@ -131,6 +131,11 @@ public class AccountService {
 
     @Transactional(readOnly = true)
     public AccountDetail get(UUID id) {
+        RecordAccess.Scope scope = RecordAccess.current();
+        List<Object> args = new ArrayList<>();
+        args.add(TenantContext.get().tenantId());
+        args.add(id);
+        String ownerFilter = scope.ownerPredicate("a.owner_id", args);
         try {
             return jdbc.queryForObject("""
                     select %s
@@ -139,7 +144,7 @@ public class AccountService {
                     left join crm.account up on up.tenant_id = a.tenant_id and up.id = a.ultimate_parent_id
                     left join identity.app_user u on u.tenant_id = a.tenant_id and u.id = a.owner_id
                     where a.tenant_id = ? and a.id = ? and a.deleted_at is null
-                    """.formatted(DETAIL_COLUMNS), detailMapper(), TenantContext.get().tenantId(), id);
+                    """.formatted(DETAIL_COLUMNS) + ownerFilter, detailMapper(), args.toArray());
         } catch (EmptyResultDataAccessException ex) {
             throw new NotFoundException("Account not found, or it has been merged away or deleted");
         }

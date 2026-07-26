@@ -155,6 +155,8 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
 
   // ---------------------------------------------------------------- SSO state
   const idpQ = useQuery({ queryKey: ["access", "idp"], queryFn: idpApi.list, enabled: canConfigureSso, retry: 1 });
+  const certificateAlertsQ = useQuery({ queryKey: ["access", "idp", "certificate-alerts"],
+    queryFn: idpApi.certificateAlerts, enabled: canConfigureSso, retry: 1 });
   const [idpDraft, setIdpDraft] = useState(EMPTY_IDP);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [attributeText, setAttributeText] = useState("email=email\ndisplayName=name");
@@ -225,6 +227,17 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
     mutationFn: () => idpApi.route(routeProbe.trim()),
     onSuccess: (answer) => setRouteAnswer(answer.note),
     onError: (error) => handle("Routing check failed", error),
+  });
+  const sweepCertificates = useMutation({
+    mutationFn: idpApi.sweepCertificateAlerts,
+    onSuccess: (result) => {
+      toasts.push("info", "Certificate control completed", result.alertsCreated
+        ? `${result.alertsCreated} new administrator warning(s) were created.`
+        : "No new warnings were needed; previous warnings remain deduplicated.");
+      void certificateAlertsQ.refetch();
+      void queryClient.invalidateQueries({ queryKey: ["notifications"] });
+    },
+    onError: (error) => toasts.push("error", "Certificate control failed", messageOf(error)),
   });
 
   function editIdp(row: IdpConfig) {
@@ -400,6 +413,10 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
         && <p className="empty-note">No identity provider is configured. Users sign in with their Axiom password.</p>}
 
       {idpQ.isSuccess && idpQ.data.length > 0 && <div className="panel" style={{ padding: 16, marginBottom: 14 }}>
+        <div className="page-head compact-head"><div><span className="eyebrow">Certificate readiness</span>
+          <p>Enabled SAML providers are checked daily. Run the same idempotent check now after rotating a certificate.</p></div>
+          <button type="button" className="btn btn-sm" disabled={sweepCertificates.isPending}
+            onClick={() => sweepCertificates.mutate()}>{sweepCertificates.isPending ? "Checking..." : "Check certificate expiry"}</button></div>
         <div className="table-wrap"><table className="data-table">
           <thead><tr>
             <th>Provider</th><th>Protocol</th><th>Routes</th><th>State</th>
@@ -432,6 +449,13 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
             </tr>
           </Fragment>)}</tbody>
         </table></div>
+      </div>}
+      {certificateAlertsQ.isSuccess && certificateAlertsQ.data.length > 0 && <div className="panel" style={{ padding: 16, marginBottom: 14 }}>
+        <span className="eyebrow">Recent certificate alerts</span>
+        <div className="table-wrap"><table className="data-table"><thead><tr><th>Provider</th><th>Severity</th><th>Certificate expiry</th><th>Administrators notified</th></tr></thead>
+          <tbody>{certificateAlertsQ.data.map((alert) => <tr key={alert.id}><td>{alert.providerName}</td>
+            <td><span className={alert.severity === "EXPIRED" ? "chip chip-crit" : "chip chip-in_approval"}>{alert.severity}</span></td>
+            <td>{when(alert.certificateNotAfter)}</td><td>{alert.recipientCount}</td></tr>)}</tbody></table></div>
       </div>}
 
       {testIdp.isPending && <LoaderStatus label="Checking provider configuration" />}

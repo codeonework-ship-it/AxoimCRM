@@ -6,6 +6,7 @@ import { useAuth } from "../auth/AuthContext";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataGridToolbar } from "../components/DataGridToolbar";
 import { DataViewFrame } from "../components/DataViewFrame";
+import { GridFilterRow, type GridFilterColumn } from "../components/GridFilterRow";
 import { InfoTag } from "../components/InfoTag";
 import { useToasts } from "../components/Toasts";
 import { formatDate, formatMoney } from "../lib/format";
@@ -52,6 +53,63 @@ const ADMIN_GROUP_COLUMNS: Record<string, GroupColumn<any>[]> = {
     { key: "payment", label: "Payment status", value: (row) => row.paymentStatus },
     { key: "plan", label: "Plan", value: (row) => row.planCode },
     { key: "billingEmail", label: "Billing email", value: (row) => row.billingEmail },
+  ],
+};
+
+/**
+ * Filter columns per admin table, one entry per rendered column in render order.
+ *
+ * <p>Separate from ADMIN_GROUP_COLUMNS above because the two lists answer
+ * different questions. Grouping keys off any value; an in-header filter must
+ * match the header cells one-for-one, in the order the table draws them, or
+ * every cell after the first mismatch sits under the wrong column. The Users
+ * table renders Name, Email, Tenant, Role, Status — note that Tenant and Role
+ * are the other way round in the group list, which is exactly the kind of
+ * silent misalignment a shared list would have produced. Permission columns and
+ * computed amounts are `none`: they hold their cell so the row stays in step.
+ */
+const ADMIN_FILTER_COLUMNS: Record<string, GridFilterColumn[]> = {
+  users: [
+    { key: "name", label: "Name" },
+    { key: "email", label: "Email" },
+    { key: "tenant", label: "Tenant" },
+    { key: "role", label: "Role" },
+    { key: "status", label: "Status" },
+  ],
+  rbac: [
+    { key: "screen", label: "Screen" },
+    { key: "module", label: "Module" },
+    { key: "route", label: "Route" },
+    { key: "read", label: "Read", kind: "none" },
+    { key: "write", label: "Write", kind: "none" },
+    { key: "export", label: "Export", kind: "none" },
+    { key: "admin", label: "Admin", kind: "none" },
+  ],
+  trials: [
+    { key: "tenant", label: "Company" },
+    { key: "status", label: "Account status" },
+    { key: "trialEnd", label: "Trial end" },
+    { key: "extensions", label: "Extensions", kind: "none" },
+  ],
+  companies: [
+    { key: "company", label: "Company" },
+    { key: "workspace", label: "Workspace" },
+    { key: "status", label: "Account status" },
+    { key: "reason", label: "Reason", kind: "none" },
+  ],
+  billing: [
+    { key: "company", label: "Company" },
+    { key: "plan", label: "Plan" },
+    { key: "payment", label: "Payment" },
+    { key: "billingEmail", label: "Billing email" },
+    { key: "invoice", label: "Invoice", kind: "none" },
+    { key: "amount", label: "Amount", kind: "none" },
+    { key: "due", label: "Due", kind: "none" },
+  ],
+  alerts: [
+    { key: "name", label: "Name" },
+    { key: "subject", label: "Subject" },
+    { key: "recipientsOrReport", label: "Recipients / report", kind: "none" },
   ],
 };
 
@@ -217,7 +275,6 @@ export function AdminPage() {
         groupColumns={ADMIN_GROUP_COLUMNS.users.map(({ key, label }) => ({ key, label }))}
         selectedGroupColumns={groupedTabs.users ?? []}
         onGroupColumnsChange={(next) => setTabGroups("users", next)}
-        filterColumns={ADMIN_GROUP_COLUMNS.users.map(({ key, label }) => ({ key, label }))}
         columnFilters={columnFiltersByTab.users ?? {}}
         onColumnFiltersChange={(next) => setTabFilters("users", next)}
         auditEntityType="APP_USER"
@@ -239,7 +296,8 @@ export function AdminPage() {
         <InfoInput info="A temporary password for the user's first sign-in." value={userDraft.password} onChange={(event) => setUserDraft((v) => ({ ...v, password: event.target.value }))} placeholder="Initial password" />
         <button className="btn btn-primary btn-sm" disabled={createUser.isPending} onClick={() => createUser.mutate()}>Create user</button>
       </div>}
-      <div className="table-wrap"><table className="data-table"><thead><tr><th>Name</th><th>Email</th><th>Tenant</th><th>Role</th><th>Status</th>{!readOnly && <th className="table-action">Action</th>}</tr></thead>
+      <div className="table-wrap"><table className="data-table"><thead><tr><th>Name</th><th>Email</th><th>Tenant</th><th>Role</th><th>Status</th>{!readOnly && <th className="table-action">Action</th>}</tr>
+        <GridFilterRow columns={ADMIN_FILTER_COLUMNS.users} filters={columnFiltersByTab.users ?? {}} onChange={(next) => setTabFilters("users", next)} trailing={readOnly ? 0 : 1} /></thead>
         <tbody>{users.map((row, index, all) => <Fragment key={row.id}>
           {selectedGroupColumns(ADMIN_GROUP_COLUMNS.users, groupedTabs.users ?? []).length > 0 && groupChangedBySelection(index, all, selectedGroupColumns(ADMIN_GROUP_COLUMNS.users, groupedTabs.users ?? [])) && <tr className="group-row"><th colSpan={readOnly ? 5 : 6}>{groupLabelFor(row, selectedGroupColumns(ADMIN_GROUP_COLUMNS.users, groupedTabs.users ?? []))}</th></tr>}
           <tr><td>{row.displayName}</td><td>{row.email}</td><td>{row.tenantName}</td><td>{row.role}</td><td>{row.active ? "Active" : "Inactive"}</td>{!readOnly && <td className="table-action">{!row.platformUser && <button className="link-btn" onClick={() => activeUser.mutate({ id: row.id, active: !row.active })}>{row.active ? "Inactivate" : "Activate"}</button>}</td>}</tr>
@@ -257,7 +315,6 @@ export function AdminPage() {
         groupColumns={ADMIN_GROUP_COLUMNS.rbac.map(({ key, label }) => ({ key, label }))}
         selectedGroupColumns={groupedTabs.rbac ?? []}
         onGroupColumnsChange={(next) => setTabGroups("rbac", next)}
-        filterColumns={ADMIN_GROUP_COLUMNS.rbac.map(({ key, label }) => ({ key, label }))}
         columnFilters={columnFiltersByTab.rbac ?? {}}
         onColumnFiltersChange={(next) => setTabFilters("rbac", next)}
         auditEntityType="SCREEN_POLICY"
@@ -276,7 +333,8 @@ export function AdminPage() {
       />}
     >
       <div className="role-card-grid">{rolesQ.data?.map((role) => <article className="role-card" key={role.code}><strong>{role.code}</strong><span>{role.scope}</span><p>{role.description}</p></article>)}</div>
-      <div className="table-wrap"><table className="data-table"><thead><tr><th>Screen</th><th>Module</th><th>Route</th><th>Read</th><th>Write</th><th>Export</th><th>Admin</th></tr></thead>
+      <div className="table-wrap"><table className="data-table"><thead><tr><th>Screen</th><th>Module</th><th>Route</th><th>Read</th><th>Write</th><th>Export</th><th>Admin</th></tr>
+        <GridFilterRow columns={ADMIN_FILTER_COLUMNS.rbac} filters={columnFiltersByTab.rbac ?? {}} onChange={(next) => setTabFilters("rbac", next)} trailing={0} /></thead>
         <tbody>{policies.map((p, index, all) => <Fragment key={`${p.roleCode}-${p.screenCode}`}>
           {selectedGroupColumns(ADMIN_GROUP_COLUMNS.rbac, groupedTabs.rbac ?? []).length > 0 && groupChangedBySelection(index, all, selectedGroupColumns(ADMIN_GROUP_COLUMNS.rbac, groupedTabs.rbac ?? [])) && <tr className="group-row"><th colSpan={7}>{groupLabelFor(p, selectedGroupColumns(ADMIN_GROUP_COLUMNS.rbac, groupedTabs.rbac ?? []))}</th></tr>}
           <tr><td>{p.displayName}</td><td>{p.moduleCode}</td><td>{p.route}</td><td>{p.canRead ? "Yes" : "No"}</td><td>{p.canWrite ? "Yes" : "No"}</td><td>{p.canExport ? "Yes" : "No"}</td><td>{p.canAdmin ? "Yes" : "No"}</td></tr>
@@ -294,7 +352,6 @@ export function AdminPage() {
         groupColumns={ADMIN_GROUP_COLUMNS.alerts.map(({ key, label }) => ({ key, label }))}
         selectedGroupColumns={groupedTabs.alerts ?? []}
         onGroupColumnsChange={(next) => setTabGroups("alerts", next)}
-        filterColumns={ADMIN_GROUP_COLUMNS.alerts.map(({ key, label }) => ({ key, label }))}
         columnFilters={columnFiltersByTab.alerts ?? {}}
         onColumnFiltersChange={(next) => setTabFilters("alerts", next)}
         auditEntityType="ALERT_CONFIGURATION"
@@ -332,8 +389,8 @@ export function AdminPage() {
         </section>
       </div>}
       <div className="alert-config-grid">
-        <AlertTable title="Email alerts" rows={emailAlertsQ.data?.filter((row) => visibleEmailAlertKeys.has(`${row.name}|${row.subject}`)).map((row) => ({ id: row.id, name: row.name, subject: row.subject, detail: row.to.join(", "), action: () => sendEmail.mutate(row.id) })) ?? []} readOnly={readOnly} />
-        <AlertTable title="Report alerts" rows={reportAlertsQ.data?.filter((row) => visibleReportAlertKeys.has(`${row.name}|${row.subject}`)).map((row) => ({ id: row.id, name: row.name, subject: row.subject, detail: `${row.reportLabel} · ${row.formats.join(", ")}`, action: () => sendReport.mutate(row.id) })) ?? []} readOnly={readOnly} />
+        <AlertTable title="Email alerts" rows={emailAlertsQ.data?.filter((row) => visibleEmailAlertKeys.has(`${row.name}|${row.subject}`)).map((row) => ({ id: row.id, name: row.name, subject: row.subject, detail: row.to.join(", "), action: () => sendEmail.mutate(row.id) })) ?? []} readOnly={readOnly} filters={columnFiltersByTab.alerts ?? {}} onFiltersChange={(next) => setTabFilters("alerts", next)} />
+        <AlertTable title="Report alerts" rows={reportAlertsQ.data?.filter((row) => visibleReportAlertKeys.has(`${row.name}|${row.subject}`)).map((row) => ({ id: row.id, name: row.name, subject: row.subject, detail: `${row.reportLabel} · ${row.formats.join(", ")}`, action: () => sendReport.mutate(row.id) })) ?? []} readOnly={readOnly} filters={columnFiltersByTab.alerts ?? {}} onFiltersChange={(next) => setTabFilters("alerts", next)} />
       </div>
     </DataViewFrame>}
 
@@ -347,7 +404,6 @@ export function AdminPage() {
         groupColumns={ADMIN_GROUP_COLUMNS.trials.map(({ key, label }) => ({ key, label }))}
         selectedGroupColumns={groupedTabs.trials ?? []}
         onGroupColumnsChange={(next) => setTabGroups("trials", next)}
-        filterColumns={ADMIN_GROUP_COLUMNS.trials.map(({ key, label }) => ({ key, label }))}
         columnFilters={columnFiltersByTab.trials ?? {}}
         onColumnFiltersChange={(next) => setTabFilters("trials", next)}
         auditEntityType="TRIAL_ACCOUNT"
@@ -362,7 +418,8 @@ export function AdminPage() {
         }))}
       />}
     >
-      <div className="table-wrap"><table className="data-table"><thead><tr><th>Company</th><th>Status</th><th>Trial end</th><th>Extensions</th>{!readOnly && <th className="table-action">Action</th>}</tr></thead>
+      <div className="table-wrap"><table className="data-table"><thead><tr><th>Company</th><th>Status</th><th>Trial end</th><th>Extensions</th>{!readOnly && <th className="table-action">Action</th>}</tr>
+        <GridFilterRow columns={ADMIN_FILTER_COLUMNS.trials} filters={columnFiltersByTab.trials ?? {}} onChange={(next) => setTabFilters("trials", next)} trailing={readOnly ? 0 : 1} /></thead>
         <tbody>{companies.map((row, index, all) => <Fragment key={row.tenantId}>
           {selectedGroupColumns(ADMIN_GROUP_COLUMNS.trials, groupedTabs.trials ?? []).length > 0 && groupChangedBySelection(index, all, selectedGroupColumns(ADMIN_GROUP_COLUMNS.trials, groupedTabs.trials ?? [])) && <tr className="group-row"><th colSpan={readOnly ? 4 : 5}>{groupLabelFor(row, selectedGroupColumns(ADMIN_GROUP_COLUMNS.trials, groupedTabs.trials ?? []))}</th></tr>}
           <tr><td>{row.tenantName}</td><td>{row.accountStatus}</td><td>{formatDate(row.trialEndsAt)}</td><td>{row.trialExtensionCount} / {row.maxTrialExtensionDays} days max</td>{!readOnly && <td className="table-action"><button className="link-btn" onClick={() => extendTrial.mutate(row.tenantId)}>Extend 7d</button></td>}</tr>
@@ -380,7 +437,6 @@ export function AdminPage() {
         groupColumns={ADMIN_GROUP_COLUMNS.companies.map(({ key, label }) => ({ key, label }))}
         selectedGroupColumns={groupedTabs.companies ?? []}
         onGroupColumnsChange={(next) => setTabGroups("companies", next)}
-        filterColumns={ADMIN_GROUP_COLUMNS.companies.map(({ key, label }) => ({ key, label }))}
         columnFilters={columnFiltersByTab.companies ?? {}}
         onColumnFiltersChange={(next) => setTabFilters("companies", next)}
         auditEntityType="COMPANY_ACCOUNT"
@@ -395,7 +451,8 @@ export function AdminPage() {
         }))}
       />}
     >
-      <div className="table-wrap"><table className="data-table"><thead><tr><th>Company</th><th>Workspace</th><th>Status</th><th>Reason</th>{!readOnly && <th className="table-action">Action</th>}</tr></thead>
+      <div className="table-wrap"><table className="data-table"><thead><tr><th>Company</th><th>Workspace</th><th>Status</th><th>Reason</th>{!readOnly && <th className="table-action">Action</th>}</tr>
+        <GridFilterRow columns={ADMIN_FILTER_COLUMNS.companies} filters={columnFiltersByTab.companies ?? {}} onChange={(next) => setTabFilters("companies", next)} trailing={readOnly ? 0 : 1} /></thead>
         <tbody>{companies.map((row, index, all) => <Fragment key={row.tenantId}>
           {selectedGroupColumns(ADMIN_GROUP_COLUMNS.companies, groupedTabs.companies ?? []).length > 0 && groupChangedBySelection(index, all, selectedGroupColumns(ADMIN_GROUP_COLUMNS.companies, groupedTabs.companies ?? [])) && <tr className="group-row"><th colSpan={readOnly ? 4 : 5}>{groupLabelFor(row, selectedGroupColumns(ADMIN_GROUP_COLUMNS.companies, groupedTabs.companies ?? []))}</th></tr>}
           <tr><td>{row.legalName}</td><td>{row.tenantSlug}</td><td>{row.accountStatus}</td><td>{row.inactiveReason ?? "-"}</td>{!readOnly && <td className="table-action company-actions"><button className="link-btn" onClick={() => companyStatus.mutate({ tenantId: row.tenantId, status: "ACTIVE" })}>Active</button><button className="link-btn danger-link" onClick={() => companyStatus.mutate({ tenantId: row.tenantId, status: "PAST_DUE" })}>Past due</button></td>}</tr>
@@ -413,7 +470,6 @@ export function AdminPage() {
         groupColumns={ADMIN_GROUP_COLUMNS.billing.map(({ key, label }) => ({ key, label }))}
         selectedGroupColumns={groupedTabs.billing ?? []}
         onGroupColumnsChange={(next) => setTabGroups("billing", next)}
-        filterColumns={ADMIN_GROUP_COLUMNS.billing.map(({ key, label }) => ({ key, label }))}
         columnFilters={columnFiltersByTab.billing ?? {}}
         onColumnFiltersChange={(next) => setTabFilters("billing", next)}
         auditEntityType="BILLING_ACCOUNT"
@@ -431,7 +487,8 @@ export function AdminPage() {
         }))}
       />}
     >
-      <div className="table-wrap"><table className="data-table"><thead><tr><th>Company</th><th>Plan</th><th>Payment</th><th>Billing email</th><th>Invoice</th><th>Amount</th><th>Due</th></tr></thead>
+      <div className="table-wrap"><table className="data-table"><thead><tr><th>Company</th><th>Plan</th><th>Payment</th><th>Billing email</th><th>Invoice</th><th>Amount</th><th>Due</th></tr>
+        <GridFilterRow columns={ADMIN_FILTER_COLUMNS.billing} filters={columnFiltersByTab.billing ?? {}} onChange={(next) => setTabFilters("billing", next)} trailing={0} /></thead>
         <tbody>{billing.map((row, index, all) => <Fragment key={row.tenantId}>
           {selectedGroupColumns(ADMIN_GROUP_COLUMNS.billing, groupedTabs.billing ?? []).length > 0 && groupChangedBySelection(index, all, selectedGroupColumns(ADMIN_GROUP_COLUMNS.billing, groupedTabs.billing ?? [])) && <tr className="group-row"><th colSpan={7}>{groupLabelFor(row, selectedGroupColumns(ADMIN_GROUP_COLUMNS.billing, groupedTabs.billing ?? []))}</th></tr>}
           <tr><td>{row.tenantName}</td><td>{row.planCode}</td><td>{row.paymentStatus}</td><td>{row.billingEmail}</td><td>{row.invoiceNumber ?? "-"}</td><td>{row.amount == null ? "-" : formatMoney(row.amount)}</td><td>{formatDate(row.dueAt)}</td></tr>
@@ -441,8 +498,9 @@ export function AdminPage() {
   </>;
 }
 
-function AlertTable({ title, rows, readOnly }: { title: string; rows: Array<{ id: string; name: string; subject: string; detail: string; action: () => void }>; readOnly: boolean }) {
-  return <section className="config-card"><h2>{title}</h2><div className="table-wrap"><table className="data-table"><thead><tr><th>Name</th><th>Subject</th><th>Recipients / report</th>{!readOnly && <th className="table-action">Action</th>}</tr></thead>
+function AlertTable({ title, rows, readOnly, filters, onFiltersChange }: { title: string; rows: Array<{ id: string; name: string; subject: string; detail: string; action: () => void }>; readOnly: boolean; filters: Record<string, string>; onFiltersChange: (next: Record<string, string>) => void }) {
+  return <section className="config-card"><h2>{title}</h2><div className="table-wrap"><table className="data-table"><thead><tr><th>Name</th><th>Subject</th><th>Recipients / report</th>{!readOnly && <th className="table-action">Action</th>}</tr>
+    <GridFilterRow columns={ADMIN_FILTER_COLUMNS.alerts} filters={filters} onChange={onFiltersChange} trailing={readOnly ? 0 : 1} /></thead>
     <tbody>{rows.map((row) => <tr key={row.id}><td>{row.name}</td><td>{row.subject}</td><td>{row.detail}</td>{!readOnly && <td className="table-action"><button className="link-btn" onClick={row.action}>Queue</button></td>}</tr>)}
     {rows.length === 0 && <tr><td colSpan={readOnly ? 3 : 4} className="empty-note">No alerts configured.</td></tr>}</tbody>
   </table></div></section>;

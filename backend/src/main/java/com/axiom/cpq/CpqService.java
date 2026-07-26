@@ -63,7 +63,7 @@ public class CpqService {
                                String customerSegment, int versionNumber, String status, boolean defaultBook,
                                OffsetDateTime activatedAt, long entryCount) {}
 
-    public record QuoteRow(UUID id, String quoteNumber, String name, int versionNumber, String status,
+    public record QuoteRow(UUID id, String quoteNumber, String name, int versionNumber, boolean activeVersion, String status,
                            String approvalStatus, String accountName, String opportunityName, String ownerName,
                            String currencyCode, BigDecimal subtotal, BigDecimal discountTotal,
                            BigDecimal grandTotal, BigDecimal marginPct, LocalDate validFrom,
@@ -188,7 +188,7 @@ public class CpqService {
         pageArgs.add(safePage * QueryService.PAGE_SIZE);
 
         List<QuoteRow> items = jdbc.query("""
-                select q.id, q.quote_number, q.name, q.version_number, q.status, q.approval_status,
+                select q.id, q.quote_number, q.name, q.version_number, q.is_active_version, q.status, q.approval_status,
                        a.name as account_name, o.name as opportunity_name, u.display_name as owner_name,
                        q.currency_code, q.subtotal, q.discount_total, q.grand_total, q.margin_pct,
                        q.valid_from, q.expires_at
@@ -205,6 +205,7 @@ public class CpqService {
                         rs.getString("quote_number"),
                         rs.getString("name"),
                         rs.getInt("version_number"),
+                        rs.getBoolean("is_active_version"),
                         rs.getString("status"),
                         rs.getString("approval_status"),
                         rs.getString("account_name"),
@@ -264,7 +265,7 @@ public class CpqService {
 
     private QuoteRow quote(UUID quoteId) {
         List<QuoteRow> rows = jdbc.query("""
-                select q.id, q.quote_number, q.name, q.version_number, q.status, q.approval_status,
+                select q.id, q.quote_number, q.name, q.version_number, q.is_active_version, q.status, q.approval_status,
                        a.name as account_name, o.name as opportunity_name, u.display_name as owner_name,
                        q.currency_code, q.subtotal, q.discount_total, q.grand_total, q.margin_pct,
                        q.valid_from, q.expires_at
@@ -283,6 +284,7 @@ public class CpqService {
                 rs.getString("quote_number"),
                 rs.getString("name"),
                 rs.getInt("version_number"),
+                rs.getBoolean("is_active_version"),
                 rs.getString("status"),
                 rs.getString("approval_status"),
                 rs.getString("account_name"),

@@ -3,8 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { api, type DownloadedFile } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { AuditDrawer } from "./AuditDrawer";
-import { createCurrentViewExport, gridExportContext, gridViewSummaryText, saveDownloadedFile, writeClipboardText, type GridExportFormat, type GridExportRow } from "./DataGridToolbar";
-import { GridColumnFilters } from "./GridColumnFilters";
+import { copyGridSnapshot, createCurrentViewExport, gridExportContext, saveDownloadedFile, type GridExportFormat, type GridExportRow } from "./DataGridToolbar";
 import { GroupColumnPicker, type GroupColumnOption } from "./GroupColumnPicker";
 import { InfoTag } from "./InfoTag";
 import { useToasts } from "./Toasts";
@@ -27,15 +26,23 @@ interface Props {
   groupColumns?: GroupColumnOption[];
   selectedGroupColumns?: string[];
   onGroupColumnsChange?: (next: string[]) => void;
+  /**
+   * Column labels used only when naming active filters in an export header, so
+   * a PDF says "Industry: Manufacturing" rather than the raw key. The filter
+   * CONTROLS live in each grid header now, not here — nothing in this toolbar
+   * renders these. Omitted by every caller today; the export falls back to
+   * title-casing the key, which is correct for the keys in use.
+   */
   filterColumns?: GroupColumnOption[];
   columnFilters?: Record<string, string>;
+  /** Retained for API compatibility; the header filter row owns the setter now. */
   onColumnFiltersChange?: (next: Record<string, string>) => void;
   exportFilename?: string;
   exportRows?: GridExportRow[];
   onChanged: () => void;
 }
 
-export function MasterToolbar({ master, entityType, search, filter, grouped, groupLabel, onToggleGroup, groupColumns, selectedGroupColumns, onGroupColumnsChange, filterColumns, columnFilters, onColumnFiltersChange, exportFilename, exportRows, onChanged }: Props) {
+export function MasterToolbar({ master, entityType, search, filter, grouped, groupLabel, onToggleGroup, groupColumns, selectedGroupColumns, onGroupColumnsChange, filterColumns, columnFilters, exportFilename, exportRows, onChanged }: Props) {
   const { user } = useAuth();
   const toasts = useToasts();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -84,58 +91,69 @@ export function MasterToolbar({ master, entityType, search, filter, grouped, gro
     columnFilters,
   });
 
-  async function copyViewSummary() {
-    if (!viewContext) return;
+  async function copyViewSnapshot() {
+    if (!viewContext || !exportRows) return;
     try {
-      await writeClipboardText(gridViewSummaryText(viewContext));
-      toasts.push("info", "View summary copied", "Paste it into a ticket, chat or audit note to describe this exact master-data view.");
+      const result = await copyGridSnapshot(exportRows, viewContext, `${master}-view-snapshot`);
+      if (result === "clipboard") {
+        toasts.push("info", "Grid snapshot copied", "The image includes the current master-data columns, rows, filters, grouping and timestamp.");
+      } else {
+        toasts.push("info", "Grid snapshot downloaded", "This browser blocked image clipboard access, so the complete PNG snapshot was downloaded instead.");
+      }
     } catch (error) {
-      toasts.push("error", "View summary not copied", error instanceof Error ? error.message : "Clipboard is unavailable.");
+      toasts.push("error", "Grid snapshot not created", error instanceof Error ? error.message : "The snapshot could not be created.");
     }
   }
 
   return (
     <>
+      {/*
+        Same three-row grid as DataGridToolbar, and it has to be the same or the
+        masters drift out of line with every other data workspace. Nesting the
+        group picker inside the action row (as this did) indented its label by
+        the width of whatever preceded it, so Accounts showed "Group" 46px
+        further right than "Column search" directly beneath it.
+      */}
       <div className="data-grid-tools-stack">
-        <div className="master-toolbar data-grid-toolbar" role="toolbar" aria-label={`${master} data tools`}>
-          <InfoTag
-            text="Use these tools to group rows, search columns, check audit history, export records, or upload many rows at once."
-            label={`${master} data tools help`}
-          />
-          {groupColumns && onGroupColumnsChange ? (
-            <GroupColumnPicker
-              id={`${master}-master-toolbar`}
-              columns={groupColumns}
-              selected={selectedGroupColumns ?? []}
-              onChange={onGroupColumnsChange}
+        <div className="grid-tool-row data-grid-toolbar" role="toolbar" aria-label={`${master} data tools`}>
+          <div className="grid-tool-label">
+            <span>Actions</span>
+            <InfoTag
+              text="Use these tools to group rows, search columns, check audit history, export records, or upload many rows at once."
+              label={`${master} data tools help`}
             />
-          ) : (
-            <button className={`btn btn-sm${grouped ? " active" : ""}`} aria-pressed={grouped} onClick={onToggleGroup}>Group: {grouped ? groupLabel : "Off"}</button>
-          )}
-          <button className="btn btn-sm" onClick={() => setAuditOpen(true)}>Audit</button>
-          <span className="toolbar-divider" aria-hidden />
-          <button className="btn btn-sm" onClick={() => void download(() => exportAction("XLSX"), "Export Excel")}>Export Excel</button>
-          <button className="btn btn-sm" onClick={() => void download(() => exportAction("DOCX"), "Export Word")}>Export Word</button>
-          <button className="btn btn-sm" onClick={() => void download(() => exportAction("PDF"), "Export PDF")}>Export PDF</button>
-          <button className="btn btn-sm" disabled={!viewContext} onClick={() => void copyViewSummary()}>Copy view</button>
-          {canImport && <>
+          </div>
+          <div className="grid-tool-controls">
+            {!(groupColumns && onGroupColumnsChange) && (
+              <button className={`btn btn-sm${grouped ? " active" : ""}`} aria-pressed={grouped} onClick={onToggleGroup}>Group: {grouped ? groupLabel : "Off"}</button>
+            )}
+            <button className="btn btn-sm" onClick={() => setAuditOpen(true)}>Audit</button>
             <span className="toolbar-divider" aria-hidden />
-            <button className="btn btn-sm" onClick={() => void download(() => api.masterTemplate(master), "Import template")}>Download template</button>
-            <button className="btn btn-sm btn-primary" disabled={importMutation.isPending} onClick={() => fileRef.current?.click()}>
-              {importMutation.isPending ? "Validating..." : "Bulk upload"}
-            </button>
-            <input ref={fileRef} className="sr-only" type="file" accept=".csv,text/csv" onChange={(event) => {
-              const file = event.target.files?.[0]; if (file) importMutation.mutate(file); event.target.value = "";
-            }} />
-          </>}
-          {viewContext && <span className="grid-view-summary" aria-live="polite">{viewSummary(viewContext.rowCount ?? 0, viewContext.filters?.length ?? 0, viewContext.groups?.length ?? 0)}</span>}
+            <button className="btn btn-sm" onClick={() => void download(() => exportAction("XLSX"), "Export Excel")}>Export Excel</button>
+            <button className="btn btn-sm" onClick={() => void download(() => exportAction("DOCX"), "Export Word")}>Export Word</button>
+            <button className="btn btn-sm" onClick={() => void download(() => exportAction("PDF"), "Export PDF")}>Export PDF</button>
+            <button className="btn btn-sm" disabled={!viewContext || !exportRows} onClick={() => void copyViewSnapshot()}>Copy view</button>
+            {canImport && <>
+              <span className="toolbar-divider" aria-hidden />
+              <button className="btn btn-sm" onClick={() => void download(() => api.masterTemplate(master), "Import template")}>Download template</button>
+              <button className="btn btn-sm btn-primary" disabled={importMutation.isPending} onClick={() => fileRef.current?.click()}>
+                {importMutation.isPending ? "Validating..." : "Bulk upload"}
+              </button>
+              <input ref={fileRef} className="sr-only" type="file" accept=".csv,text/csv" onChange={(event) => {
+                const file = event.target.files?.[0]; if (file) importMutation.mutate(file); event.target.value = "";
+              }} />
+            </>}
+          </div>
+          <div className="grid-tool-trailing">
+            {viewContext && <span className="grid-view-summary" aria-live="polite">{viewSummary(viewContext.rowCount ?? 0, viewContext.filters?.length ?? 0, viewContext.groups?.length ?? 0)}</span>}
+          </div>
         </div>
-        {filterColumns && columnFilters && onColumnFiltersChange && (
-          <GridColumnFilters
+        {groupColumns && onGroupColumnsChange && (
+          <GroupColumnPicker
             id={`${master}-master-toolbar`}
-            columns={filterColumns}
-            filters={columnFilters}
-            onChange={onColumnFiltersChange}
+            columns={groupColumns}
+            selected={selectedGroupColumns ?? []}
+            onChange={onGroupColumnsChange}
           />
         )}
       </div>

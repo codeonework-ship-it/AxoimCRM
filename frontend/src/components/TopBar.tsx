@@ -9,6 +9,7 @@ import { useNotifications } from "./notifications";
 import { ThemeSwitcher } from "./ThemeSwitcher";
 import { UserMenu } from "./UserMenu";
 import { BellIcon, MenuIcon, SearchIcon } from "./icons";
+import { useToasts } from "./Toasts";
 
 interface TopBarProps {
   onOpenCommand: () => void;
@@ -20,6 +21,7 @@ interface TopBarProps {
 export function TopBar({ onOpenCommand, onOpenHelp, onToggleNav, navExpanded }: TopBarProps) {
   const navigate = useNavigate();
   const t = useT();
+  const toasts = useToasts();
   const { user, tenant, switchTenant } = useAuth();
   const tenantsQ = useQuery({
     queryKey: ["auth", "tenants"],
@@ -27,7 +29,15 @@ export function TopBar({ onOpenCommand, onOpenHelp, onToggleNav, navExpanded }: 
     enabled: !!user?.platformUser,
     staleTime: 60_000,
   });
-  const switchMutation = useMutation({ mutationFn: switchTenant });
+  const switchMutation = useMutation({
+    mutationFn: switchTenant,
+    onSuccess: () => toasts.push("info", "Company changed", "The active company and its governed data are now loaded."),
+    onError: (error) => toasts.push(
+      "error",
+      "Company could not be changed",
+      error instanceof Error ? error.message : "Please retry the company selection.",
+    ),
+  });
   const { notifications, unreadCount, isLoading, isError, markRead, markUnread, markAllRead, refetch } =
     useNotifications();
   const [panelOpen, setPanelOpen] = useState(false);

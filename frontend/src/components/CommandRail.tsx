@@ -47,11 +47,6 @@ function ModuleLink({ item, onNavigate, t }: { item: ModuleItem; onNavigate: () 
     >
       <Icon />
       <span>{label}</span>
-      {item.status === "partial" && (
-        <em className="rail-flag is-partial" title={t(NAV_BADGE_KEYS.betaTitle, "Partially implemented")}>
-          {t(NAV_BADGE_KEYS.beta, "Beta")}
-        </em>
-      )}
     </NavLink>
   );
 }

@@ -1,6 +1,8 @@
 package com.axiom.api;
 
 import com.axiom.accounts.AccountService;
+import com.axiom.accounts.AccountHealthService;
+import com.axiom.accounts.RollupService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -15,7 +17,8 @@ class AccountControllerTest {
     @Test void delegatesListDetailAndHierarchy() {
         QueryService queries = mock(QueryService.class);
         AccountService accounts = mock(AccountService.class);
-        AccountController controller = new AccountController(queries, accounts);
+        AccountController controller = new AccountController(queries, accounts,
+                mock(RollupService.class), mock(AccountHealthService.class));
         UUID id = UUID.randomUUID();
         PageResult<QueryService.AccountRow> page = PageResult.of(List.of(), 0, 100, 0);
         AccountService.AccountDetail detail = mock(AccountService.AccountDetail.class);

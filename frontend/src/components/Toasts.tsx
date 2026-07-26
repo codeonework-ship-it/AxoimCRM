@@ -57,18 +57,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={apiValue}>
       {children}
-      <div className="toast-region" role="region" aria-label="Notifications">
+      <div className="toast-region" role="region" aria-label="Status notifications" aria-live="polite" aria-relevant="additions">
         {toasts.map((t) => (
           <div
             key={t.id}
             className={`toast toast-${t.kind}`}
             role={t.kind === "error" ? "alert" : "status"}
           >
-            <div>
+            <div className="toast-copy">
               <span className="toast-kind">
                 {KIND_LABEL[t.kind]} — {t.title}
               </span>
-              {t.message}
+              <p>{t.message}</p>
             </div>
             <button
               className="toast-close"
@@ -77,6 +77,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             >
               ×
             </button>
+            <span className="toast-progress" aria-hidden="true" />
           </div>
         ))}
       </div>

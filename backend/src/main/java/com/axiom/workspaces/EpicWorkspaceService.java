@@ -236,27 +236,32 @@ public class EpicWorkspaceService {
         List<Object> args = new ArrayList<>(List.of(tenantId()));
         String where = where("r", search, status, args, "r.rule_code", "r.name", "r.trigger_type", "r.object_type", "u.display_name");
         long total = total("""
-                select count(*) from automation.automation_rule r
-                join identity.app_user u on u.tenant_id = r.tenant_id and u.id = r.owner_id
+                select count(*) from automation.rule_definition r
+                left join identity.app_user u on u.tenant_id = r.tenant_id and u.id = r.created_by
                 """ + where, args);
         List<WorkspaceRow> rows = query("""
                 select r.id, r.rule_code as code, r.name as title,
-                       r.trigger_type || ' - ' || r.object_type || ' - version ' || r.active_version as subtitle,
-                       r.status, u.display_name as owner_name, r.run_count::numeric as amount,
-                       r.last_run_at::date as target_date, r.updated_at,
-                       jsonb_build_object('version', r.active_version, 'simulationPassed', r.simulation_passed, 'steps', count(s.id), 'errors', coalesce(sum(run.error_count), 0)) as metrics
-                from automation.automation_rule r
-                join identity.app_user u on u.tenant_id = r.tenant_id and u.id = r.owner_id
-                left join automation.automation_step s on s.tenant_id = r.tenant_id and s.rule_id = r.id
-                left join automation.automation_run run on run.tenant_id = r.tenant_id and run.rule_id = r.id
+                       r.trigger_type || ' - ' || r.object_type || ' - canonical version ' || r.active_version_no as subtitle,
+                       r.status, coalesce(u.display_name, 'System') as owner_name,
+                       count(distinct run.id)::numeric as amount,
+                       schedule.next_due_at::date as target_date, r.updated_at,
+                       jsonb_build_object('version', r.active_version_no,
+                         'versions', count(distinct v.id),
+                         'runs', count(distinct run.id),
+                         'errors', count(distinct run.id) filter (where run.status in ('FAILED','HALTED'))) as metrics
+                from automation.rule_definition r
+                left join identity.app_user u on u.tenant_id = r.tenant_id and u.id = r.created_by
+                left join automation.rule_version v on v.tenant_id = r.tenant_id and v.rule_id = r.id
+                left join automation.rule_execution run on run.tenant_id = r.tenant_id and run.rule_id = r.id
+                left join automation.rule_schedule_state schedule on schedule.tenant_id = r.tenant_id and schedule.rule_id = r.id
                 """ + where + """
-                 group by r.id, r.rule_code, r.name, r.trigger_type, r.object_type, r.active_version, r.status,
-                         u.display_name, r.run_count, r.last_run_at, r.updated_at, r.simulation_passed
-                order by r.status, r.last_run_at desc nulls last limit ? offset ?""", args, safePage);
-        return new WorkspacePage("AUTOMATION", "Automation", "Rules, simulations, approvals and execution trace health.",
-                List.of(countMetric("Active rules", "automation.automation_rule", "status = 'ACTIVE'", "good"),
-                        countMetric("Runs", "automation.automation_run", "true", "good"),
-                        countMetric("Errored runs", "automation.automation_run", "error_count > 0", "warn")),
+                 group by r.id, r.rule_code, r.name, r.trigger_type, r.object_type, r.active_version_no,
+                          r.status, u.display_name, schedule.next_due_at, r.updated_at
+                order by r.status, r.updated_at desc limit ? offset ?""", args, safePage);
+        return new WorkspacePage("AUTOMATION", "Automation", "Canonical versioned rules, dry-run simulations, approvals and execution trace health.",
+                List.of(countMetric("Active rules", "automation.rule_definition", "status = 'ACTIVE'", "good"),
+                        countMetric("Runs", "automation.rule_execution", "true", "good"),
+                        countMetric("Errored runs", "automation.rule_execution", "status in ('FAILED','HALTED')", "warn")),
                 PageResult.of(rows, safePage, QueryService.PAGE_SIZE, total));
     }
 

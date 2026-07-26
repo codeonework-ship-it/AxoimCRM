@@ -25,6 +25,7 @@ const ActivateAccountPage = lazyPage(() => import("./pages/ActivateAccountPage")
 const HomePage = lazyPage(() => import("./pages/HomePage"), "HomePage");
 const PipelinePage = lazyPage(() => import("./pages/PipelinePage"), "PipelinePage");
 const AccountsPage = lazyPage(() => import("./pages/AccountsPage"), "AccountsPage");
+const ContactsPage = lazyPage(() => import("./pages/ContactsPage"), "ContactsPage");
 const LeadsPage = lazyPage(() => import("./pages/LeadsPage"), "LeadsPage");
 const ActivitiesPage = lazyPage(() => import("./pages/ActivitiesPage"), "ActivitiesPage");
 const CpqPage = lazyPage<CpqRouteProps>(() => import("./pages/CpqPage"), "CpqPage");
@@ -55,6 +56,7 @@ export function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/pipeline" element={<PipelinePage />} />
           <Route path="/accounts" element={<AccountsPage />} />
+          <Route path="/contacts" element={<ContactsPage />} />
           <Route path="/leads" element={<LeadsPage />} />
           <Route path="/activities" element={<ActivitiesPage />} />
           {workspaceRoute("/forecast", "forecast")}

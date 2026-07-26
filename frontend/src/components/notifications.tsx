@@ -7,6 +7,7 @@ import {
 } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type NotificationItem } from "../api/client";
+import { useToasts } from "./Toasts";
 
 export interface AppNotification {
   id: string;
@@ -64,6 +65,7 @@ function toAppNotification(item: NotificationItem): AppNotification {
 
 export function NotificationsProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const toasts = useToasts();
   const feedQ = useQuery({
     queryKey: ["notifications", "feed"],
     queryFn: () => api.notifications("all"),
@@ -85,10 +87,23 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     mutationFn: ({ id, read }: { id: string; read: boolean }) =>
       read ? api.markNotificationRead(id) : api.markNotificationUnread(id),
     onSuccess: refresh,
+    onError: (error) => toasts.push(
+      "error",
+      "Notification could not be updated",
+      error instanceof Error ? error.message : "Please retry the notification action.",
+    ),
   });
   const allReadMutation = useMutation({
     mutationFn: api.markAllNotificationsRead,
-    onSuccess: refresh,
+    onSuccess: () => {
+      refresh();
+      toasts.push("info", "Notifications updated", "All notifications are marked as read.");
+    },
+    onError: (error) => toasts.push(
+      "error",
+      "Notifications could not be updated",
+      error instanceof Error ? error.message : "Please retry the notification action.",
+    ),
   });
 
   const notifications = useMemo(

@@ -30,9 +30,12 @@ import java.util.Map;
 public class PicklistGovernanceController {
 
     private final PicklistGovernanceService service;
+    private final ReferenceDataService referenceData;
 
-    public PicklistGovernanceController(PicklistGovernanceService service) {
+    public PicklistGovernanceController(PicklistGovernanceService service,
+                                        ReferenceDataService referenceData) {
         this.service = service;
+        this.referenceData = referenceData;
     }
 
     @GetMapping("/value-sets/{apiName}/selectable")
@@ -43,10 +46,10 @@ public class PicklistGovernanceController {
     }
 
     @GetMapping("/value-sets/{apiName}/resolve/{code}")
-    public PicklistGovernanceService.ValueOption resolve(
+    public ReferenceDataService.ResolvedEntry resolve(
             @PathVariable String apiName, @PathVariable String code,
             @RequestParam(required = false) LocalDate asOf) {
-        return service.resolve(apiName, code, asOf);
+        return referenceData.resolve(apiName, code, asOf);
     }
 
     @GetMapping("/dependencies")

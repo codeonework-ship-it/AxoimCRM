@@ -16,7 +16,7 @@ import static org.mockito.Mockito.when;
 class CpqControllerTest {
     @Test void productsDelegateSearchFilterAndPaginationContract() {
         CpqService service = mock(CpqService.class);
-        CpqController controller = new CpqController(service);
+        CpqController controller = new CpqController(service, mock(QuoteAuthoringService.class));
         PageResult<CpqService.ProductRow> page = PageResult.of(List.of(), 2, 100, 0);
         when(service.products("platform", "Subscription", 2)).thenReturn(page);
 
@@ -26,7 +26,7 @@ class CpqControllerTest {
 
     @Test void quotesDelegateStatusAndPaginationContract() {
         CpqService service = mock(CpqService.class);
-        CpqController controller = new CpqController(service);
+        CpqController controller = new CpqController(service, mock(QuoteAuthoringService.class));
         PageResult<CpqService.QuoteRow> page = PageResult.of(List.of(), 1, 100, 0);
         when(service.quotes("kestrel", "SENT", 1)).thenReturn(page);
 
@@ -36,7 +36,7 @@ class CpqControllerTest {
 
     @Test void quoteDocumentReturnsAttachment() {
         CpqService service = mock(CpqService.class);
-        CpqController controller = new CpqController(service);
+        CpqController controller = new CpqController(service, mock(QuoteAuthoringService.class));
         UUID quoteId = UUID.randomUUID();
         CpqService.FilePayload file = new CpqService.FilePayload(
                 "quote".getBytes(StandardCharsets.UTF_8), "text/plain", "q-1.txt");

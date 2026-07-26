@@ -1,10 +1,11 @@
 import { Fragment, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isUnreachable, type CpqPriceBook, type CpqProduct, type CpqQuote } from "../api/client";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataGridToolbar, saveDownloadedFile } from "../components/DataGridToolbar";
 import { DataViewFrame } from "../components/DataViewFrame";
+import { GridFilterRow, type GridFilterColumn } from "../components/GridFilterRow";
 import { InfoTag } from "../components/InfoTag";
 import { GridLoader } from "../components/Loaders";
 import { useToasts } from "../components/Toasts";
@@ -43,8 +44,47 @@ const QUOTE_GROUP_COLUMNS: GroupColumn<CpqQuote>[] = [
   { key: "approval", label: "Approval", value: (row) => row.approvalStatus },
 ];
 
+/*
+ * Filter columns, one entry per column each table actually renders, in render
+ * order. These cannot be the group-column lists above: grouping works on values
+ * that have no column of their own (a quote's approval status, a product's
+ * family before the Family column existed), whereas an in-header filter must
+ * line up cell-for-cell with the header above it. Columns with no sensible
+ * filter — a computed count, a formatted total — are declared `none` so they
+ * render an empty cell and hold their place rather than shifting every filter
+ * after them one column to the left.
+ */
+const PRODUCT_FILTER_COLUMNS: GridFilterColumn[] = [
+  { key: "code", label: "Code" },
+  { key: "name", label: "Product" },
+  { key: "family", label: "Family" },
+  { key: "category", label: "Category" },
+  { key: "uom", label: "UOM", kind: "none" },
+  { key: "activePrices", label: "Active prices", kind: "none" },
+  { key: "status", label: "Status" },
+];
+const PRICE_BOOK_FILTER_COLUMNS: GridFilterColumn[] = [
+  { key: "code", label: "Code" },
+  { key: "name", label: "Name" },
+  { key: "currency", label: "Currency" },
+  { key: "segment", label: "Segment" },
+  { key: "version", label: "Version", kind: "none" },
+  { key: "entries", label: "Entries", kind: "none" },
+  { key: "status", label: "Status" },
+];
+const QUOTE_FILTER_COLUMNS: GridFilterColumn[] = [
+  { key: "quote", label: "Quote" },
+  { key: "account", label: "Account" },
+  { key: "opportunity", label: "Opportunity", kind: "none" },
+  { key: "owner", label: "Owner" },
+  { key: "total", label: "Total", kind: "none" },
+  { key: "margin", label: "Margin", kind: "none" },
+  { key: "status", label: "Status" },
+];
+
 export function CpqPage({ section }: CpqPageProps) {
   const toasts = useToasts();
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("");
@@ -69,6 +109,15 @@ export function CpqPage({ section }: CpqPageProps) {
     retry: 1,
   });
   const summaryQ = useQuery({ queryKey: ["cpq", "quotes", "summary"], queryFn: api.cpqQuoteSummary, retry: 1 });
+  const revisionMutation = useMutation({
+    mutationFn: ({ quote, reason }: { quote: CpqQuote; reason: string }) => api.reviseQuote(quote.id, reason),
+    onSuccess: (result) => {
+      toasts.push("info", "Quote revision created", `${result.quoteNumber} copied ${result.copiedLines} line(s).`);
+      void queryClient.invalidateQueries({ queryKey: ["cpq", "quotes"] });
+      void queryClient.invalidateQueries({ queryKey: ["audit"] });
+    },
+    onError: (error) => toasts.push("error", "Quote revision rejected", error instanceof Error ? error.message : "Revision could not be created."),
+  });
 
   const activeQ = section === "products" ? productsQ : section === "price-books" ? priceBooksQ : quotesQ;
   if (isUnreachable(activeQ.error)) return <ApiUnreachable onRetry={() => void activeQ.refetch()} retrying={activeQ.isFetching} />;
@@ -141,7 +190,6 @@ export function CpqPage({ section }: CpqPageProps) {
         groupColumns={toolbarGroupColumns.map(({ key, label }) => ({ key, label }))}
         selectedGroupColumns={toolbarGroupKeys}
         onGroupColumnsChange={setGroupColumns}
-        filterColumns={toolbarGroupColumns.map(({ key, label }) => ({ key, label }))}
         columnFilters={columnFilters}
         onColumnFiltersChange={setColumnFilters}
         auditEntityType={section === "products" ? "PRODUCT" : section === "price-books" ? "PRICE_BOOK" : "QUOTE"}
@@ -152,9 +200,12 @@ export function CpqPage({ section }: CpqPageProps) {
     >
       {activeQ.isLoading && <GridLoader label="Reading governed CPQ records" rows={6} columns={6} />}
       {activeQ.isError && <p className="empty-note">CPQ records failed to load{activeQ.error instanceof Error ? `: ${activeQ.error.message}` : "."}</p>}
-      {activeQ.isSuccess && section === "products" && <ProductTable rows={sortByGroups(productRows, selectedProductGroups, (row) => row.name)} groupColumns={selectedProductGroups} />}
-      {activeQ.isSuccess && section === "price-books" && <PriceBookTable rows={sortByGroups(priceBookRows, selectedPriceBookGroups, (row) => row.name)} groupColumns={selectedPriceBookGroups} />}
-      {activeQ.isSuccess && section === "quotes" && <QuoteTable rows={sortByGroups(quoteRows, selectedQuoteGroups, (row) => row.quoteNumber)} groupColumns={selectedQuoteGroups} onDownload={downloadQuote} />}
+      {activeQ.isSuccess && section === "products" && <ProductTable rows={sortByGroups(productRows, selectedProductGroups, (row) => row.name)} groupColumns={selectedProductGroups} filters={columnFilters} onFiltersChange={setColumnFilters} />}
+      {activeQ.isSuccess && section === "price-books" && <PriceBookTable rows={sortByGroups(priceBookRows, selectedPriceBookGroups, (row) => row.name)} groupColumns={selectedPriceBookGroups} filters={columnFilters} onFiltersChange={setColumnFilters} />}
+      {activeQ.isSuccess && section === "quotes" && <QuoteTable rows={sortByGroups(quoteRows, selectedQuoteGroups, (row) => row.quoteNumber)} groupColumns={selectedQuoteGroups} filters={columnFilters} onFiltersChange={setColumnFilters} onDownload={downloadQuote} revisingId={revisionMutation.variables?.quote.id} onRevise={(quote) => {
+        const reason = window.prompt(`Create a new immutable revision of ${quote.quoteNumber}. What changed?`, "Commercial terms updated after customer review.");
+        if (reason?.trim()) revisionMutation.mutate({ quote, reason: reason.trim() });
+      }} />}
       {activeQ.isSuccess && <footer className="page-controls" aria-label="CPQ pagination">
         <span>Showing {pageData?.items.length ?? 0} of {total} records - 100 rows per page</span>
         <div>
@@ -167,10 +218,11 @@ export function CpqPage({ section }: CpqPageProps) {
   </>;
 }
 
-function ProductTable({ rows, groupColumns }: { rows: CpqProduct[]; groupColumns: GroupColumn<CpqProduct>[] }) {
+function ProductTable({ rows, groupColumns, filters, onFiltersChange }: { rows: CpqProduct[]; groupColumns: GroupColumn<CpqProduct>[]; filters: Record<string, string>; onFiltersChange: (next: Record<string, string>) => void }) {
   let previousGroup = "";
   return <div className="table-wrap"><table className="data-table cpq-table">
-    <thead><tr><th>Code</th><th>Product</th><th>Family</th><th>Category</th><th>UOM</th><th>Active prices</th><th>Status</th></tr></thead>
+    <thead><tr><th>Code</th><th>Product</th><th>Family</th><th>Category</th><th>UOM</th><th>Active prices</th><th>Status</th></tr>
+      <GridFilterRow columns={PRODUCT_FILTER_COLUMNS} filters={filters} onChange={onFiltersChange} /></thead>
     <tbody>
       {rows.map((row) => {
         const group = groupColumns.length > 0 ? groupLabelFor(row, groupColumns) : "";
@@ -189,10 +241,11 @@ function ProductTable({ rows, groupColumns }: { rows: CpqProduct[]; groupColumns
   </table></div>;
 }
 
-function PriceBookTable({ rows, groupColumns }: { rows: CpqPriceBook[]; groupColumns: GroupColumn<CpqPriceBook>[] }) {
+function PriceBookTable({ rows, groupColumns, filters, onFiltersChange }: { rows: CpqPriceBook[]; groupColumns: GroupColumn<CpqPriceBook>[]; filters: Record<string, string>; onFiltersChange: (next: Record<string, string>) => void }) {
   let previousGroup = "";
   return <div className="table-wrap"><table className="data-table cpq-table">
-    <thead><tr><th>Code</th><th>Name</th><th>Currency</th><th>Segment</th><th>Version</th><th>Entries</th><th>Status</th></tr></thead>
+    <thead><tr><th>Code</th><th>Name</th><th>Currency</th><th>Segment</th><th>Version</th><th>Entries</th><th>Status</th></tr>
+      <GridFilterRow columns={PRICE_BOOK_FILTER_COLUMNS} filters={filters} onChange={onFiltersChange} /></thead>
     <tbody>
       {rows.map((row) => {
         const group = groupColumns.length > 0 ? groupLabelFor(row, groupColumns) : "";
@@ -211,10 +264,11 @@ function PriceBookTable({ rows, groupColumns }: { rows: CpqPriceBook[]; groupCol
   </table></div>;
 }
 
-function QuoteTable({ rows, groupColumns, onDownload }: { rows: CpqQuote[]; groupColumns: GroupColumn<CpqQuote>[]; onDownload: (quote: CpqQuote, format: "PDF" | "DOCX" | "XLSX") => void }) {
+function QuoteTable({ rows, groupColumns, filters, onFiltersChange, onDownload, onRevise, revisingId }: { rows: CpqQuote[]; groupColumns: GroupColumn<CpqQuote>[]; filters: Record<string, string>; onFiltersChange: (next: Record<string, string>) => void; onDownload: (quote: CpqQuote, format: "PDF" | "DOCX" | "XLSX") => void; onRevise: (quote: CpqQuote) => void; revisingId?: string }) {
   let previousGroup = "";
   return <div className="table-wrap"><table className="data-table cpq-table">
-    <thead><tr><th>Quote</th><th>Account</th><th>Opportunity</th><th>Owner</th><th>Total</th><th>Margin</th><th>Status</th><th>Docs</th></tr></thead>
+    <thead><tr><th>Quote</th><th>Account</th><th>Opportunity</th><th>Owner</th><th>Total</th><th>Margin</th><th>Status</th><th>Actions</th></tr>
+      <GridFilterRow columns={QUOTE_FILTER_COLUMNS} filters={filters} onChange={onFiltersChange} trailing={1} /></thead>
     <tbody>
       {rows.map((row) => {
         const group = groupColumns.length > 0 ? groupLabelFor(row, groupColumns) : "";
@@ -223,12 +277,12 @@ function QuoteTable({ rows, groupColumns, onDownload }: { rows: CpqQuote[]; grou
         return <Fragment key={row.id}>
           {showGroup && <tr className="group-row"><th colSpan={8}>{group}</th></tr>}
           <tr>
-            <td><span className="mono">{row.quoteNumber}</span><small>{row.name} - v{row.versionNumber}</small></td>
+            <td><span className="mono">{row.quoteNumber}</span><small>{row.name} - v{row.versionNumber} · {row.activeVersion ? "CURRENT" : "SUPERSEDED"}</small></td>
             <td>{row.accountName}</td><td>{row.opportunityName ?? "-"}</td><td>{row.ownerName ?? "-"}</td>
             <td>{formatMoney(row.grandTotal)}<small>Discount {formatMoney(row.discountTotal)}</small></td>
             <td>{row.marginPct == null ? "-" : `${row.marginPct.toFixed(1)}%`}</td>
             <td><span className={`chip chip-${row.status.toLowerCase()}`}>{row.status}</span><small>{row.approvalStatus} - expires {formatDate(row.expiresAt)}</small></td>
-            <td className="quote-doc-actions"><button className="link-btn" onClick={() => onDownload(row, "PDF")}>PDF</button><button className="link-btn" onClick={() => onDownload(row, "DOCX")}>Word</button><button className="link-btn" onClick={() => onDownload(row, "XLSX")}>Excel</button></td>
+            <td className="quote-doc-actions"><button className="link-btn" onClick={() => onDownload(row, "PDF")}>PDF</button><button className="link-btn" onClick={() => onDownload(row, "DOCX")}>Word</button><button className="link-btn" onClick={() => onDownload(row, "XLSX")}>Excel</button>{row.activeVersion && row.status !== "ORDERED" && <button className="link-btn quote-revise" disabled={revisingId === row.id} onClick={() => onRevise(row)}>{revisingId === row.id ? "Revising..." : "New revision"}</button>}</td>
           </tr>
         </Fragment>;
       })}

@@ -37,12 +37,14 @@ public class OrgDataController {
     private final BusinessHoursService businessHours;
     private final TerritoryService territories;
     private final QuotaService quotas;
+    private final ForecastAttainmentService attainment;
     private final MasterChangeControlService changeControl;
     private final MasterGovernanceGate gate;
 
     public OrgDataController(BusinessUnitService businessUnits, CurrencyService currencies,
                             FiscalCalendarService fiscalCalendars, BusinessHoursService businessHours,
                             TerritoryService territories, QuotaService quotas,
+                            ForecastAttainmentService attainment,
                             MasterChangeControlService changeControl, MasterGovernanceGate gate) {
         this.businessUnits = businessUnits;
         this.currencies = currencies;
@@ -50,6 +52,7 @@ public class OrgDataController {
         this.businessHours = businessHours;
         this.territories = territories;
         this.quotas = quotas;
+        this.attainment = attainment;
         this.changeControl = changeControl;
         this.gate = gate;
     }
@@ -347,5 +350,19 @@ public class OrgDataController {
             @PathVariable UUID id,
             @RequestBody @Valid MasterChangeControlService.DecisionRequest request) {
         return changeControl.reject(id, request);
+    }
+
+    /**
+     * Forecast attainment for one period: targets against actuals, by owner and
+     * rolled up the territory hierarchy.
+     *
+     * <p>Lives on the org-data path because that is where targets and territories
+     * already are — the numbers it reports are a join across them, not a new
+     * subsystem, and putting it elsewhere would suggest otherwise.
+     */
+    @GetMapping("/forecast-attainment/{fiscalPeriodId}")
+    public ForecastAttainmentService.PeriodAttainment forecastAttainment(
+            @PathVariable java.util.UUID fiscalPeriodId) {
+        return attainment.forPeriod(fiscalPeriodId);
     }
 }

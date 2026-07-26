@@ -9,6 +9,8 @@ import {
   rbac,
   RbacApiError,
   type AccessCause,
+  type AccessReviewCampaign,
+  type AccessReviewItem,
   type AssignmentRow,
   type FieldPermissionRow,
   type FloorFinding,
@@ -56,6 +58,7 @@ const TABS = [
   { id: "owd", label: "Org-wide defaults" },
   { id: "sharing", label: "Sharing rules" },
   { id: "sod", label: "Segregation of duties" },
+  { id: "reviews", label: "Access reviews" },
   { id: "explainer", label: "Access explainer" },
   { id: "floor", label: "Admin & auditor floor" },
 ] as const;
@@ -156,6 +159,7 @@ export function RbacAdminPage() {
           {tab === "owd" && <OrgWideDefaultsTab canWrite={canWrite} onChanged={() => invalidate("owd")} />}
           {tab === "sharing" && <SharingTab canWrite={canWrite} onChanged={() => invalidate("sharing")} />}
           {tab === "sod" && <SodTab canWrite={canWrite} onChanged={() => invalidate("sod")} />}
+          {tab === "reviews" && <AccessReviewsTab canWrite={canWrite} onChanged={() => invalidate("reviews")} />}
           {tab === "explainer" && <ExplainerTab users={overviewQ.data.users} objects={overviewQ.data.objects} />}
           {tab === "floor" && (
             <FloorTab canWrite={canWrite} users={overviewQ.data.users} onChanged={() => invalidate("floor", "users")} />
@@ -164,6 +168,123 @@ export function RbacAdminPage() {
       )}
     </>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Access recertification
+// ---------------------------------------------------------------------------
+
+function AccessReviewsTab({ canWrite, onChanged }: { canWrite: boolean; onChanged: () => void }) {
+  const toasts = useToasts();
+  const [selected, setSelected] = useState<string | null>(null);
+  const [draft, setDraft] = useState(() => ({
+    code: `ACCESS_${new Date().getFullYear()}`,
+    name: "Quarterly access review",
+    scopeNote: "Roles, permission bundles, manual record shares and delegated administration",
+    deadline: new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10),
+  }));
+  const campaignsQ = useQuery({ queryKey: ["rbac", "reviews"], queryFn: rbac.accessReviews, retry: 1 });
+  const itemsQ = useQuery({
+    queryKey: ["rbac", "reviews", selected, "items"],
+    queryFn: () => rbac.accessReviewItems(selected as string),
+    enabled: !!selected,
+    retry: 1,
+  });
+  const create = useMutation({
+    mutationFn: () => rbac.createAccessReview({
+      code: draft.code,
+      name: draft.name,
+      scopeNote: draft.scopeNote,
+      deadlineAt: new Date(`${draft.deadline}T23:59:59`).toISOString(),
+    }),
+    onSuccess: (campaign) => {
+      setSelected(campaign.id);
+      toasts.push("info", "Access review opened", `${campaign.totalItems} live grants were snapshotted for review.`);
+      void campaignsQ.refetch();
+      onChanged();
+    },
+    onError: (error) => toasts.push("error", "Review not created", messageOf(error)),
+  });
+  const decide = useMutation({
+    mutationFn: ({ item, decision }: { item: AccessReviewItem; decision: "CONFIRMED" | "REVOKED" }) => {
+      const note = window.prompt(
+        decision === "REVOKED" ? "Why should this access be removed?" : "Review note (optional)",
+        decision === "REVOKED" ? "No longer required" : "Still required for current duties",
+      );
+      if (note === null) return Promise.reject(new Error("Decision cancelled."));
+      return rbac.decideAccessReviewItem(item.id, decision, note);
+    },
+    onSuccess: () => {
+      toasts.push("info", "Access decision recorded", "The decision is immutable and any revocation is already effective.");
+      void itemsQ.refetch();
+      void campaignsQ.refetch();
+      onChanged();
+    },
+    onError: (error) => {
+      if (messageOf(error) !== "Decision cancelled.") toasts.push("error", "Decision refused", messageOf(error));
+    },
+  });
+
+  const campaignColumns: Column<AccessReviewCampaign>[] = [
+    { key: "code", header: "Code", value: (r) => r.code, cellClass: "mono" },
+    { key: "name", header: "Review", value: (r) => r.name },
+    { key: "status", header: "Status", value: (r) => r.overdue ? "OVERDUE" : r.status, filter: "enum" },
+    { key: "deadline", header: "Deadline", value: (r) => new Date(r.deadlineAt).toLocaleDateString() },
+    { key: "pending", header: "Pending", value: (r) => r.pendingItems, cellClass: "num" },
+    { key: "confirmed", header: "Confirmed", value: (r) => r.confirmedItems, cellClass: "num" },
+    { key: "revoked", header: "Revoked", value: (r) => r.revokedItems, cellClass: "num" },
+    {
+      key: "review",
+      header: "Action",
+      value: () => "Review",
+      render: (r) => <button type="button" className="link-btn" onClick={() => setSelected(r.id)}>Review grants</button>,
+    },
+  ];
+  const itemColumns: Column<AccessReviewItem>[] = [
+    { key: "subject", header: "User", value: (r) => r.subjectEmail, filter: "enum" },
+    { key: "grantType", header: "Grant type", value: (r) => r.grantType.replace(/_/g, " "), filter: "enum" },
+    { key: "description", header: "Access being reviewed", value: (r) => r.description },
+    { key: "decision", header: "Decision", value: (r) => r.decision, filter: "enum" },
+    { key: "note", header: "Note", value: (r) => r.note ?? "", blank: "not decided" },
+    {
+      key: "action",
+      header: "Action",
+      value: (r) => r.decision,
+      render: (r) => r.decision !== "PENDING" || !canWrite ? <span>{r.decision}</span> : <span className="inline-actions">
+        <button type="button" className="link-btn" disabled={decide.isPending}
+          onClick={() => decide.mutate({ item: r, decision: "CONFIRMED" })}>Confirm</button>
+        <button type="button" className="link-btn danger-link" disabled={decide.isPending}
+          onClick={() => decide.mutate({ item: r, decision: "REVOKED" })}>Revoke</button>
+      </span>,
+    },
+  ];
+
+  return <>
+    <div className="page-head compact-head">
+      <div><span className="eyebrow">Access recertification</span><h2>Review who still needs access</h2>
+        <p>A campaign snapshots current grants. Confirm what is still required or revoke it immediately.</p></div>
+    </div>
+    {canWrite && <section className="list-controls" aria-label="Create an access review">
+      <label><span>Review code</span><input value={draft.code} onChange={(e) => setDraft((v) => ({ ...v, code: e.target.value.toUpperCase() }))} /></label>
+      <label><span>Review name</span><input value={draft.name} onChange={(e) => setDraft((v) => ({ ...v, name: e.target.value }))} /></label>
+      <label><span>Deadline</span><input type="date" value={draft.deadline} onChange={(e) => setDraft((v) => ({ ...v, deadline: e.target.value }))} /></label>
+      <button type="button" className="btn btn-primary btn-sm" disabled={create.isPending || !draft.code || !draft.name || !draft.deadline}
+        onClick={() => create.mutate()}>{create.isPending ? "Opening review..." : "Open review"}</button>
+    </section>}
+    {campaignsQ.isLoading && <GridLoader label="Reading access reviews" rows={4} columns={7} />}
+    {campaignsQ.isError && <p className="form-error">{messageOf(campaignsQ.error)}</p>}
+    {campaignsQ.isSuccess && <DataTable name="Access review campaigns" columns={campaignColumns}
+      rows={campaignsQ.data} rowKey={(r) => r.id}
+      note="Overdue campaigns remain open until every captured grant has a decision." />}
+    {selected && <>
+      <h2 className="eyebrow" style={{ marginTop: 20 }}>Captured grants</h2>
+      {itemsQ.isLoading && <GridLoader label="Reading captured grants" rows={6} columns={6} />}
+      {itemsQ.isError && <p className="form-error">{messageOf(itemsQ.error)}</p>}
+      {itemsQ.isSuccess && <DataTable name="Access review items" columns={itemColumns}
+        rows={itemsQ.data} rowKey={(r) => r.id}
+        note="A revoked decision updates the authoritative grant in the same database transaction." />}
+    </>}
+  </>;
 }
 
 // ---------------------------------------------------------------------------

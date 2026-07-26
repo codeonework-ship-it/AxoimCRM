@@ -20,7 +20,7 @@ const SCREEN_INFO: Record<string, string> = {
 const FIELD_INFO: Record<string, string> = {
   Workspace: "The short workspace name for your company, for example meridian.",
   Email: "Use your work email address.",
-  "Work email": "Use the company email that your workspace recognizes.",
+  "Work email": "Use the company email address registered with Axiom.",
   Password: "Enter the password given to you or created during activation.",
   "New password": "Choose the password you want to use from now on.",
   "Confirm password": "Type the same password again so we can catch mistakes.",

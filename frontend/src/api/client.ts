@@ -114,6 +114,19 @@ export interface ReferenceEntryMutation {
   effectiveTo?: string | null;
 }
 
+export interface ResolvedReferenceEntry {
+  entryId: string;
+  valueSet: string;
+  code: string;
+  label: string;
+  asOf: string;
+  effectiveFrom: string | null;
+  effectiveTo: string | null;
+  activeNow: boolean;
+  selectableForNewRecords: boolean;
+  note: string;
+}
+
 export interface LocaleOption {
   code: string;
   englishName: string;
@@ -135,6 +148,205 @@ export interface Account {
   name: string;
   industry: string | null;
   ownerName: string | null;
+}
+
+/* --------------------------------------------------------------- contacts --- */
+
+/**
+ * The full contact row. `version` is the reason this type exists separately from
+ * the lightweight `ContactRow` the picker uses: it is what makes an edit safe to
+ * send back, and a type that omits it lets a caller write an unsafe PUT without
+ * the compiler noticing.
+ */
+export interface ContactDetail {
+  id: string;
+  accountId: string | null;
+  accountName: string | null;
+  firstName: string;
+  lastName: string;
+  title: string | null;
+  department: string | null;
+  seniority: string | null;
+  reportsToContactId: string | null;
+  reportsToName: string | null;
+  ownerId: string | null;
+  ownerName: string | null;
+  email: string | null;
+  phone: string | null;
+  mobile: string | null;
+  status: string;
+  emailBounced: boolean;
+  lastEngagedAt: string | null;
+  sourceSystem: string | null;
+  externalRef: string | null;
+  mergedIntoId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface ContactRequest {
+  firstName: string;
+  lastName: string;
+  accountId?: string | null;
+  title?: string | null;
+  department?: string | null;
+  seniority?: string | null;
+  reportsToContactId?: string | null;
+  ownerId?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  mobile?: string | null;
+  status?: string | null;
+  sourceSystem?: string | null;
+  externalRef?: string | null;
+  acknowledgeDuplicates?: boolean;
+  duplicateReason?: string | null;
+}
+
+export interface ContactTimelineEntry {
+  id: string;
+  activityType: string;
+  subject: string;
+  status: string;
+  ownerName: string | null;
+  occurredAt: string | null;
+  dueAt: string | null;
+}
+
+export interface ContactAddress {
+  id: string;
+  addressType: string;
+  isPrimary: boolean;
+  line1: string;
+  line2: string | null;
+  city: string | null;
+  stateRegion: string | null;
+  postalCode: string | null;
+  countryCode: string | null;
+  validationStatus: string | null;
+}
+
+export interface ContactChannel {
+  id: string;
+  channel: string;
+  channelType: string;
+  value: string;
+  isPrimary: boolean;
+  verifiedAt: string | null;
+}
+
+/* ---------------------------------------------- saved views + bulk edit --- */
+
+/**
+ * The grid state a saved view stores. Mirrors `PersistedGridState` plus the
+ * facets the server accepts — deliberately the same shape, because a saved view
+ * is the live grid's state under a name, not a separate concept.
+ */
+export interface SavedViewDefinition {
+  groupColumns?: string[];
+  columnFilters?: Record<string, string>;
+  sort?: { key: string; direction: 1 | -1 } | null;
+  columnOrder?: string[];
+  hiddenColumns?: string[];
+}
+
+/**
+ * One row of reference.ui_theme (V336). `swatch` is exactly three hex colours —
+ * ground, interactive accent, AI-provenance mark — and the length is enforced by
+ * a database check constraint, so the client can render it without guarding.
+ */
+export interface UiTheme {
+  code: string;
+  name: string;
+  blurb: string;
+  swatch: string[];
+  appearance: "LIGHT" | "DARK";
+  isDefault: boolean;
+  sortOrder: number;
+}
+
+/**
+ * `selected` is the user's stored choice and is null when they have never made
+ * one; `effective` is what to actually paint, which is the selection when it is
+ * still on offer and the default otherwise. Painting `effective` rather than
+ * `selected ?? defaultCode` is what makes retiring a theme actually retire it.
+ */
+export interface UiThemeState {
+  themes: UiTheme[];
+  selected: string | null;
+  defaultCode: string;
+  effective: string;
+}
+
+export interface SavedView {
+  id: string;
+  gridKey: string;
+  name: string;
+  description: string | null;
+  ownerId: string;
+  ownerName: string | null;
+  visibility: "PRIVATE" | "SHARED";
+  definition: SavedViewDefinition;
+  isDefault: boolean;
+  /** False for a shared view owned by somebody else: apply yes, change no. */
+  editable: boolean;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface SavedViewRequest {
+  gridKey: string;
+  name: string;
+  description?: string | null;
+  visibility?: "PRIVATE" | "SHARED";
+  definition: SavedViewDefinition;
+  isDefault?: boolean;
+}
+
+export interface BulkFieldUpdate {
+  recordIds: string[];
+  field: string;
+  value: string | null;
+  reason?: string | null;
+}
+
+export interface BulkReassign {
+  recordIds: string[];
+  ownerId: string;
+  reason?: string | null;
+}
+
+/** One row's outcome. `SKIPPED` and `FAILED` always carry a `detail`. */
+export interface BulkRowOutcome {
+  recordId: string;
+  label: string | null;
+  outcome: "APPLIED" | "SKIPPED" | "FAILED";
+  detail: string | null;
+  beforeValue: string | null;
+  afterValue: string | null;
+}
+
+export interface BulkResult {
+  operationId: string;
+  objectType: string;
+  operation: string;
+  total: number;
+  succeeded: number;
+  failed: number;
+  skipped: number;
+  rows: BulkRowOutcome[];
+  note: string;
+}
+
+/** Everything the detail drawer renders, from one request. */
+export interface ContactView {
+  contact: ContactDetail;
+  directReports: ContactDetail[];
+  timeline: ContactTimelineEntry[];
+  addresses: ContactAddress[];
+  channels: ContactChannel[];
 }
 
 export interface AccountDetail extends Account {
@@ -183,6 +395,54 @@ export interface AccountHierarchy {
   restrictionNote: string | null;
 }
 
+export interface AccountHealthFactor {
+  code: string;
+  label: string;
+  weight: number;
+  score: number;
+  observed: string;
+  direction: string;
+  explanation: string;
+}
+
+export interface AccountHealth {
+  accountId: string;
+  score: number;
+  band: string;
+  factors: AccountHealthFactor[];
+  computedAt: string;
+  previousScore: number | null;
+  previousBand: string | null;
+  changeExplanation: string;
+}
+
+export interface AccountRollupFigures {
+  accountsIncluded: number;
+  openPipelineValue: number;
+  openOpportunityCount: number;
+  closedWonRevenue: number;
+  closedWonCount: number;
+  openCases: number | null;
+  slaBreaches: number | null;
+  caseSignalSource: string | null;
+  caseSignalAsOf: string | null;
+  lastActivityAt: string | null;
+  activityCount90d: number;
+}
+
+export interface AccountRollup {
+  accountId: string;
+  accountName: string;
+  ultimateParentId: string | null;
+  ultimateParentName: string | null;
+  hierarchyDepth: number;
+  accountOnly: AccountRollupFigures;
+  hierarchy: AccountRollupFigures;
+  restricted: boolean;
+  restrictionNote: string | null;
+  unavailableMeasures: { code: string; label: string; reason: string }[];
+}
+
 export type LeadStatus =
   | "NEW"
   | "WORKING"
@@ -199,6 +459,46 @@ export interface Lead {
   email: string | null;
   status: LeadStatus;
   ownerName: string | null;
+}
+
+export interface LeadIngestRequest {
+  firstName: string;
+  lastName: string;
+  company: string;
+  email?: string | null;
+  phone?: string | null;
+  title?: string | null;
+  source?: string | null;
+  campaignCode?: string | null;
+  territory?: string | null;
+  segment?: string | null;
+  productInterest?: string | null;
+  rating?: string | null;
+  status?: string | null;
+  ownerId?: string | null;
+  notes?: string | null;
+  qualificationData?: Record<string, unknown>;
+  customFields?: Record<string, unknown>;
+}
+
+export interface LeadIngestRowResult {
+  rowNumber: number;
+  status: string;
+  recordId: string | null;
+  recordType: string | null;
+  score: number | null;
+  assignment: string | null;
+  errors: string[];
+  message: string;
+}
+
+export interface LeadBatchResult {
+  batchId: string;
+  submitted: number;
+  accepted: number;
+  rejected: number;
+  rows: LeadIngestRowResult[];
+  note: string;
 }
 
 export interface BoardOpportunity {
@@ -222,6 +522,28 @@ export interface BoardStage {
 
 export interface PipelineBoard {
   stages: BoardStage[];
+}
+
+export interface OpportunityGateIssue {
+  gate: string;
+  stageName: string;
+  code: string;
+  criterion: string;
+  observation: string;
+  action: string;
+}
+
+export interface OpportunityGatePreview {
+  opportunityId: string;
+  targetStageId: string;
+  targetStageName: string;
+  transitionKind: string;
+  allowed: boolean;
+  reasonRequired: boolean;
+  appliedExitVersionId: string | null;
+  appliedExitVersionNumber: number;
+  unsatisfied: OpportunityGateIssue[];
+  refusal: string | null;
 }
 
 export interface DashboardStageSlice {
@@ -324,6 +646,23 @@ export interface ReportDefinition {
   description: string;
   allowedFormats: Array<"PDF" | "XLSX" | "DOCX" | string>;
   active: boolean;
+  category: "EXECUTIVE" | "SALES" | "GROWTH" | "CUSTOMER" | "COMMERCIAL" | "GOVERNANCE" | "GENERAL";
+  businessQuestion: string;
+  audience: string[];
+  sortOrder: number;
+}
+
+export interface ReportPreview {
+  code: string;
+  label: string;
+  description: string;
+  category: string;
+  businessQuestion: string;
+  audience: string[];
+  tenantName: string;
+  generatedAt: string;
+  columns: { dimension: string; value: string; detail: string; signal: string };
+  rows: Array<{ metric: string; value: string; detail: string; signal: string }>;
 }
 
 export interface EmailAlert {
@@ -406,6 +745,25 @@ export interface ActivityRequest {
   disposition?: string | null;
 }
 
+export interface EmailTemplate {
+  id: string;
+  apiName: string;
+  name: string;
+  folder: string;
+  description: string | null;
+  sharingScope: string;
+  active: boolean;
+  currentVersion: number;
+  subject: string;
+  body: string;
+  mergeFields: string[];
+  changeNote: string | null;
+  ownerId: string;
+  ownerName: string;
+  canEdit: boolean;
+  updatedAt: string;
+}
+
 export interface CpqProduct {
   id: string;
   code: string;
@@ -439,6 +797,7 @@ export interface CpqQuote {
   quoteNumber: string;
   name: string;
   versionNumber: number;
+  activeVersion: boolean;
   status: string;
   approvalStatus: string;
   accountName: string;
@@ -461,6 +820,17 @@ export interface CpqQuoteSummary {
   acceptedQuotes: number;
   netPipeline: number;
   acceptedRevenue: number;
+}
+
+export interface QuoteRevisionResult {
+  previousQuoteId: string;
+  quoteId: string;
+  quoteGroupId: string;
+  quoteNumber: string;
+  versionNumber: number;
+  status: string;
+  copiedLines: number;
+  message: string;
 }
 
 export interface WorkspaceMetric {
@@ -499,6 +869,66 @@ export interface WorkspaceActionResult {
   details: Record<string, unknown>;
 }
 
+export interface CampaignPerformanceSnapshot {
+  id: string; campaignId: string; members: number; responses: number; mqls: number; sqls: number;
+  budget: number; influencedPipeline: number; roiPercent: number | null; capturedAt: string;
+}
+
+export interface CaseSlaSweepResult {
+  caseId: string; missedMilestones: number; createdEscalations: number; caseStatus: string; message: string;
+}
+
+export interface PartnerRegistration {
+  id: string; registrationNumber: string; customerName: string; dealName: string; status: string;
+  conflictStatus: string; conflictCount: number; protectionExpiresAt: string | null; replayed: boolean;
+}
+
+export interface AutomationRuleVersion {
+  id: string; versionNo: number; notes: string | null; restoredFromVersionNo: number | null;
+  createdAt: string; active: boolean; definition: Record<string, unknown>;
+}
+
+export interface ReportSubscription {
+  id: string; reportCode: string; name: string; format: "PDF" | "XLSX" | "DOCX";
+  frequency: "DAILY" | "WEEKLY" | "MONTHLY"; recipients: string[]; enabled: boolean;
+  nextRunAt: string; lastRunAt: string | null;
+}
+
+export interface ContractRenewalResult {
+  planId: string;
+  sourceContractId: string;
+  generatedContractId: string;
+  generatedContractNumber: string;
+  startDate: string;
+  endDate: string;
+  subscriptionsCopied: number;
+  alreadyGenerated: boolean;
+  message: string;
+}
+
+export interface ForecastScenarioFactor {
+  code: string;
+  label: string;
+  baseline: string;
+  scenario: string;
+  effect: string;
+}
+
+export interface ForecastScenario {
+  id: string;
+  submissionId: string;
+  name: string;
+  amountAdjustmentPct: number;
+  confidencePct: number;
+  riskCount: number;
+  baselineAmount: number;
+  scenarioAmount: number;
+  weightedAmount: number;
+  explanation: ForecastScenarioFactor[];
+  createdAt: string;
+  note: string;
+}
+
 export interface WorkflowGateIssue {
   code: string;
   gate: string;
@@ -528,11 +958,23 @@ export interface WorkflowGateStatus {
 /** HTTP-level failure: server responded with a non-2xx status. */
 export class ApiError extends Error {
   readonly status: number;
+  /**
+   * The parsed error body, when the server sent one.
+   *
+   * <p>Several endpoints answer a 409 with structured detail the UI is meant to
+   * act on rather than merely display — the duplicate engine returns the
+   * candidate records it matched, their confidence, and the exact resolution
+   * ("resend acknowledged, with a reason"). Keeping only `message` threw all of
+   * that away and left the dialog able to say "duplicate" without being able to
+   * show which record, so the user had to go and find it themselves.
+   */
+  readonly payload: unknown;
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, payload?: unknown) {
     super(message);
     this.name = "ApiError";
     this.status = status;
+    this.payload = payload;
   }
 }
 
@@ -595,9 +1037,11 @@ async function request<T>(
   }
 
   if (!res.ok) {
+    let payload: unknown;
     let message = `Request failed (${res.status})`;
     try {
       const data: unknown = await res.json();
+      payload = data;
       if (
         data &&
         typeof data === "object" &&
@@ -609,7 +1053,7 @@ async function request<T>(
     } catch {
       /* non-JSON error body — keep generic message */
     }
-    throw new ApiError(res.status, message);
+    throw new ApiError(res.status, message, payload);
   }
 
   if (res.status === 204) {
@@ -722,12 +1166,115 @@ export const api = {
     return request<void>("DELETE", `/master-data/${encodeURIComponent(master)}/${encodeURIComponent(id)}`);
   },
 
+  /* ------------------------------------------------------------ contacts ----
+     The grid binds to /contacts/full rather than /contacts. Both return the same
+     rows; only the full projection carries `version`, and an editor without the
+     version cannot send a safe PUT — optimistic locking would silently decay
+     into last-write-wins. The lighter endpoint stays for callers that only
+     render names. */
+
+  contactsFull(params: { accountId?: string; search?: string; status?: string } = {}): Promise<ContactDetail[]> {
+    return request<ContactDetail[]>("GET", `/contacts/full${queryString(params)}`);
+  },
+
+  contact(id: string): Promise<ContactDetail> {
+    return request<ContactDetail>("GET", `/contacts/${encodeURIComponent(id)}`);
+  },
+
+  contactView(id: string): Promise<ContactView> {
+    return request<ContactView>("GET", `/contacts/${encodeURIComponent(id)}/view`);
+  },
+
+  createContact(body: ContactRequest): Promise<ContactDetail> {
+    return request<ContactDetail>("POST", "/contacts", body);
+  },
+
+  /** `version` is the one the editor loaded. A 409 means someone else saved first. */
+  updateContact(id: string, version: number, body: ContactRequest): Promise<ContactDetail> {
+    return request<ContactDetail>("PUT", `/contacts/${encodeURIComponent(id)}${queryString({ version })}`, body);
+  },
+
+  cloneContact(id: string, overrides: Partial<ContactRequest> = {}): Promise<ContactDetail> {
+    return request<ContactDetail>("POST", `/contacts/${encodeURIComponent(id)}/clone`, overrides);
+  },
+
+  reassignContact(id: string, ownerId: string, reason?: string): Promise<ContactDetail> {
+    return request<ContactDetail>("POST", `/contacts/${encodeURIComponent(id)}/reassign`, { ownerId, reason });
+  },
+
+  deleteContact(id: string, reason?: string): Promise<void> {
+    return request<void>("DELETE", `/contacts/${encodeURIComponent(id)}${queryString({ reason })}`);
+  },
+
+  /* ----------------------------------------------------------------- ui ----
+     The theme catalogue and this user's choice. One GET returns both, because
+     the theme decides the first paint and two sequential requests would mean
+     painting the default and then switching. */
+
+  uiTheme(): Promise<UiThemeState> {
+    return request<UiThemeState>("GET", "/ui/theme");
+  },
+
+  /**
+   * The catalogue alone, for the sign-in screen — there is no token there, so no
+   * preference to read. The choice is cached locally and attached to the user by
+   * chooseUiTheme once they are signed in.
+   */
+  publicUiThemes(): Promise<UiTheme[]> {
+    return request<UiTheme[]>("GET", "/public/ui/themes");
+  },
+
+  /** Pass null to clear the choice and follow the product default again. */
+  chooseUiTheme(themeCode: string | null): Promise<UiThemeState> {
+    return request<UiThemeState>("PUT", "/ui/theme", { themeCode });
+  },
+
+  /* ------------------------------------------------- saved views + bulk ----
+     `gridKey` is the same string usePersistedGridState uses for localStorage, so
+     a saved view and the live grid are describing the same object. If those two
+     ever diverge, applying a view silently drops whatever the grid understands
+     and the view does not. */
+
+  savedViews(gridKey: string): Promise<SavedView[]> {
+    return request<SavedView[]>("GET", `/list-views${queryString({ gridKey })}`);
+  },
+
+  createSavedView(body: SavedViewRequest): Promise<SavedView> {
+    return request<SavedView>("POST", "/list-views", body);
+  },
+
+  updateSavedView(id: string, version: number, body: SavedViewRequest): Promise<SavedView> {
+    return request<SavedView>("PUT", `/list-views/${encodeURIComponent(id)}${queryString({ version })}`, body);
+  },
+
+  deleteSavedView(id: string): Promise<void> {
+    return request<void>("DELETE", `/list-views/${encodeURIComponent(id)}`);
+  },
+
+  /** Published by the server so the picker offers exactly what it will accept. */
+  bulkEditableFields(): Promise<Record<string, string[]>> {
+    return request<Record<string, string[]>>("GET", "/list-views/bulk/editable-fields");
+  },
+
+  bulkUpdateField(objectType: string, body: BulkFieldUpdate): Promise<BulkResult> {
+    return request<BulkResult>("POST", `/list-views/bulk/${encodeURIComponent(objectType)}/field`, body);
+  },
+
+  bulkReassign(objectType: string, body: BulkReassign): Promise<BulkResult> {
+    return request<BulkResult>("POST", `/list-views/bulk/${encodeURIComponent(objectType)}/reassign`, body);
+  },
+
   referenceValueSets(): Promise<ReferenceValueSet[]> {
     return request<ReferenceValueSet[]>("GET", "/reference/value-sets");
   },
 
   referenceEntries(apiName: string, includeInactive = true): Promise<ReferenceEntry[]> {
     return request<ReferenceEntry[]>("GET", `/reference/value-sets/${encodeURIComponent(apiName)}/entries${queryString({ includeInactive })}`);
+  },
+
+  resolveReferenceEntry(apiName: string, code: string, asOf: string): Promise<ResolvedReferenceEntry> {
+    return request<ResolvedReferenceEntry>("GET",
+      `/reference/value-sets/${encodeURIComponent(apiName)}/resolve/${encodeURIComponent(code)}${queryString({ asOf })}`);
   },
 
   createReferenceEntry(apiName: string, entry: ReferenceEntryMutation): Promise<ReferenceEntry> {
@@ -754,6 +1301,18 @@ export const api = {
     return request<AccountHierarchy>("GET", `/accounts/${encodeURIComponent(id)}/hierarchy`);
   },
 
+  accountRollup(id: string): Promise<AccountRollup> {
+    return request<AccountRollup>("GET", `/accounts/${encodeURIComponent(id)}/rollup`);
+  },
+
+  accountHealth(id: string): Promise<AccountHealth | null> {
+    return request<AccountHealth | null>("GET", `/accounts/${encodeURIComponent(id)}/health`);
+  },
+
+  recomputeAccountHealth(id: string): Promise<AccountHealth> {
+    return request<AccountHealth>("POST", `/accounts/${encodeURIComponent(id)}/health/recompute`);
+  },
+
   leads(params?: ListParams): Promise<PageResult<Lead>> {
     return request<PageResult<{
       id: string; firstName: string; lastName: string; company: string | null;
@@ -775,6 +1334,14 @@ export const api = {
     }));
   },
 
+  captureLead(body: LeadIngestRequest): Promise<LeadIngestRowResult> {
+    return request<LeadIngestRowResult>("POST", "/leads", body);
+  },
+
+  bulkCaptureLeads(rows: LeadIngestRequest[]): Promise<LeadBatchResult> {
+    return request<LeadBatchResult>("POST", "/leads/bulk", rows);
+  },
+
   convertLead(leadId: string): Promise<void> {
     return request<void>("POST", `/leads/${encodeURIComponent(leadId)}/convert`);
   },
@@ -788,11 +1355,16 @@ export const api = {
   },
 
   /** 409 → ApiError whose message is the server's exact stage-gate refusal. */
-  moveOpportunity(opportunityId: string, stageId: string): Promise<void> {
+  previewOpportunityStage(opportunityId: string, targetStageId: string): Promise<OpportunityGatePreview> {
+    return request<OpportunityGatePreview>("GET",
+      `/opportunities/${encodeURIComponent(opportunityId)}/stage-gate${queryString({ targetStageId })}`);
+  },
+
+  moveOpportunity(opportunityId: string, stageId: string, reason?: string): Promise<void> {
     return request<void>(
       "POST",
       `/opportunities/${encodeURIComponent(opportunityId)}/stage`,
-      { stageId },
+      { stageId, reason: reason?.trim() || null },
     );
   },
 
@@ -892,8 +1464,25 @@ export const api = {
     return request<ReportDefinition[]>("GET", "/reports");
   },
 
+  reportPreview(code: string): Promise<ReportPreview> {
+    return request<ReportPreview>("GET", `/reports/${encodeURIComponent(code)}/preview`);
+  },
+
   downloadReport(code: string, format: "PDF" | "XLSX" | "DOCX"): Promise<DownloadedFile> {
     return fileRequest(`/reports/${encodeURIComponent(code)}/download${queryString({ format })}`);
+  },
+
+  reportSubscriptions(): Promise<ReportSubscription[]> {
+    return request<ReportSubscription[]>("GET", "/reports/subscriptions");
+  },
+
+  createReportSubscription(req: { reportCode: string; name: string; format: "PDF" | "XLSX" | "DOCX";
+    frequency: "DAILY" | "WEEKLY" | "MONTHLY"; recipients: string[]; nextRunAt?: string }): Promise<ReportSubscription> {
+    return request<ReportSubscription>("POST", "/reports/subscriptions", req);
+  },
+
+  runDueReportSubscriptions(): Promise<{ subscriptionId: string; status: string; filename: string | null; nextRunAt: string }[]> {
+    return request("POST", "/reports/subscriptions/run-due");
   },
 
   emailAlerts(): Promise<EmailAlert[]> {
@@ -947,6 +1536,19 @@ export const api = {
     return request<ActivityRow>("PATCH", `/activities/${encodeURIComponent(id)}/complete`, { outcome });
   },
 
+  emailTemplates(): Promise<EmailTemplate[]> {
+    return request<EmailTemplate[]>("GET", "/engagement/email-templates");
+  },
+
+  createEmailTemplate(req: { apiName: string; name: string; folder?: string; description?: string;
+    sharingScope: string; subject: string; body: string; mergeFields?: string[]; changeNote?: string }): Promise<EmailTemplate> {
+    return request<EmailTemplate>("POST", "/engagement/email-templates", req);
+  },
+
+  reviseEmailTemplate(id: string, req: { subject: string; body: string; mergeFields?: string[]; changeNote: string }): Promise<EmailTemplate> {
+    return request<EmailTemplate>("POST", `/engagement/email-templates/${encodeURIComponent(id)}/versions`, req);
+  },
+
   cpqProducts(params?: ListParams & { category?: string }): Promise<PageResult<CpqProduct>> {
     return request<PageResult<CpqProduct>>("GET", `/cpq/products${queryString({
       page: params?.page ?? 0,
@@ -979,6 +1581,10 @@ export const api = {
     return fileRequest(`/cpq/quotes/${encodeURIComponent(quoteId)}/download${queryString({ format })}`);
   },
 
+  reviseQuote(quoteId: string, reason: string): Promise<QuoteRevisionResult> {
+    return request<QuoteRevisionResult>("POST", `/cpq/quotes/${encodeURIComponent(quoteId)}/revisions`, { reason });
+  },
+
   workspace(module: "forecast" | "contracts" | "campaigns" | "cases" | "migration" | "partners" | "automation" | "analytics" | "copilot" | "mobile" | "integrations" | "sandbox" | "audit" | "bfsi" | "commodity", params?: ListParams & { status?: string }): Promise<WorkspacePage> {
     return request<WorkspacePage>("GET", `/workspaces/${module}${queryString({
       page: params?.page ?? 0,
@@ -1000,6 +1606,19 @@ export const api = {
     return request<WorkspaceActionResult>("POST", `/workspaces/forecast/${encodeURIComponent(id)}/submit`, {
       managerNote: managerNote?.trim() || null,
     });
+  },
+
+  prepareContractRenewal(id: string, rationale: string): Promise<ContractRenewalResult> {
+    return request<ContractRenewalResult>("POST", `/workspaces/contracts/${encodeURIComponent(id)}/renewal`, { rationale });
+  },
+
+  forecastScenarios(id: string): Promise<ForecastScenario[]> {
+    return request<ForecastScenario[]>("GET", `/workspaces/forecast/${encodeURIComponent(id)}/scenarios`);
+  },
+
+  createForecastScenario(id: string, req: { name: string; amountAdjustmentPct: number;
+    confidencePct?: number; riskReduction?: number }): Promise<ForecastScenario> {
+    return request<ForecastScenario>("POST", `/workspaces/forecast/${encodeURIComponent(id)}/scenarios`, req);
   },
 
   resolveCase(id: string, outcome: string): Promise<WorkspaceActionResult> {
@@ -1024,6 +1643,28 @@ export const api = {
 
   completeCampaign(id: string, outcome: string): Promise<WorkspaceActionResult> {
     return request<WorkspaceActionResult>("POST", `/workspaces/campaigns/${encodeURIComponent(id)}/complete`, { outcome });
+  },
+
+  captureCampaignPerformance(id: string): Promise<CampaignPerformanceSnapshot> {
+    return request<CampaignPerformanceSnapshot>("POST", `/workspaces/campaigns/${encodeURIComponent(id)}/performance`);
+  },
+
+  sweepCaseSla(id: string): Promise<CaseSlaSweepResult> {
+    return request<CaseSlaSweepResult>("POST", `/workspaces/cases/${encodeURIComponent(id)}/sla-sweep`);
+  },
+
+  registerPartnerDeal(id: string, opportunityId: string, amount?: number): Promise<PartnerRegistration> {
+    return request<PartnerRegistration>("POST", `/workspaces/partners/${encodeURIComponent(id)}/registrations`, {
+      opportunityId, amount: amount ?? null, idempotencyKey: crypto.randomUUID(),
+    });
+  },
+
+  automationRuleVersions(id: string): Promise<AutomationRuleVersion[]> {
+    return request<AutomationRuleVersion[]>("GET", `/automation/rules/${encodeURIComponent(id)}/versions`);
+  },
+
+  restoreAutomationRuleVersion(id: string, versionNo: number): Promise<unknown> {
+    return request("POST", `/automation/rules/${encodeURIComponent(id)}/versions/${versionNo}/restore`);
   },
 
   activatePartner(id: string): Promise<WorkspaceActionResult> {

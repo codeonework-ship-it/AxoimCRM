@@ -59,6 +59,29 @@ public enum CrmRole {
         if (!current(role).platform) throw new ForbiddenException("Platform role required");
     }
 
+    /**
+     * The write gate for any state-changing operation.
+     *
+     * <p>Defined in terms of {@code readOnly} rather than an allow-list of roles
+     * that may write, and the direction matters: a role added to this enum in
+     * future is writable unless it declares otherwise, but the two roles that
+     * exist to observe — {@code AUDITOR} inside a tenant and {@code SUPER_AUDIT}
+     * across the platform — are refused by the same flag that describes them.
+     * An auditor with complete read and no write is a requirement of the tenant
+     * role model, and this is where that promise is actually kept; a per-service
+     * list of permitted roles would let it drift the first time someone adds a
+     * service and forgets.
+     *
+     * <p>{@code INTEGRATION} is deliberately not read-only. It is the
+     * non-interactive API identity and exists to write; what it may reach is
+     * constrained by the scopes on its credential, not by this gate.
+     */
+    public static void requireWrite(String role) {
+        if (current(role).readOnly) {
+            throw new ForbiddenException("Your role has read-only access and cannot change records");
+        }
+    }
+
     public static void requireExport(String role) {
         if (!current(role).exportAllowed) throw new ForbiddenException("Your role does not permit data export");
     }

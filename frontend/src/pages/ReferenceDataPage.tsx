@@ -1,11 +1,12 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { api, isUnreachable, type ReferenceEntry, type ReferenceValueSet } from "../api/client";
+import { api, isUnreachable, type ReferenceEntry, type ReferenceValueSet, type ResolvedReferenceEntry } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataGridToolbar } from "../components/DataGridToolbar";
 import { DataViewFrame } from "../components/DataViewFrame";
+import { GridFilterRow } from "../components/GridFilterRow";
 import { InfoTag } from "../components/InfoTag";
 import { canManageMasters } from "../components/MasterToolbar";
 import { useToasts } from "../components/Toasts";
@@ -36,6 +37,19 @@ const REFERENCE_GROUP_COLUMNS: GroupColumn<ReferenceEntry>[] = [
   { key: "systemManaged", label: "System managed", value: (row) => row.systemManaged },
 ];
 
+/**
+ * The columns the entries table actually renders, in render order.
+ *
+ * <p>Deliberately not the same list as above. Grouping can group by a value the
+ * table does not show as a column — "System managed" is groupable but has no
+ * column of its own — whereas an in-header filter must correspond one-to-one to
+ * a rendered column or every cell after the mismatch lands under the wrong
+ * heading. Two lists because they answer two different questions.
+ */
+const REFERENCE_FILTER_COLUMNS = REFERENCE_GROUP_COLUMNS
+  .filter((column) => column.key !== "systemManaged")
+  .map(({ key, label }) => ({ key, label }));
+
 function tabDomId(apiName: string): string {
   return `master-tab-${apiName}`;
 }
@@ -52,6 +66,9 @@ export function ReferenceDataPage() {
   const params = useParams<{ setCode?: string }>();
   const [searchParams] = useSearchParams();
   const [draft, setDraft] = useState(EMPTY_DRAFT);
+  const [asOf, setAsOf] = useState(() => new Date().toISOString().slice(0, 10));
+  const [resolveCode, setResolveCode] = useState("");
+  const [resolved, setResolved] = useState<ResolvedReferenceEntry | null>(null);
   const [counts, setCounts] = useState<Record<string, number>>({});
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
   const pendingFocus = useRef<string | null>(null);
@@ -83,7 +100,11 @@ export function ReferenceDataPage() {
   }, [navigate, selectedApiName, urlIsCanonical]);
 
   // A half-typed value from one master must not leak into the next.
-  useEffect(() => setDraft(EMPTY_DRAFT), [selectedApiName]);
+  useEffect(() => {
+    setDraft(EMPTY_DRAFT);
+    setResolveCode("");
+    setResolved(null);
+  }, [selectedApiName]);
 
   // Counts are only ever shown for sets whose entries have actually loaded —
   // never estimated, never faked.
@@ -132,6 +153,14 @@ export function ReferenceDataPage() {
       void queryClient.invalidateQueries({ queryKey: ["reference", "entries", selectedApiName] });
     },
     onError: (error) => toasts.push("error", "Reference update failed", error instanceof Error ? error.message : "Update failed."),
+  });
+  const resolveMutation = useMutation({
+    mutationFn: () => api.resolveReferenceEntry(selectedApiName, resolveCode, asOf),
+    onSuccess: setResolved,
+    onError: (error) => {
+      setResolved(null);
+      toasts.push("error", "No value for that date", error instanceof Error ? error.message : "Resolution failed.");
+    },
   });
   const activeGroupColumns = selectedGroupColumns(REFERENCE_GROUP_COLUMNS, groupColumns);
   const visibleEntries = sortByGroups(
@@ -195,7 +224,6 @@ export function ReferenceDataPage() {
         groupColumns={REFERENCE_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
         selectedGroupColumns={groupColumns}
         onGroupColumnsChange={setGroupColumns}
-        filterColumns={REFERENCE_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
         columnFilters={columnFilters}
         onColumnFiltersChange={setColumnFilters}
         auditEntityType="REFERENCE_VALUE_SET"
@@ -244,6 +272,23 @@ export function ReferenceDataPage() {
         <header>
           <div><span className="eyebrow">{activeSet.module}</span><h2>{activeSet.label}</h2><p>{activeSet.description ?? "Tenant-scoped governed values."}</p></div>
         </header>
+        <section className="list-controls" aria-label="Resolve a historical reference value">
+          <label><span>Value code <InfoTag text="Choose the stored code from a historical record." label="Historical value code help" /></span>
+            <select value={resolveCode} onChange={(event) => { setResolveCode(event.target.value); setResolved(null); }}>
+              <option value="">Choose a value</option>
+              {(entriesQ.data ?? []).map((entry) => <option key={entry.id} value={entry.code}>{entry.code} — {entry.label}</option>)}
+            </select>
+          </label>
+          <label><span>Record date <InfoTag text="Axiom resolves the label that was effective on this business date, even if the value is inactive today." label="As-of date help" /></span>
+            <input type="date" value={asOf} onChange={(event) => { setAsOf(event.target.value); setResolved(null); }} />
+          </label>
+          <button type="button" className="btn btn-sm" disabled={!resolveCode || !asOf || resolveMutation.isPending}
+            onClick={() => resolveMutation.mutate()}>{resolveMutation.isPending ? "Resolving..." : "Resolve as of date"}</button>
+          {resolved && <div className="panel inline-result" role="status">
+            <strong>{resolved.code} — {resolved.label}</strong>
+            <span>{resolved.note}</span>
+          </div>}
+        </section>
         {canManage && <div className="reference-entry-form">
           <span className="reference-form-help"><InfoTag text="Add a new dropdown value. Codes are system-friendly names; labels are what users read." label="Reference value form help" /></span>
           <input title="Short system code for this value, usually uppercase." value={draft.code} onChange={(event) => setDraft((value) => ({ ...value, code: event.target.value.toUpperCase() }))} placeholder="CODE" aria-label="Reference code" />
@@ -253,7 +298,13 @@ export function ReferenceDataPage() {
         </div>}
         {entriesQ.isLoading && <GridLoader label="Reading value set" rows={5} columns={5} />}
         {entriesQ.isError && <p className="empty-note">Entries failed to load{entriesQ.error instanceof Error ? `: ${entriesQ.error.message}` : "."}</p>}
-        {entriesQ.isSuccess && <div className="table-wrap"><table className="data-table"><thead><tr><th>Code</th><th>Label</th><th>Order</th><th>Status</th>{canManage && <th className="table-action">Action</th>}</tr></thead>
+        {entriesQ.isSuccess && <div className="table-wrap"><table className="data-table"><thead><tr><th>Code</th><th>Label</th><th>Order</th><th>Status</th>{canManage && <th className="table-action">Action</th>}</tr>
+          <GridFilterRow
+            columns={REFERENCE_FILTER_COLUMNS}
+            filters={columnFilters}
+            onChange={setColumnFilters}
+            trailing={canManage ? 1 : 0}
+          /></thead>
           <tbody>{visibleEntries.map((entry, index, all) => {
             const group = entry.active ? "Active" : "Inactive";
             const previous = all[index - 1];

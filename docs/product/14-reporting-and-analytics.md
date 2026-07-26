@@ -58,6 +58,83 @@ Custom objects and fields are reportable the moment they exist (`FR-ADM-001`), a
 
 Natural-language report generation (`F-257`) emits a builder-native report definition — inspectable and editable like any hand-built report, with the interpretation displayed per [AI capabilities](11-ai-capabilities.md) §2.4. With AI off, the builder is unaffected (`FR-AIX-013`).
 
+### 4.1 Analytics Studio implementation contract
+
+The runnable Analytics Studio at `/reports` is one product surface over the governed engine, not a second reporting implementation:
+
+- The route starts with two explicit workspaces. **Reports Studio** is the standard Jasper grid and full-document viewer; **Custom Reports** contains the no-code builder, dashboards, formulas, collaboration and delivery configuration. A user browsing an approved report never has to pass through authoring controls.
+- Selecting a standard report renders an accessible semantic document from the exact tenant-scoped rows and column contract supplied to Jasper. This avoids depending on native PDF plug-ins, which can expose a blank surface in hardened browsers and WebViews, without creating a second calculation path. PDF, Excel and Word remain adjacent authoritative Jasper download actions.
+- The standard portfolio is a governed data grid with per-column search/filter, sorting, multi-column grouping, audit, snapshot copy, current-view export and full-size review. Selection, document full view, refresh, scheduling and Jasper download are keyboard-addressable.
+
+- Field chips can be dragged into detail, row-group, measure and pivot-column zones; click-to-add remains available for keyboard and touch users.
+- Tabular, summary and matrix/pivot definitions are stored as structured JSON and revalidated on every save and execution.
+- Calculated measures use the closed Axiom expression grammar. SQL, scripts, assignment, loops and class/member access are not accepted.
+- Conditional formatting is metadata over named output fields. Operators and six-digit colours are validated by the API before they are saved.
+- Cross-module joins are expressed through administrator-approved related-record semantics (`WITH` / `WITHOUT`), never user-authored join SQL.
+- Dashboard widgets reference saved report definitions and use a validated twelve-column layout. Available visualizations are KPI, bar, line, area, donut, funnel, table, pivot and summary.
+- Shares and comments are tenant-scoped. Every viewer still receives a result computed under their own record and field access.
+- Embedded views are authenticated-only and allow exact-origin allow-lists. An anonymous embed is rejected by the database constraint.
+- Delivery policies can be periodic or governed-KPI threshold driven. Artifact generation is first-party; the external mail adapter remains `PENDING_ADAPTER` until a configured vendor transport reports delivery.
+- `/api/v1/analytics/studio/performance` exposes the rolling 30-day execution count, timeouts, truncations, P95 and maximum server time. `scripts/validate-reporting-scale.ps1` is the repeatable release gate and refuses to call a demo-sized dataset a scale test unless explicitly run as a smoke check.
+
+### 4.2 Governed Jasper report portfolio
+
+The standard catalogue is a decision portfolio, not a collection of database dumps. Every report declares the business question it answers, its recommended audience, its collection and its supported document formats. All twenty-one reports render through the same governed Jasper layout and are available as PDF, Excel and Word.
+
+| Collection | Report | Decision supported | Recommended audience |
+|---|---|---|---|
+| Executive | Revenue Command Summary | What is the commercial position of this tenant now? | CRO, revenue operations, tenant administrator |
+| Sales | Pipeline by Stage | Where is pipeline concentrated and what value is exposed? | Sales manager, account executive |
+| Sales | Forecast Commitment | What is committed, likely and at risk for the forecast period? | CRO, sales manager, finance |
+| Sales | Pipeline Aging and Risk | Which opportunities are stalled or overdue for intervention? | Sales manager, account executive, revenue operations |
+| Sales | Win/Loss Analysis | Why are deals won or lost and where should coaching focus? | Sales manager, revenue operations |
+| Growth | Lead Conversion Funnel | Where are leads accumulating or falling out of the funnel? | Marketing, SDR manager, revenue operations |
+| Growth | Lead Source Conversion | Which acquisition sources create qualified demand? | Marketing, SDR manager |
+| Sales | Sales Activity Productivity | Which activity patterns support active pipeline? | Sales manager, account executive |
+| Customer | Account Health Portfolio | Which accounts need retention or expansion attention? | Customer success, account executive |
+| Customer | Customer Service SLA | Where are case volume and service risk concentrated? | Service manager, customer success |
+| Commercial | Quote Conversion and Margin | Which quote outcomes and discount levels threaten conversion or margin? | CPQ manager, finance, sales manager |
+| Growth | Campaign ROI | Which campaigns are converting spend into pipeline and revenue? | Marketing, finance |
+| Governance | Data Quality Exceptions | Which missing or invalid fields make CRM decisions unreliable? | Data steward, revenue operations, auditor |
+| Sales | Quota Attainment by Representative and Territory | Who is ahead of quota and where is the governed target gap? | CRO, sales manager, finance, revenue operations |
+| Sales | Forecast Accuracy and Directional Bias | Are submissions accurate, systematically optimistic or systematically conservative? | CRO, sales manager, finance, revenue operations |
+| Sales | Stage Conversion and Sales Velocity | Which stage cohorts convert, stall or consume the most time? | CRO, sales manager, revenue operations |
+| Customer | Renewal, Churn and ARR Movement Bridge | What changed recurring revenue and what is due for renewal? | CRO, finance, account manager, service manager |
+| Sales | Pipeline Movement Waterfall | Which named movements reconcile opening pipeline to closing pipeline? | CRO, sales manager, revenue operations, finance |
+| Customer | Account Whitespace and Cross-Sell Opportunity | Which active catalogue products are absent from each account relationship? | Account manager, seller, sales manager |
+| Executive | Customer 360 Executive Brief | What is each customer complete commercial, health, renewal and service posture? | CEO, CRO, account manager, service manager |
+| Governance | Discount Leakage and Approval Governance | Where do discount or margin exceptions need approval review? | Finance, sales manager, operations, auditor |
+
+The catalogue API rejects an enabled definition whose query implementation is unknown. This fail-closed rule prevents a newly seeded report from silently returning another report's data. Export runs are recorded with the report definition, format, generated row count and user identity.
+
+### 4.3 Report delivery status and discovery roadmap
+
+New reports are selected by business decision, data readiness and repeatability. A mock-up is not considered shipped until its authoritative inputs, calculation grain, tenant isolation, RBAC behaviour, empty-data state and all three export formats are verified.
+
+**Delivered from first-party governed data:**
+
+1. **Quota attainment by representative and territory** — uses the current versioned quota and closed-won revenue in its fiscal period. Team quotas explicitly name the missing team-credit mapping rather than borrowing another scope.
+2. **Forecast accuracy and directional bias** — compares each submitted owner-period forecast with closed-won actuals in that exact period.
+3. **Stage conversion and sales velocity** — uses append-only stage occupancy cohorts, forward exits and elapsed stage time.
+4. **Renewal, churn and ARR movement bridge** — annualizes governed subscriptions and separates opening, new, churned, renewal-due and closing ARR.
+5. **Pipeline movement waterfall** — reconstructs opening and closing state from append-only history so its value buckets reconcile.
+6. **Account whitespace and cross-sell opportunity** — subtracts active subscriptions and open opportunity lines from the active product catalogue.
+7. **Customer 360 executive brief** — combines health, ARR, pipeline, contacts, service demand and renewal timing at account grain.
+8. **Discount leakage and approval governance** — compares quote and line discounts with margin and approval state.
+
+**Following priority — valuable after data-quality gates pass:**
+
+- Marketing attribution-model comparison.
+- Duplicate, stale-data and workflow-gate exception trends.
+
+**Connector-dependent ideas — deliberately not presented as complete:**
+
+- CAC, gross margin and payback need authoritative finance cost inputs.
+- Product-usage-to-renewal correlation needs product telemetry.
+- Email and call sentiment needs an approved communications/transcription adapter and AI governance.
+
+Each roadmap candidate must show missing inputs rather than fabricating a partial metric. That is the practical meaning of the product principle, "explain every number."
+
 ## 5. Access-aware results and drill-through
 
 Two rules, both enforced server-side:

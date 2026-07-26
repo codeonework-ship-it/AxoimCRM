@@ -1,5 +1,8 @@
 package com.axiom.api;
 
+import com.axiom.leads.LeadIngestRequest;
+import com.axiom.leads.LeadIngestionService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -13,6 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.UUID;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/leads")
@@ -20,10 +24,12 @@ public class LeadController {
 
     private final QueryService queries;
     private final LeadService leadService;
+    private final LeadIngestionService ingestion;
 
-    public LeadController(QueryService queries, LeadService leadService) {
+    public LeadController(QueryService queries, LeadService leadService, LeadIngestionService ingestion) {
         this.queries = queries;
         this.leadService = leadService;
+        this.ingestion = ingestion;
     }
 
     @GetMapping
@@ -35,6 +41,17 @@ public class LeadController {
 
     public record ConvertRequest(String accountName, String opportunityName, BigDecimal amount) {}
     public record DisqualifyRequest(String reasonCode, String note, LocalDate recycleDate) {}
+
+    @PostMapping
+    @ResponseStatus(HttpStatus.CREATED)
+    public LeadIngestionService.RowResult capture(@RequestBody @Valid LeadIngestRequest request) {
+        return ingestion.single(request);
+    }
+
+    @PostMapping("/bulk")
+    public LeadIngestionService.BatchResult bulk(@RequestBody List<LeadIngestRequest> requests) {
+        return ingestion.bulk(requests);
+    }
 
     @PostMapping("/{id}/convert")
     @ResponseStatus(HttpStatus.CREATED)

@@ -2,6 +2,7 @@ package com.axiom.analytics;
 
 import com.axiom.common.ConflictException;
 import com.axiom.common.NotFoundException;
+import com.axiom.auth.CrmRole;
 import com.axiom.tenancy.TenantContext;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -62,8 +63,18 @@ public class ReportViewService {
         return jdbc.query("""
                 select id, code, name, description, dataset, format, definition,
                        created_by, created_at, updated_at
-                  from analytics.report_view where tenant_id = ? order by name
-                """, this::map, TenantContext.get().tenantId());
+                  from analytics.report_view r
+                 where tenant_id = ? and archived_at is null and (
+                       ? or created_by = ? or exists (
+                         select 1 from analytics.report_share s
+                          where s.tenant_id=r.tenant_id and s.report_view_id=r.id and s.revoked_at is null
+                            and ((s.principal_type='USER' and s.principal_key in (?, ?))
+                              or (s.principal_type='ROLE' and s.principal_key=?)
+                              or s.principal_type='TENANT')))
+                 order by name
+                """, this::map, TenantContext.get().tenantId(), platformViewer(),
+                TenantContext.get().userId(), TenantContext.get().userId().toString(),
+                TenantContext.get().email(), TenantContext.get().role());
     }
 
     @Transactional(readOnly = true)
@@ -71,14 +82,23 @@ public class ReportViewService {
         List<SavedReport> found = jdbc.query("""
                 select id, code, name, description, dataset, format, definition,
                        created_by, created_at, updated_at
-                  from analytics.report_view where tenant_id = ? and code = ?
-                """, this::map, TenantContext.get().tenantId(), code);
+                  from analytics.report_view r where tenant_id = ? and code = ? and archived_at is null and (
+                       ? or created_by = ? or exists (
+                         select 1 from analytics.report_share s
+                          where s.tenant_id=r.tenant_id and s.report_view_id=r.id and s.revoked_at is null
+                            and ((s.principal_type='USER' and s.principal_key in (?, ?))
+                              or (s.principal_type='ROLE' and s.principal_key=?)
+                              or s.principal_type='TENANT')))
+                """, this::map, TenantContext.get().tenantId(), code, platformViewer(),
+                TenantContext.get().userId(), TenantContext.get().userId().toString(),
+                TenantContext.get().email(), TenantContext.get().role());
         if (found.isEmpty()) throw new NotFoundException("No saved report with code " + code);
         return found.get(0);
     }
 
     @Transactional
     public SavedReport save(SaveRequest request) {
+        CrmRole.requireWrite(TenantContext.get().role());
         ReportQueryService.ReportRequest definition = request.definition();
         AnalyticsDataset dataset = AnalyticsDataset.of(definition == null ? null : definition.dataset());
         // Validate now, so a report that cannot run is never saved. The cheapest way
@@ -103,7 +123,7 @@ public class ReportViewService {
                     on conflict (tenant_id, code) do update set
                       name = excluded.name, description = excluded.description,
                       dataset = excluded.dataset, format = excluded.format,
-                      definition = excluded.definition, updated_at = now()
+                      definition = excluded.definition, archived_at = null, updated_at = now()
                     """, TenantContext.get().tenantId(), request.code(), request.name(),
                     request.description(), dataset.name(), format, payload,
                     TenantContext.get().userId());
@@ -115,9 +135,14 @@ public class ReportViewService {
 
     @Transactional
     public void delete(String code) {
-        int removed = jdbc.update("delete from analytics.report_view where tenant_id = ? and code = ?",
+        CrmRole.requireWrite(TenantContext.get().role());
+        int removed = jdbc.update("update analytics.report_view set archived_at=now(), updated_at=now() where tenant_id = ? and code = ? and archived_at is null",
                 TenantContext.get().tenantId(), code);
         if (removed == 0) throw new NotFoundException("No saved report with code " + code);
+    }
+
+    private static boolean platformViewer() {
+        return CrmRole.current(TenantContext.get().role()).platform();
     }
 
     private SavedReport map(java.sql.ResultSet rs, int rowNum) throws java.sql.SQLException {

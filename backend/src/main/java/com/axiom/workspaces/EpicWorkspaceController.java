@@ -1,5 +1,6 @@
 package com.axiom.workspaces;
 
+import com.axiom.automation.SimulationService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,12 +20,24 @@ public class EpicWorkspaceController {
     private final EpicWorkspaceService workspaces;
     private final WorkspaceExportService exports;
     private final WorkspaceActionService actions;
+    private final MarketingPerformanceService marketingPerformance;
+    private final CaseSlaService caseSla;
+    private final PartnerDealService partnerDeals;
+    private final SimulationService simulations;
 
     public EpicWorkspaceController(EpicWorkspaceService workspaces, WorkspaceExportService exports,
-                                   WorkspaceActionService actions) {
+                                   WorkspaceActionService actions,
+                                   MarketingPerformanceService marketingPerformance,
+                                   CaseSlaService caseSla,
+                                   PartnerDealService partnerDeals,
+                                   SimulationService simulations) {
         this.workspaces = workspaces;
         this.exports = exports;
         this.actions = actions;
+        this.marketingPerformance = marketingPerformance;
+        this.caseSla = caseSla;
+        this.partnerDeals = partnerDeals;
+        this.simulations = simulations;
     }
 
     @GetMapping("/forecast")
@@ -163,7 +176,14 @@ public class EpicWorkspaceController {
     public WorkspaceActionService.ActionResult simulateAutomation(
             @PathVariable UUID id,
             @RequestBody(required = false) WorkspaceActionService.AutomationSimulateRequest request) {
-        return actions.simulateAutomation(id, request);
+        SimulationService.SimulationRequest input = new SimulationService.SimulationRequest(
+                null, request == null ? null : request.sampleSize(), null, "UPDATE", null);
+        SimulationService.SimulationResult result = simulations.simulate(id, input);
+        simulations.recordSimulationRun(id, result);
+        return new WorkspaceActionService.ActionResult(id, "automation", "SIMULATED",
+                "Canonical rule simulation completed without business writes.",
+                java.util.Map.of("matched", result.recordsMatched(), "evaluated", result.recordsEvaluated(),
+                        "wouldExecute", result.wouldBeActionCount(), "anythingWritten", result.anythingWasWritten()));
     }
 
     @PostMapping("/migration/{id}/validate")
@@ -188,6 +208,37 @@ public class EpicWorkspaceController {
             @PathVariable UUID id,
             @RequestBody WorkspaceActionService.CampaignCompleteRequest request) {
         return actions.completeCampaign(id, request);
+    }
+
+    @GetMapping("/campaigns/{id}/performance")
+    public MarketingPerformanceService.Snapshot campaignPerformance(@PathVariable UUID id) {
+        return marketingPerformance.latest(id);
+    }
+
+    @PostMapping("/campaigns/{id}/performance")
+    public MarketingPerformanceService.Snapshot captureCampaignPerformance(@PathVariable UUID id) {
+        return marketingPerformance.capture(id);
+    }
+
+    @GetMapping("/cases/{id}/escalations")
+    public java.util.List<CaseSlaService.Escalation> caseEscalations(@PathVariable UUID id) {
+        return caseSla.list(id);
+    }
+
+    @PostMapping("/cases/{id}/sla-sweep")
+    public CaseSlaService.SweepResult sweepCaseSla(@PathVariable UUID id) {
+        return caseSla.sweep(id);
+    }
+
+    @GetMapping("/partners/{id}/registrations")
+    public java.util.List<PartnerDealService.Registration> partnerRegistrations(@PathVariable UUID id) {
+        return partnerDeals.list(id);
+    }
+
+    @PostMapping("/partners/{id}/registrations")
+    public PartnerDealService.Registration registerPartnerDeal(
+            @PathVariable UUID id, @RequestBody PartnerDealService.RegisterRequest request) {
+        return partnerDeals.register(id, request);
     }
 
     @PostMapping("/partners/{id}/activate")

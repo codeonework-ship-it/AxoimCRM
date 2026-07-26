@@ -38,13 +38,15 @@ import java.util.UUID;
 public class SsoController {
 
     private final IdpConfigService configs;
+    private final IdpCertificateAlertService certificateAlerts;
     private final SsoFlowService flows;
     private final StepUpService stepUp;
     private final JdbcTemplate jdbc;
 
-    public SsoController(IdpConfigService configs, SsoFlowService flows, StepUpService stepUp,
-                         JdbcTemplate jdbc) {
+    public SsoController(IdpConfigService configs, IdpCertificateAlertService certificateAlerts,
+                         SsoFlowService flows, StepUpService stepUp, JdbcTemplate jdbc) {
         this.configs = configs;
+        this.certificateAlerts = certificateAlerts;
         this.flows = flows;
         this.stepUp = stepUp;
         this.jdbc = jdbc;
@@ -87,6 +89,16 @@ public class SsoController {
     @PostMapping("/identity/idp/{id}/test")
     public IdpConfigService.TestResult test(@PathVariable UUID id) {
         return configs.test(id);
+    }
+
+    @GetMapping("/identity/idp/certificate-alerts")
+    public List<IdpCertificateAlertService.AlertRow> certificateAlerts() {
+        return certificateAlerts.history();
+    }
+
+    @PostMapping("/identity/idp/certificate-alerts/sweep")
+    public Map<String, Integer> sweepCertificateAlerts() {
+        return Map.of("alertsCreated", certificateAlerts.sweepNow());
     }
 
     // ---------------------------------------------------------------- routing

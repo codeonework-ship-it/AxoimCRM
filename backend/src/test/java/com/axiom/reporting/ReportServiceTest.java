@@ -5,11 +5,14 @@ import com.axiom.tenancy.TenantContext;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.ResourceLoader;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.mock;
 
@@ -26,5 +29,23 @@ class ReportServiceTest {
 
     @Test void integrationRoleCannotExportReports() {
         assertThrows(ForbiddenException.class, () -> service.export("tenant_summary", ReportService.ReportFormat.PDF));
+    }
+
+    @Test void crmPortfolioHasAnImplementedQueryContractForEverySeededReport() {
+        assertEquals(21, ReportService.supportedReportCodes().size());
+        assertEquals(java.util.Set.of(
+                "tenant_summary", "pipeline_snapshot", "forecast_commitment", "pipeline_aging_risk",
+                "win_loss_analysis", "lead_conversion_funnel", "lead_source_conversion",
+                "sales_activity_productivity", "account_health_portfolio", "customer_service_sla",
+                "quote_conversion_margin", "campaign_roi", "data_quality_exceptions",
+                "quota_attainment", "forecast_accuracy_bias", "stage_conversion_velocity",
+                "renewal_arr_bridge", "pipeline_movement_waterfall", "account_whitespace",
+                "customer_360_brief", "discount_approval_governance"
+        ), ReportService.supportedReportCodes());
+    }
+
+    @Test void crmInsightJasperTemplateCompiles() throws Exception {
+        var resource = new ClassPathResource("reports/crm-insight-report.jrxml");
+        assertNotNull(net.sf.jasperreports.engine.JasperCompileManager.compileReport(resource.getInputStream()));
     }
 }

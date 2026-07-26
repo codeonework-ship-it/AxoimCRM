@@ -14,6 +14,7 @@ import org.mockito.ArgumentCaptor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -318,6 +319,48 @@ class ReportQueryGovernanceTest {
                 null, null, null, null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("is not numeric");
+    }
+
+    @Test
+    @DisplayName("calculated measures use the sandboxed expression language and become governed output columns")
+    void calculatedMeasuresAreEvaluatedWithoutSql() {
+        when(authorization.visibleRecordPredicate(eq(SecurableObject.OPPORTUNITY), anyString()))
+                .thenReturn(ALLOW_ALL);
+        when(jdbc.query(anyString(), any(Object[].class), any(RowMapper.class)))
+                .thenReturn(List.of(new LinkedHashMap<>(Map.of("amount", new BigDecimal("125000"),
+                                "probability", new BigDecimal("0.4")))))
+                .thenReturn(List.of(Map.of("recordCount", 1)));
+
+        ReportQueryService.ReportResult result = service.run(new ReportQueryService.ReportRequest(
+                "OPPORTUNITY", "TABULAR", List.of("amount", "probability"), null, null, null,
+                null, null, null, null, null,
+                List.of(new ReportQueryService.CalculatedMeasure("riskAdjusted", "Risk adjusted", "amount * probability")),
+                List.of(new ReportQueryService.ConditionalRule("riskAdjusted", "GT", "40000", "#FFFFFF", "#9A3412"))));
+
+        assertThat(result.rows().get(0)).containsEntry("riskAdjusted", new BigDecimal("50000.0"));
+        assertThat(result.columns()).extracting(ReportQueryService.Column::field).contains("riskAdjusted");
+        assertThat(result.conditionalRules()).hasSize(1);
+        // The formula never appears in generated SQL: it is parsed and evaluated over already-authorized output.
+        assertThat(firstQuery()).doesNotContain("probability *").doesNotContain("riskAdjusted");
+    }
+
+    @Test
+    @DisplayName("calculated measures cannot smuggle SQL or reference fields outside the report output")
+    void calculatedMeasuresRejectUnknownReferences() {
+        when(authorization.visibleRecordPredicate(eq(SecurableObject.OPPORTUNITY), anyString()))
+                .thenReturn(ALLOW_ALL);
+        when(jdbc.query(anyString(), any(Object[].class), any(RowMapper.class)))
+                .thenReturn(List.of(new LinkedHashMap<>(Map.of("amount", new BigDecimal("1")))))
+                .thenReturn(List.of());
+
+        assertThatThrownBy(() -> service.run(new ReportQueryService.ReportRequest(
+                "OPPORTUNITY", "TABULAR", List.of("amount"), null, null, null, null,
+                null, null, null, null,
+                List.of(new ReportQueryService.CalculatedMeasure("unsafe", "Unsafe", "secretMargin + 1")),
+                List.of())))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("references unavailable fields")
+                .hasMessageContaining("secretMargin");
     }
 
     // ------------------------------------------------------------------ helpers

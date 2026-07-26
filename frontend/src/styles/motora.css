@@ -126,7 +126,7 @@ thead th,
   letter-spacing: 0.3em;
   color: var(--cyan);
 }
-.eyebrow::before { content: "//"; opacity: 0.7; }
+.eyebrow::before { content: none; }
 .num, .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 
 /* ---- Command rail -------------------------------------------------------- */
@@ -201,14 +201,7 @@ thead th,
     background var(--speed) var(--ease), color var(--speed) var(--ease),
     border-color var(--speed) var(--ease);
 }
-.btn:hover {
-  transform: translateY(-1px);
-  border-color: var(--cyan);
-  color: var(--cyan);
-  background: transparent;
-  box-shadow: none;
-}
-.btn:active { transform: translateY(0); }
+/* No :hover or :active restyling on buttons — see the rule in app.css. */
 
 .btn-primary,
 .btn.btn-primary {
@@ -216,12 +209,6 @@ thead th,
   background: var(--cyan);
   color: #03222b;
   font-weight: 700;
-  filter: none;
-}
-.btn-primary:hover {
-  background: var(--cyan);
-  color: #03222b;
-  box-shadow: 0 0 22px rgba(53, 224, 255, 0.45);
   filter: none;
 }
 /* The previous skin's sweep pseudo-element would sit over the cyan fill. */
@@ -237,7 +224,6 @@ thead th,
   background: transparent;
   color: var(--red);
 }
-.btn-danger:hover { background: var(--red); color: #2a0a0a; box-shadow: 0 0 18px rgba(255, 93, 93, 0.35); }
 .btn-sm, .btn.btn-sm { min-height: 32px; padding: 6px 13px; font-size: 0.64rem; }
 .btn[aria-pressed="true"] { background: var(--cyan); border-color: var(--cyan); color: #03222b; }
 
@@ -249,7 +235,6 @@ thead th,
   background: rgba(5, 7, 11, 0.6);
   color: var(--muted);
 }
-.icon-btn:hover { color: var(--cyan); border-color: var(--cyan); background: rgba(5, 7, 11, 0.6); }
 
 .link-btn {
   font-family: var(--mono);
@@ -693,16 +678,6 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   background: var(--cyan);
   color: #03222b;
 }
-.btn-primary:hover,
-.btn.btn-primary:hover {
-  box-shadow: 0 0 18px rgba(53, 224, 255, 0.4);
-}
-
-/* Secondary reads as a console key via its hairline and cyan hover. */
-.btn:not(.btn-primary):not(.btn-danger):hover {
-  border-color: var(--cyan);
-  color: var(--cyan);
-}
 
 /* ============================================================================
    ARCTIC FROST — daylight refinement + icon-button repair
@@ -718,11 +693,6 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   background: transparent;
   color: var(--ink-soft);
   border-color: var(--line-bright);
-}
-.icon-btn:hover {
-  background: var(--cyan-dim);
-  border-color: var(--cyan);
-  color: var(--cyan);
 }
 .icon-btn svg { width: 18px; height: 18px; }
 /* The mobile menu button is transparent-bordered at rest elsewhere; give it the
@@ -782,8 +752,6 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
 :root[data-theme="light"] .rail-avatar { background: rgba(127, 215, 245, 0.16); color: #7fd7f5; }
 
 /* Daylight is quiet: no ambient glow anywhere. */
-:root[data-theme="light"] .btn-primary:hover,
-:root[data-theme="light"] .btn:hover,
 :root[data-theme="light"] .rail-btn.active::before,
 :root[data-theme="light"] .master-tab[aria-selected="true"] {
   box-shadow: none;
@@ -805,11 +773,9 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   border-color: var(--cyan);
   color: #ffffff;
 }
-:root[data-theme="light"] .btn-primary:hover { background: var(--cyan-deep); border-color: var(--cyan-deep); }
 
 /* Secondary: hairline on snow. */
 :root[data-theme="light"] .btn { border-color: var(--line-bright); color: var(--ink-soft); }
-:root[data-theme="light"] .btn:hover { border-color: var(--cyan); color: var(--cyan); }
 
 /* Frosted popovers. */
 :root[data-theme="light"] .user-pop,
@@ -821,6 +787,307 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   box-shadow: 0 20px 48px rgba(13, 27, 42, 0.14);
 }
 :root[data-theme="light"] .user-trigger { background: var(--panel); border-color: var(--line-bright); }
+
+/* ============================================================================
+   MERIDIAN — skin.
+
+   ONE RULE GENERATES ALMOST EVERYTHING BELOW: THE LIGHT COMES FROM ABOVE, AND
+   IT IS WARM.
+
+   That is the whole difference between a light theme that feels designed and one
+   that feels like the dark theme with the colours flipped. On a dark ground a
+   surface separates from its neighbour by emitting; on a light ground it has to
+   separate by being LIT — which means a consistent light direction, and that
+   means every raised surface gets the same two-part treatment:
+
+     1. a warm near-white top edge   (inset 0 1px 0)     — the lit face
+     2. a warm shadow falling down   (0 Npx rgba warm)   — the cast
+
+   and every recessed surface gets the inverse: a shadow at the TOP edge, so it
+   reads as pressed into the page. Table heads, tool trays and wells are all
+   recessed; panels, cards, buttons and popovers are all raised. Applied without
+   exception, that single convention is what makes the interface feel physical
+   at a glance, and it costs two declarations per surface.
+
+   EVERY rgba() here is warm ink — rgb(74, 60, 38) — never the cool rgb(13, 27,
+   42) this file used for Arctic Frost. On warm stone a cool-grey shadow turns
+   visibly blue-violet where it meets the surface, which reads as a colour-
+   management fault rather than as depth. The shadow family has to match the
+   surface family.
+   ============================================================================ */
+
+:root[data-theme="meridian"] body { background-color: var(--bg); }
+
+/* The ground is stone with the light falling across it, not a flat fill. Two
+   very low-alpha washes: a warm one from the top-left where the light enters,
+   and a cool one settling into the bottom-right where it does not reach. The
+   pair is what gives a large empty viewport somewhere to go, and neither is
+   strong enough to affect the contrast of anything sitting on top. */
+:root[data-theme="meridian"] .app-ground {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(1100px 620px at 12% -12%, rgba(255, 252, 244, 0.85), transparent 68%),
+    radial-gradient(900px 560px at 92% 108%, rgba(26, 95, 160, 0.05), transparent 66%);
+  background-attachment: fixed;
+}
+
+/* Chrome is frosted stone: warm, translucent, and sitting on a hairline. */
+:root[data-theme="meridian"] .topbar {
+  background: rgba(252, 250, 246, 0.82);
+  backdrop-filter: blur(14px) saturate(1.15);
+  border-bottom: 1px solid var(--line-m);
+  box-shadow: 0 1px 0 rgba(74, 60, 38, 0.05), 0 6px 16px rgba(74, 60, 38, 0.04);
+}
+
+/* The lit sheet. Top edge catches the light, shadow falls below it — the two
+   halves of the one rule. */
+:root[data-theme="meridian"] .panel,
+:root[data-theme="meridian"] .card {
+  background: var(--panel);
+  border: 1px solid var(--line-m);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(74, 60, 38, 0.06),
+    0 10px 28px -6px rgba(74, 60, 38, 0.1);
+}
+
+/* Hover lifts the sheet: the cast lengthens and softens, exactly as it would if
+   the object rose toward the light. Nothing changes colour — the depth alone
+   carries the feedback, which is why it never competes with the ocean accent. */
+:root[data-theme="meridian"] .card:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 2px 4px rgba(74, 60, 38, 0.07),
+    0 18px 40px -10px rgba(74, 60, 38, 0.16);
+}
+
+/* Corner brackets: the HUD detail survives into daylight as a fine ocean
+   registration mark rather than a bright bracket. */
+:root[data-theme="meridian"] .panel::before,
+:root[data-theme="meridian"] .card::before,
+:root[data-theme="meridian"] .panel::after,
+:root[data-theme="meridian"] .card::after {
+  width: 10px;
+  height: 10px;
+  border-width: 1px;
+  border-color: rgba(26, 95, 160, 0.34);
+}
+
+/* ---------------------------------------------------------------------------
+   THE RAIL STAYS DARK, AND THAT IS THE STRUCTURAL IDEA OF THE THEME.
+
+   A light app with a light sidebar has no anchor: navigation, chrome and content
+   are all the same value, so the eye has to read text to find out where it is.
+   Holding the rail dark does three things at once — it frames the workspace, it
+   makes the stone canvas look brighter than it measures, and it gives the
+   ocean accent somewhere to be brilliant instead of merely dark-enough.
+
+   But the dark here is WARM ink, not the navy Arctic Frost used. Navy beside
+   warm stone reads as two unrelated products bolted together; a warm near-black
+   reads as the same material in shadow, which is what it is meant to be.
+   --------------------------------------------------------------------------- */
+:root[data-theme="meridian"] .rail {
+  background: linear-gradient(180deg, #2c2820 0%, #1c1915 100%);
+  border-right: 1px solid #141210;
+  /* The lit inner edge: the rail is a wall and this is the light grazing it. */
+  box-shadow:
+    inset -1px 0 0 rgba(26, 95, 160, 0.4),
+    4px 0 20px -6px rgba(74, 60, 38, 0.22);
+}
+:root[data-theme="meridian"] .rail-brand strong { color: #f6f2ea; }
+:root[data-theme="meridian"] .rail-brand small { color: var(--gold-border); }
+:root[data-theme="meridian"] .rail-section { color: #a49b88; }
+:root[data-theme="meridian"] .rail-btn { color: #ddd6c8; }
+:root[data-theme="meridian"] .rail-btn:hover {
+  color: #fffdf7;
+  background: rgba(255, 252, 244, 0.07);
+}
+/* Active: a solid ocean spine and a wash that fades back into the rail. On a
+   dark rail the accent can be the LIFTED ocean, which is too light to sit on
+   the stone canvas but is exactly right here — the same colour family reading
+   correctly in both rooms is the whole reason --ion-500 exists. */
+:root[data-theme="meridian"] .rail-btn.active {
+  color: #8fc3ee;
+  background: linear-gradient(90deg, rgba(53, 121, 184, 0.26), transparent 86%);
+  border-left-color: var(--ion-500);
+  font-weight: 700;
+}
+:root[data-theme="meridian"] .rail-btn.active::before {
+  background: var(--ion-500);
+  box-shadow: none;
+  animation: none;
+}
+:root[data-theme="meridian"] .rail-btn.is-planned { color: #8b8474; }
+:root[data-theme="meridian"] .rail-avatar {
+  background: rgba(53, 121, 184, 0.2);
+  color: #8fc3ee;
+  box-shadow: inset 0 0 0 1px rgba(53, 121, 184, 0.4);
+}
+
+/* Daylight is quiet: no ambient glow anywhere. */
+:root[data-theme="meridian"] .master-tab[aria-selected="true"] { box-shadow: none; }
+
+/* ---------------------------------------------------------------------------
+   THE GRID — the surface a CRM user actually spends the day inside.
+
+   The head is RECESSED (shadow at the top edge, not the bottom): it is the one
+   place the light-from-above rule runs in reverse, and that inversion is what
+   makes a sticky header read as a fixed frame rather than as the first row of
+   data. Everything else here serves row-scanning: no zebra striping, because
+   alternating fills fight the hover state that actually carries meaning; a
+   single hairline per row; and a hover that combines a faint ocean wash with a
+   solid 2px spine on the leading edge, so the eye can find its row again after
+   crossing twelve columns.
+   --------------------------------------------------------------------------- */
+:root[data-theme="meridian"] thead th {
+  background: var(--panel-2);
+  color: var(--ink-soft);
+  border-bottom: 1px solid var(--line-bright);
+  box-shadow: inset 0 1px 2px rgba(74, 60, 38, 0.07);
+}
+:root[data-theme="meridian"] .grid-filter-row > th {
+  background: #f9f6f0;
+  border-bottom-color: var(--line-m);
+  box-shadow: none;
+}
+:root[data-theme="meridian"] tbody tr:hover td { background: rgba(26, 95, 160, 0.055); }
+:root[data-theme="meridian"] tbody tr:hover td:first-child {
+  box-shadow: inset 2px 0 0 var(--cyan);
+}
+:root[data-theme="meridian"] tbody tr.is-selected > td {
+  background: rgba(26, 95, 160, 0.11);
+}
+:root[data-theme="meridian"] tr.group-row > th {
+  background: linear-gradient(90deg, rgba(26, 95, 160, 0.13), transparent 74%);
+  color: var(--cyan-deep);
+  border-block-start: 1px solid var(--line-m);
+  box-shadow: none;
+}
+
+/* Tool trays are recessed too — they hold controls, so they belong to the frame
+   rather than to the content. */
+:root[data-theme="meridian"] .grid-tool-row {
+  background: var(--panel-2);
+  border-color: var(--line-m);
+  box-shadow: inset 0 1px 2px rgba(74, 60, 38, 0.05);
+}
+:root[data-theme="meridian"] .grid-tool-label { color: var(--cyan-deep); }
+
+:root[data-theme="meridian"] .data-view-head {
+  background: var(--panel);
+  border-color: var(--line-m);
+  border-bottom-color: var(--line-bright);
+}
+:root[data-theme="meridian"] .data-view-title > span { color: var(--text); }
+:root[data-theme="meridian"] .data-view-head .eyebrow,
+:root[data-theme="meridian"] .page-head .eyebrow,
+:root[data-theme="meridian"] .kpi .eyebrow { color: var(--cyan-deep); }
+:root[data-theme="meridian"] .page-head {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line-m);
+}
+
+/* KPI tiles: the ocean rule along the top is the light entering the instrument,
+   and the numeral is full-strength ink so the figure is the loudest thing on it. */
+:root[data-theme="meridian"] .kpi {
+  background: var(--panel);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 2px rgba(74, 60, 38, 0.06),
+    0 10px 24px -8px rgba(74, 60, 38, 0.12);
+}
+:root[data-theme="meridian"] .kpi::after {
+  box-shadow: inset 0 0 0 1px var(--line-m), inset 0 2px 0 var(--cyan);
+}
+:root[data-theme="meridian"] .kpi-value { color: var(--text); }
+
+/* ---------------------------------------------------------------------------
+   CONTROLS. A button is a raised object, so it obeys the light rule: lit top
+   edge, cast below, and both intensify on hover as it rises.
+   --------------------------------------------------------------------------- */
+:root[data-theme="meridian"] .btn-primary,
+:root[data-theme="meridian"] .btn.btn-primary {
+  background: linear-gradient(180deg, var(--ion-500) 0%, var(--cyan) 62%);
+  border-color: var(--cyan-deep);
+  color: #ffffff;                     /* 6.59:1 on --cyan */
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    0 1px 2px rgba(74, 60, 38, 0.2);
+}
+
+:root[data-theme="meridian"] .btn {
+  background: linear-gradient(180deg, #fffdf9 0%, var(--panel) 100%);
+  border-color: var(--line-bright);
+  color: var(--ink-soft);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.9),
+    0 1px 1px rgba(74, 60, 38, 0.07);
+}
+
+/* Fields are recessed — they are holes you put text into, and the inset shadow
+   says so without needing a heavier border. */
+:root[data-theme="meridian"] :is(input, select, textarea) {
+  background: #fffdf9;
+  border-color: var(--line-bright);
+  color: var(--text);
+  box-shadow: inset 0 1px 2px rgba(74, 60, 38, 0.07);
+}
+:root[data-theme="meridian"] ::placeholder { color: var(--slate-faint); }
+:root[data-theme="meridian"] :is(input, select, textarea, .btn):focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 1px;
+  box-shadow: 0 0 0 4px rgba(26, 95, 160, 0.16);
+}
+
+/* Status chips draw on the designed family. Each is a tint of its own hue with
+   the full-strength hue as its text and border, so the chip carries the meaning
+   three ways — hue, luminance and label — and stays readable to a colour-blind
+   user and in greyscale print. */
+:root[data-theme="meridian"] .chip {
+  background: var(--panel-2);
+  border-color: var(--line-m);
+  color: var(--ink-soft);
+}
+:root[data-theme="meridian"] :is(.chip-open, .chip-active, .chip-applied) {
+  background: rgba(26, 95, 160, 0.1);
+  border-color: rgba(26, 95, 160, 0.34);
+  color: var(--cyan-deep);
+}
+:root[data-theme="meridian"] :is(.chip-won, .chip-success, .chip-paid) {
+  background: rgba(10, 87, 65, 0.1);
+  border-color: rgba(10, 87, 65, 0.32);
+  color: var(--green);
+}
+:root[data-theme="meridian"] :is(.chip-lost, .chip-failed, .chip-overdue) {
+  background: rgba(184, 64, 46, 0.1);
+  border-color: rgba(184, 64, 46, 0.32);
+  color: var(--red);
+}
+
+/* Frosted popovers: warm glass, and the deepest cast in the theme because they
+   float furthest above the page. */
+:root[data-theme="meridian"] .user-pop,
+:root[data-theme="meridian"] .notif-pop,
+:root[data-theme="meridian"] .locale-pop {
+  background: rgba(252, 250, 246, 0.95);
+  backdrop-filter: blur(14px) saturate(1.15);
+  border-color: var(--line-bright);
+  box-shadow: 0 24px 56px -12px rgba(74, 60, 38, 0.3);
+}
+:root[data-theme="meridian"] .user-trigger { background: var(--panel); border-color: var(--line-bright); }
+
+/* Users who ask for less transparency get opaque chrome rather than a blur. */
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-theme="meridian"] .topbar,
+  :root[data-theme="meridian"] .user-pop,
+  :root[data-theme="meridian"] .notif-pop,
+  :root[data-theme="meridian"] .locale-pop,
+  :root[data-theme="meridian"] .theme-pop {
+    background: var(--panel);
+    backdrop-filter: none;
+  }
+  :root[data-theme="meridian"] .app-ground { background-image: none; }
+}
 
 /* ============================================================================
    RAIL DIVIDER REPAIR
@@ -883,19 +1150,38 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
 
 :root[data-theme="ironman"] .app-ground {
   background-color: var(--bg);
+  /* The ground is a void with a reactor bloom above the fold and a faint plating
+     grid. The grid is red now, not gold: gold is reserved for AI provenance, and
+     a gold lattice over warm brown was a large part of what read as muddy. */
   background-image:
-    radial-gradient(1100px 460px at 50% -12%, rgba(232, 71, 79, 0.09), transparent 62%),
-    radial-gradient(700px 320px at 88% 8%, rgba(245, 179, 42, 0.05), transparent 60%),
-    repeating-linear-gradient(0deg, rgba(245, 179, 42, 0.018) 0 1px, transparent 1px 56px),
-    repeating-linear-gradient(90deg, rgba(245, 179, 42, 0.018) 0 1px, transparent 1px 56px);
+    radial-gradient(1200px 520px at 50% -14%, rgba(255, 107, 116, 0.11), transparent 64%),
+    radial-gradient(760px 340px at 88% 6%, rgba(121, 226, 248, 0.055), transparent 62%),
+    repeating-linear-gradient(0deg, rgba(255, 107, 116, 0.02) 0 1px, transparent 1px 56px),
+    repeating-linear-gradient(90deg, rgba(255, 107, 116, 0.02) 0 1px, transparent 1px 56px);
 }
 
-/* Armour panel: warm gradient, gold hairline, arc-reactor corner brackets. */
+/* ---------------------------------------------------------------------------
+   Armour plate.
+
+   Three things make a panel read as machined metal rather than a coloured box,
+   and all three are edges rather than fills:
+
+   1. A LIT TOP EDGE. One bright hairline where light would catch the bevel
+      (--line-bright, 3.79:1 on the plate). This is the single highest-value
+      detail in the theme — it is what turns a rectangle into a plate.
+   2. A DARKER BOTTOM. The gradient runs plate -> well downward, so the bottom
+      recedes and the top advances.
+   3. A CRISP PERIMETER at 2.04:1 instead of the old invisible 1.25:1.
+   --------------------------------------------------------------------------- */
 :root[data-theme="ironman"] .panel,
 :root[data-theme="ironman"] .card {
-  background: linear-gradient(180deg, var(--panel-2), var(--panel));
+  background: linear-gradient(180deg, var(--panel) 0%, #2c1c1d 62%, var(--panel-2) 100%);
   border: 1px solid var(--line-m);
-  box-shadow: 0 1px 0 rgba(245, 179, 42, 0.06) inset, 0 10px 30px rgba(0, 0, 0, 0.5);
+  border-top-color: var(--line-bright);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 168, 160, 0.16),   /* the lit bevel itself */
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),        /* the shadowed underside */
+    0 12px 34px rgba(0, 0, 0, 0.62);
 }
 :root[data-theme="ironman"] .panel::before,
 :root[data-theme="ironman"] .card::before,
@@ -904,36 +1190,56 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   border-color: var(--cyan);
 }
 
-/* The rail is the chest plate: deep red armour with a gold seam and the
-   reactor's glow along its inner edge. */
+/* The rail is the chest plate. Deeper and more saturated than before so it reads
+   as armour against the void rather than as a slightly darker sidebar, with the
+   reactor seam along its inner edge. */
 :root[data-theme="ironman"] .rail {
-  background: linear-gradient(180deg, #4a1114 0%, #2b0d0e 46%, #180b0b 100%);
-  border-right: 1px solid #5e2a26;
-  box-shadow: inset -1px 0 0 rgba(245, 179, 42, 0.42);
+  background: linear-gradient(180deg, #5c1216 0%, #340f11 44%, #14090a 100%);
+  border-right: 1px solid #7a2f2a;
+  box-shadow:
+    inset -1px 0 0 var(--armour-line),
+    inset 1px 0 0 rgba(255, 168, 160, 0.1);
 }
-:root[data-theme="ironman"] .rail-brand strong { color: #fff4ef; }
-:root[data-theme="ironman"] .rail-brand small { color: var(--amber); }
-:root[data-theme="ironman"] .rail-section { color: #d3a49c; }
-:root[data-theme="ironman"] .rail-section:hover { color: var(--amber); }
-:root[data-theme="ironman"] .rail-btn { color: #edd6d1; }
-:root[data-theme="ironman"] .rail-btn:hover { background: rgba(245, 179, 42, 0.12); color: #fff; }
+:root[data-theme="ironman"] .rail-brand strong { color: #fff6f3; }
+/* Gold survives here: the wordmark is the one place it is decorative rather than
+   semantic, and it is not competing with an interactive state. */
+:root[data-theme="ironman"] .rail-brand small { color: var(--gold-500); }
+:root[data-theme="ironman"] .rail-section { color: #dcaea6; }
+:root[data-theme="ironman"] .rail-section:hover { color: var(--armour-600); }
+:root[data-theme="ironman"] .rail-btn { color: #f2ded9; }
+
+/* Hover and active were both gold. Hover is now armour red — the plate warming
+   under the cursor — and active stays arc-reactor cyan, so the two states are
+   different colours instead of two shades of the same one. */
+:root[data-theme="ironman"] .rail-btn:hover {
+  background: var(--armour-dim);
+  color: #fff;
+  box-shadow: inset 2px 0 0 var(--armour-500);
+}
 :root[data-theme="ironman"] .rail-btn.active {
   color: var(--cyan);
-  background: linear-gradient(90deg, rgba(95, 211, 238, 0.2), transparent 85%);
+  background: linear-gradient(90deg, rgba(121, 226, 248, 0.22), transparent 86%);
   border-left-color: var(--cyan);
+  box-shadow: inset 2px 0 0 var(--cyan), 0 0 18px rgba(121, 226, 248, 0.16);
 }
-:root[data-theme="ironman"] .rail-btn.is-planned { color: #b0827b; }
-:root[data-theme="ironman"] .rail-avatar { background: var(--cyan-dim); color: var(--cyan); }
-/* Divider on red armour needs a warm tint, not a cool one. */
+:root[data-theme="ironman"] .rail-btn.is-planned { color: #b98d86; }
+:root[data-theme="ironman"] .rail-avatar {
+  background: var(--cyan-dim);
+  color: var(--cyan);
+  box-shadow: inset 0 0 0 1px rgba(121, 226, 248, 0.42);
+}
 :root[data-theme="ironman"] .shell.rail-collapsed .rail-section,
 :root[data-theme="ironman"] .rail-group + .rail-group > .rail-section::after {
-  background: linear-gradient(90deg, transparent, rgba(245, 179, 42, 0.34) 22%,
-    rgba(245, 179, 42, 0.34) 78%, transparent);
+  background: linear-gradient(90deg, transparent, var(--armour-line) 22%,
+    var(--armour-line) 78%, transparent);
 }
 
 :root[data-theme="ironman"] .topbar {
-  background: rgba(20, 14, 14, 0.88);
+  background: rgba(12, 7, 8, 0.9);
   border-bottom: 1px solid var(--line-m);
+  /* A single armour hairline under the bar. Cheap, and it stops the header
+     floating free of the content it belongs to. */
+  box-shadow: 0 1px 0 var(--armour-dim);
 }
 
 /* Primary control is the reactor, not the armour — red buttons read as danger. */
@@ -941,13 +1247,64 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
 :root[data-theme="ironman"] .btn.btn-primary {
   background: var(--cyan);
   border-color: var(--cyan);
-  color: #06222b;
+  color: #05202a;
+  box-shadow: 0 0 0 1px rgba(121, 226, 248, 0.3), 0 0 16px rgba(121, 226, 248, 0.22);
 }
-:root[data-theme="ironman"] .btn-primary:hover { box-shadow: 0 0 22px rgba(95, 211, 238, 0.5); }
-:root[data-theme="ironman"] .btn:hover { border-color: var(--amber); color: var(--amber); }
-:root[data-theme="ironman"] tbody tr:hover td { background: rgba(245, 179, 42, 0.06); }
-:root[data-theme="ironman"] tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--amber); }
-:root[data-theme="ironman"] thead th { background: var(--panel-2); }
+
+/* Secondary buttons: machined plate with a lit top edge, hovering to armour red
+   rather than gold. */
+:root[data-theme="ironman"] .btn {
+  border-top-color: rgba(255, 168, 160, 0.22);
+  box-shadow: inset 0 1px 0 rgba(255, 168, 160, 0.1);
+}
+
+/* Grid rows. The hover spine is armour red, so the interactive cyan stays
+   unambiguous and the two never read as the same signal. */
+:root[data-theme="ironman"] tbody tr:hover td { background: rgba(255, 107, 116, 0.075); }
+:root[data-theme="ironman"] tbody tr:hover td:first-child {
+  box-shadow: inset 2px 0 0 var(--armour-500);
+}
+:root[data-theme="ironman"] tbody tr.is-selected > td {
+  background: rgba(121, 226, 248, 0.1);
+  box-shadow: inset 0 1px 0 rgba(121, 226, 248, 0.14);
+}
+
+/* Header band: the sunken well, with a lit rule beneath it separating the header
+   from the data — the detail that makes a dense grid scannable. */
+:root[data-theme="ironman"] thead th {
+  background: var(--panel-2);
+  border-bottom-color: var(--line-bright);
+}
+:root[data-theme="ironman"] .grid-filter-row > th {
+  background: #221516;
+  border-bottom-color: var(--line-m);
+}
+
+/* Tool rows sit as plates in the band, each with its own lit edge, so the stack
+   reads as stacked hardware rather than one tall block. */
+/* Tool rows get a uniform crisp border, NOT the lit top edge. The lit bevel is
+   what distinguishes a panel; five stacked rows each with a bright top edge would
+   be five bright stripes, which reads as noise rather than as hardware. So the
+   hierarchy is: panels are plates with a lit bevel, tool rows are plain plate. */
+:root[data-theme="ironman"] .grid-tool-row {
+  background: linear-gradient(180deg, rgba(255, 168, 160, 0.03) 0%, rgba(0, 0, 0, 0.24) 100%), var(--panel);
+  border-color: var(--line-m);
+}
+:root[data-theme="ironman"] .grid-tool-label { color: var(--cyan); }
+
+/* The data-workspace head is the instrument bezel. */
+:root[data-theme="ironman"] .data-view-head {
+  background: linear-gradient(180deg, #3b2728, #2a1b1c);
+  border-color: var(--line-m);
+  border-top-color: var(--line-bright);
+}
+
+/* Focus is the reactor coming online: a tight ring, never a soft halo. */
+:root[data-theme="ironman"] :is(input, select, textarea, .btn):focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 1px;
+  box-shadow: 0 0 14px rgba(121, 226, 248, 0.45);
+}
 
 /* ============================================================================
    THEME SWITCHER
@@ -1108,18 +1465,10 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   color: #001417;
   box-shadow: 0 0 20px rgba(111, 249, 255, 0.45);
 }
-:root[data-theme="tron"] .btn-primary:hover { box-shadow: 0 0 30px rgba(111, 249, 255, 0.75); }
 :root[data-theme="tron"] .btn { border-color: var(--line-bright); }
-:root[data-theme="tron"] .btn:hover {
-  border-color: var(--cyan);
-  color: var(--cyan);
-  box-shadow: 0 0 14px rgba(111, 249, 255, 0.28);
-}
 :root[data-theme="tron"] .btn-danger { border-color: var(--red); color: var(--red); }
-:root[data-theme="tron"] .btn-danger:hover { background: var(--red); color: #1a0600; box-shadow: 0 0 18px rgba(255, 122, 53, 0.5); }
 
 :root[data-theme="tron"] .icon-btn { border-color: var(--line-bright); color: var(--ink-soft); }
-:root[data-theme="tron"] .icon-btn:hover { border-color: var(--cyan); color: var(--cyan); box-shadow: 0 0 12px rgba(111, 249, 255, 0.3); }
 
 :root[data-theme="tron"] thead th {
   background: var(--panel-2);
@@ -1421,4 +1770,165 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   .login { grid-template-columns: 1fr; }
   .login-downloads { max-width: none; }
   .trial-grid { grid-template-columns: 1fr; }
+}
+
+/* ============================================================================
+   MARK VII — character pass.
+
+   The palette pass fixed contrast, and contrast was the wrong target on its own:
+   a theme can hit every ratio and still have no identity. What was missing is
+   that Mark VII should feel like looking THROUGH a helmet at instrumentation —
+   red armour plate around the edge of vision, cyan data floating on it — rather
+   than a dark theme that happens to contain red.
+
+   Five devices carry that, and each is deliberately cheap: no images, no extra
+   DOM, nothing that costs a repaint. They are all edges, rules and gradients.
+
+     1. PLATING     diagonal panel seams on the ground, so the page is a surface
+     2. CHAMFERS    cut corners on plates — armour is cut, never rounded
+     3. BRACKETS    HUD corner ticks that frame content the way a targeting
+                    reticle frames a target
+     4. INSTRUMENTS KPI tiles as gauge readouts: cyan rule, tabular numerals,
+                    a faint horizontal scan
+     5. SEAMS       a red armour seam under every section head, so the page reads
+                    as assembled panels rather than one continuous field
+
+   Gold appears nowhere structural. It stays reserved for AI provenance, which is
+   why the armour accent here is red and the instrumentation is cyan.
+   ============================================================================ */
+
+/* 1 — PLATING. Two diagonal families at different pitches read as machined
+   panel seams; a single family reads as a repeating texture. Kept under 3%
+   opacity so it is felt rather than seen, and it never competes with data. */
+:root[data-theme="ironman"] .app-ground::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-image:
+    repeating-linear-gradient(38deg,
+      rgba(255, 107, 116, 0.028) 0 1px, transparent 1px 88px),
+    repeating-linear-gradient(-38deg,
+      rgba(121, 226, 248, 0.018) 0 1px, transparent 1px 132px);
+}
+:root[data-theme="ironman"] .app-ground > * { position: relative; z-index: 1; }
+
+/* 2 — CHAMFERS. The armour cut, applied to plates that are currently square.
+   `--cut` already exists for this; Mark VII simply uses it more. */
+:root[data-theme="ironman"] .grid-tool-row,
+:root[data-theme="ironman"] .list-controls,
+:root[data-theme="ironman"] .data-view-frame {
+  clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
+}
+
+/* 3 — BRACKETS. Corner ticks on the data workspace: two short cyan rules per
+   corner, the way a reticle marks a target. Only on the workspace head, because
+   brackets on every container is a costume rather than a design. */
+:root[data-theme="ironman"] .data-view-head { position: relative; }
+:root[data-theme="ironman"] .data-view-head::before,
+:root[data-theme="ironman"] .data-view-head::after {
+  content: "";
+  position: absolute;
+  inline-size: 18px;
+  block-size: 18px;
+  pointer-events: none;
+  opacity: 0.85;
+}
+:root[data-theme="ironman"] .data-view-head::before {
+  inset-block-start: -1px;
+  inset-inline-start: -1px;
+  border-block-start: 2px solid var(--cyan);
+  border-inline-start: 2px solid var(--cyan);
+}
+:root[data-theme="ironman"] .data-view-head::after {
+  inset-block-start: -1px;
+  inset-inline-end: -1px;
+  border-block-start: 2px solid var(--cyan);
+  border-inline-end: 2px solid var(--cyan);
+}
+
+/* 4 — INSTRUMENTS. A KPI is a gauge: cut corner, lit cyan rule across the top,
+   a faint scan across the face, and the value in tabular mono so a column of
+   figures aligns digit-for-digit the way a readout does. */
+:root[data-theme="ironman"] .kpi {
+  background:
+    linear-gradient(180deg, rgba(121, 226, 248, 0.05) 0%, transparent 42%),
+    repeating-linear-gradient(180deg,
+      rgba(255, 255, 255, 0.012) 0 1px, transparent 1px 4px),
+    linear-gradient(180deg, var(--panel) 0%, #2a1b1c 100%);
+}
+:root[data-theme="ironman"] .kpi::after {
+  box-shadow:
+    inset 0 0 0 1px var(--line-m),
+    inset 0 2px 0 var(--cyan),
+    inset 0 -1px 0 var(--armour-line);
+}
+:root[data-theme="ironman"] .kpi-value {
+  color: #fff8f6;
+  text-shadow: 0 0 18px rgba(121, 226, 248, 0.28);
+  letter-spacing: 0.01em;
+}
+:root[data-theme="ironman"] .kpi .eyebrow { color: var(--cyan); }
+
+/* 5 — SEAMS. A red armour seam under each section head. This is the single
+   change that stops the page reading as one flat field: it says "these are
+   separate assembled plates" without adding a single box. */
+:root[data-theme="ironman"] .page-head {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--armour-line);
+  box-shadow: 0 1px 0 rgba(255, 168, 160, 0.07);
+}
+:root[data-theme="ironman"] .page-head h1 {
+  color: #fff8f6;
+  text-shadow: 0 0 22px rgba(255, 107, 116, 0.22);
+}
+:root[data-theme="ironman"] .page-head .eyebrow { color: var(--armour-600); }
+
+/* The search and filter strip is the helmet's input line: sunken, cyan-lit on
+   focus, so the one row you type into is unambiguous. */
+:root[data-theme="ironman"] .list-controls {
+  background: linear-gradient(180deg, var(--panel-2), #14090a);
+  border: 1px solid var(--line-m);
+  border-top-color: var(--armour-line);
+}
+:root[data-theme="ironman"] :is(input, select, textarea) {
+  background: #140b0c;
+  border-color: #6a4444;
+  color: var(--text);
+}
+:root[data-theme="ironman"] :is(input, select, textarea):hover { border-color: var(--armour-500); }
+:root[data-theme="ironman"] ::placeholder { color: #9c7f7a; }
+
+/* Chips read as etched plate rather than filled pills. */
+:root[data-theme="ironman"] .chip {
+  background: rgba(255, 107, 116, 0.09);
+  border-color: var(--armour-line);
+  color: var(--armour-600);
+}
+:root[data-theme="ironman"] .chip-open,
+:root[data-theme="ironman"] .chip-active,
+:root[data-theme="ironman"] .chip-applied {
+  background: var(--cyan-dim);
+  border-color: rgba(121, 226, 248, 0.5);
+  color: var(--cyan);
+}
+
+/* The workspace title is the instrument label. */
+:root[data-theme="ironman"] .data-view-title > span { color: #fff8f6; }
+:root[data-theme="ironman"] .data-view-head .eyebrow { color: var(--cyan); }
+
+/* Group header rows: the seam repeated inside the grid, so a grouped table reads
+   as stacked plates too. */
+:root[data-theme="ironman"] tr.group-row > th {
+  background: linear-gradient(90deg, rgba(255, 107, 116, 0.14), transparent 72%);
+  border-block-start: 1px solid var(--armour-line);
+  color: var(--armour-600);
+}
+
+/* Reduced motion and low-transparency users get the flat version: the plating
+   and scanlines are decoration, and decoration is the first thing to drop. */
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-theme="ironman"] .app-ground::before { display: none; }
+  :root[data-theme="ironman"] .kpi { background: var(--panel); }
 }

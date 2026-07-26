@@ -32,6 +32,10 @@ public class ReferenceDataService {
     public record EntryRow(UUID id, String code, String label, int sortOrder,
                            boolean active, boolean systemManaged,
                            LocalDate effectiveFrom, LocalDate effectiveTo) {}
+    public record ResolvedEntry(UUID entryId, String valueSet, String code, String label,
+                                LocalDate asOf, LocalDate effectiveFrom, LocalDate effectiveTo,
+                                boolean activeNow, boolean selectableForNewRecords,
+                                String note) {}
 
     @Transactional(readOnly = true)
     public List<ValueSetRow> listValueSets() {
@@ -70,6 +74,46 @@ public class ReferenceDataService {
                 TenantContext.get().tenantId(), valueSetId, includeInactive);
     }
 
+    /**
+     * Resolve the label that was in force on a business date.  Deliberately does
+     * not hide an inactive value: historical records must remain readable and
+     * reportable after administrators stop offering that value for new records.
+     */
+    @Transactional(readOnly = true)
+    public ResolvedEntry resolve(String apiName, String code, LocalDate asOf) {
+        UUID valueSetId = valueSetId(apiName);
+        LocalDate date = asOf == null ? LocalDate.now() : asOf;
+        try {
+            return jdbc.queryForObject("""
+                    select v.entry_id, v.code, v.label, v.effective_from, v.effective_to,
+                           e.active
+                    from reference.value_set_entry_version v
+                    join reference.value_set_entry e
+                      on e.tenant_id = v.tenant_id and e.id = v.entry_id
+                    where v.tenant_id = ? and v.value_set_id = ? and v.code = ?
+                      and (v.effective_from is null or v.effective_from <= ?)
+                      and (v.effective_to is null or v.effective_to >= ?)
+                    order by v.recorded_at desc
+                    limit 1
+                    """, (rs, i) -> {
+                        LocalDate from = rs.getObject("effective_from", LocalDate.class);
+                        LocalDate to = rs.getObject("effective_to", LocalDate.class);
+                        boolean active = rs.getBoolean("active");
+                        boolean selectable = active && !date.isBefore(from == null ? LocalDate.MIN : from)
+                                && !date.isAfter(to == null ? LocalDate.MAX : to);
+                        return new ResolvedEntry(rs.getObject("entry_id", UUID.class),
+                                normalizeApiName(apiName), rs.getString("code"), rs.getString("label"),
+                                date, from, to, active, selectable,
+                                active
+                                        ? "This label is the governed value for the selected date."
+                                        : "This value is inactive for new records but remains visible on historical records and reports.");
+                    }, TenantContext.get().tenantId(), valueSetId, normalizeCode(code), date, date);
+        } catch (EmptyResultDataAccessException ex) {
+            throw new NotFoundException("No " + apiName + " value with code " + normalizeCode(code)
+                    + " was effective on " + date + ". Choose another date or review the value's effective window.");
+        }
+    }
+
     @Transactional
     public EntryRow createEntry(String apiName, EntryMutation request) {
         CrmRole.requireMasterAdmin(TenantContext.get().role());
@@ -97,6 +141,7 @@ public class ReferenceDataService {
             audit.record("REFERENCE_ENTRY_CREATE", "REFERENCE_VALUE_SET", valueSetId,
                     "Created reference entry " + row.code() + " in " + apiName,
                     Map.of("code", row.code(), "label", row.label(), "sortOrder", row.sortOrder()));
+            recordVersion(valueSetId, row);
             return row;
         } catch (DataIntegrityViolationException ex) {
             throw new ConflictException("Reference entry code or sort order already exists, or the effective date range is invalid");
@@ -131,12 +176,23 @@ public class ReferenceDataService {
             audit.record("REFERENCE_ENTRY_UPDATE", "REFERENCE_VALUE_SET", valueSetId,
                     "Updated reference entry " + row.code() + " in " + apiName,
                     Map.of("code", row.code(), "active", row.active(), "sortOrder", row.sortOrder()));
+            recordVersion(valueSetId, row);
             return row;
         } catch (EmptyResultDataAccessException ex) {
             throw new NotFoundException("Reference entry not found");
         } catch (DataIntegrityViolationException ex) {
             throw new ConflictException("Reference entry code or sort order already exists, or the effective date range is invalid");
         }
+    }
+
+    private void recordVersion(UUID valueSetId, EntryRow row) {
+        jdbc.update("""
+                insert into reference.value_set_entry_version
+                  (tenant_id, value_set_id, entry_id, code, label, active,
+                   effective_from, effective_to, recorded_by)
+                values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, TenantContext.get().tenantId(), valueSetId, row.id(), row.code(), row.label(),
+                row.active(), row.effectiveFrom(), row.effectiveTo(), TenantContext.get().userId());
     }
 
     private UUID valueSetId(String apiName) {

@@ -17,6 +17,30 @@
    ============================================================================ */
 
 :root {
+  /* ==========================================================================
+     Spacing scale.
+
+     Seventeen declarations across app.css were already written against these
+     names — gaps, paddings and margins on the lead capture panel, the health
+     factor list, the rollup comparison and `.inline-actions` — but the scale
+     itself was never defined anywhere. An undefined custom property makes the
+     whole declaration invalid at computed-value time, so every one of them
+     silently resolved to zero. That is why "4 total" and the Capture leads
+     button sat flush against each other on the Leads header: the gap between
+     them was `var(--space-2)`, and `var(--space-2)` did not exist.
+
+     Failures like this are invisible in review because the CSS reads correctly;
+     they only show up on screen. Defining the scale fixes every one of those
+     seventeen sites at once. 4px base, matching the 8/12/16 rhythm the rest of
+     the sheet already uses in literal pixels.
+     ========================================================================== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
   /* ---- Motora core palette (dark = the product) ---- */
   --bg: #05070b;
   --bg-raise: #090d14;
@@ -148,6 +172,111 @@
   color-scheme: light;
 }
 
+
+/* ============================================================================
+   MERIDIAN — the light edition.
+
+   Named for the line the sun crosses at noon, and for the navigational sense
+   that puts it in the same family as Command Deck: both are instruments, one
+   read at night and one read in daylight.
+
+   MERIDIAN AND ARCTIC FROST ARE BOTH LIGHT, AND BOTH SHIP. They are not
+   duplicates: they answer the same brief with opposite materials, and which one
+   a user wants is a matter of eyes and taste rather than of one being better.
+
+     Arctic Frost   cool, glacial, pure white, hairline-precise, minimal
+     Meridian       warm, stone, stopped-down white, lit and physical
+
+   Arctic Frost is the sharper instrument; Meridian is the kinder one, and is the
+   right default for anyone who works a full shift in the product or finds a
+   white screen tiring. Offering both is cheaper than guessing.
+
+   Command Deck's character comes from light emitted against black, which has no
+   honest equivalent on a light ground — invert it and you get grey-on-white with
+   the life drained out. So Meridian is not that inversion; it is built on a
+   different physical model:
+
+     Command Deck                      Meridian
+     ------------------------------    ------------------------------
+     the panel emits                   the panel is lit
+     depth from glow                   depth from a real light direction
+     carbon black + cyan telemetry     warm stone + ocean ink
+     colour is emission                colour is pigment
+
+   WHY WARM STONE AND NOT WHITE. Arctic Frost puts --panel at #ffffff, which is
+   the correct choice for what that theme is going for and measures flawlessly
+   against text (16.9:1) — but a sheet of maximum-luminance white is the
+   brightest thing
+   a monitor can do, and a UI that fills the viewport with it holds the iris
+   stopped down for the entire shift. That is felt as fatigue and afterimages,
+   and no contrast ratio reports it. So Meridian's brightest surface is 95.7%
+   luminance rather than 100%, and the whole neutral ramp carries a warm bias
+   (+6 to +25 red-over-blue, where Arctic Frost was -10, i.e. actively blue).
+   Warm because short-wavelength light scatters most inside the eye, so a warm
+   white of equal luminance reads as softer than a blue-white one.
+
+   Nothing was traded for the comfort: body text measures 16.69:1, muted 6.12:1
+   (up from 5.6), and every accent clears AA against the paper.
+
+   THE STATUS FAMILY IS DESIGNED, NOT DEFAULTED. A CRM is mostly state — open,
+   won, lost, overdue, at risk — so the status colours are the palette that
+   matters most, and they are drawn from the same warm world as the surfaces:
+   deep sage rather than a stock green, rust rather than a stock red. They are
+   also separated in LUMINANCE, not only in hue: sage-to-rust measures 1.55:1
+   against each other, because two status colours of equal luminance are the
+   same grey to a red-green colour-blind user and the chip becomes unreadable
+   even though it passes every contrast check against its background.
+
+   Ocean blue is the single interaction signal, and gold — as everywhere in this
+   product — means AI provenance and nothing else.
+   ============================================================================ */
+
+:root[data-theme="meridian"] {
+  /* Stone. The ground is a working surface, the panel is what sits on it.
+     They are only 1.25:1 apart because separation here is the light and the
+     edge, not a heavy change of fill. */
+  --bg: #e6e1d7;          /* warm limestone — the ground */
+  --bg-raise: #f0ece3;    /* the lit face of the stone */
+  --panel: #fcfaf6;       /* the sheet: 95.7% luminance, deliberately not #fff */
+  --panel-2: #f5f1e9;     /* pressed-in trays: table heads, tool rows */
+
+  --line-m: #d5cdbc;      /* 1.52:1 — the hairline that guides the eye */
+  --line-bright: #9c927e; /* 2.95:1 — the rule that ends a section */
+
+  /* Ocean: the one interaction colour. Light enough to sit clear of sage and
+     gold in luminance, deep enough to carry a white label at 6.59:1. */
+  --cyan: #1a5fa0;
+  --cyan-deep: #103f6d;   /* pressed, and text on tinted washes */
+  --cyan-dim: rgba(26, 95, 160, 0.1);
+
+  /* Gold — AI PROVENANCE ONLY, never decoration and never interaction. */
+  --amber: #8f6000;       /* 5.24:1 */
+  --gold-500: #8f6000;
+  --gold-600: #6d4900;
+  --gold-100: rgba(143, 96, 0, 0.1);
+  --gold-border: rgba(143, 96, 0, 0.32);
+
+  --red: #b8402e;         /* rust  — 5.29:1, and 1.55:1 clear of sage */
+  --green: #0a5741;       /* sage  — 8.21:1 */
+  --info: #2f4f86;        /* 7.80:1 */
+
+  --text: #1b1a17;        /* 16.69:1 — warm black, not blue-black */
+  --ink-soft: #3b382f;    /* 11.24:1 */
+  --muted: #635f52;       /*  6.12:1 — the smallest text still passes AA */
+  --slate-faint: #857f6f; /*  3.83:1 — large or decorative only */
+
+  --steel-900: #1b1a17;
+  --steel-800: #33302a;
+  --ion-500: #3579b8;     /* the lifted ocean: hover, and 4.59:1 on white */
+
+  /* No glow in daylight — a light theme that glows looks like a rendering
+     fault. Depth is a warm directional shadow and a lit top edge instead. */
+  --glow: none;
+
+  color-scheme: light;
+}
+
+
 /* ============================================================================
    MARK VII — the Iron Man suite.
    Hot-rod red armour plating, gold trim, arc-reactor glow.
@@ -161,41 +290,73 @@
    ============================================================================ */
 
 :root[data-theme="ironman"] {
-  /* Warm charcoal — armour undersuit, never neutral grey. */
-  --bg: #140e0e;
-  --bg-raise: #1b1312;
-  --panel: #211715;
-  --panel-2: #2a1d1a;
-  --line-m: #3a2724;
-  --line-bright: #5e3a34;
+  /* ---------------------------------------------------------------------------
+     SURFACES — the fix for "dull".
 
-  /* Arc reactor — the interactive signal. 8.4:1 on --panel. */
-  --cyan: #5fd3ee;
-  --cyan-deep: #1c7f96;
-  --cyan-dim: rgba(95, 211, 238, 0.12);
+     The previous palette put the ground at #140e0e and panels at #211715: a
+     measured 1.09:1 apart. Two surfaces that close are the same surface to the
+     eye, so every panel, card and grid dissolved into one flat brown field and no
+     amount of accent colour could rescue it. Dullness here was never the hue — it
+     was the absence of separation.
 
-  /* Gold trim — AI provenance ONLY, per the product-wide rule. */
-  --amber: #f5b32a;
-  --gold-500: #f5b32a;
-  --gold-600: #ffc95c;
-  --gold-100: rgba(245, 179, 42, 0.1);
-  --gold-border: rgba(245, 179, 42, 0.42);
+     Now: a near-black warm void, and armour plate that sits ON it at 1.39:1.
+     Panels read as objects with edges. Nested wells go DARKER rather than
+     lighter, because an inset well is what a machined plate actually does and it
+     buys a real step (1.28:1) instead of another invisible one.
+     --------------------------------------------------------------------------- */
+  --bg: #080405;          /* void — warm near-black, never neutral */
+  --bg-raise: #1a1112;
+  --panel: #362425;       /* armour plate. 1.39:1 on --bg */
+  --panel-2: #1a1011;     /* sunken well. 1.28:1 under --panel */
 
-  /* Hot-rod red — armour and danger. */
-  --red: #e8474f;
-  --green: #3fbf87;
+  /* EDGES — the other half of "sharp".
+     The old border was 1.25:1 against its own panel, which is a border you cannot
+     see. A machined plate is defined by its edge, so these are deliberately
+     assertive: a visible hairline everywhere, and a brighter armour edge for the
+     top of a panel where light would catch it. */
+  --line-m: #754d4d;      /* 2.04:1 on --panel — visible hairline */
+  --line-bright: #c4675b; /* 3.79:1 — lit armour edge */
 
-  --text: #f7edea;        /* warm white, not clinical */
-  --muted: #b19792;       /* 5.9:1 on --panel */
-  --ink-soft: #ddc9c4;
-  --slate-faint: #8a6f6a;
+  /* Arc reactor — the interactive signal. 9.78:1 on --panel. */
+  --cyan: #79e2f8;
+  --cyan-deep: #1f8ca6;
+  --cyan-dim: rgba(121, 226, 248, 0.14);
 
-  --steel-900: #180f0f;
-  --steel-800: #2b1a17;
-  --ion-500: #8ee2f5;
-  --info: #8fa5ff;
+  /* Gold trim — AI provenance ONLY, per the product-wide rule.
+     Note this is genuinely reserved now. The previous Mark VII skin used
+     var(--amber) for rail hover, active navigation, button hover and row hover,
+     which both contradicted the rule and produced the muddy gold-on-brown that
+     read as dull. Those four now use the armour red below. */
+  --amber: #ffc247;
+  --gold-500: #ffc247;
+  --gold-600: #ffd479;
+  --gold-100: rgba(255, 194, 71, 0.12);
+  --gold-border: rgba(255, 194, 71, 0.46);
 
-  --glow: 0 0 18px rgba(95, 211, 238, 0.4);
+  /* Hot-rod red — armour and danger, and now the STRUCTURAL accent: the spine of
+     an active nav row, the lit top edge of a panel, section rules. This is what
+     makes the theme read as Iron Man rather than as a warm dark theme. 5.3:1. */
+  --red: #ff6b74;
+  --armour-500: #ff6b74;
+  --armour-600: #ff8a91;
+  --armour-line: rgba(255, 107, 116, 0.55);
+  --armour-dim: rgba(255, 107, 116, 0.12);
+
+  --green: #4ad39a;
+
+  --text: #fdf6f4;        /* 13.7:1 on --panel */
+  --muted: #c9aeaa;       /* 7.05:1 — comfortably AA at small sizes */
+  --ink-soft: #eadcd8;    /* 10.95:1 */
+  --slate-faint: #9c7f7a;
+
+  --steel-900: #0f0809;
+  --steel-800: #2f1f20;
+  --ion-500: #9deafb;
+  --info: #9fb2ff;
+
+  /* Arc-reactor bloom. Tighter and brighter than before: a wide soft halo reads
+     as blur, a tight one reads as emission. */
+  --glow: 0 0 14px rgba(121, 226, 248, 0.45);
 
   color-scheme: dark;
 }

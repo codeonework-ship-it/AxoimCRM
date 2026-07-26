@@ -1,7 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+  No xsi:schemaLocation on purpose.
+
+  It used to point at http://jasperreports.sourceforge.net/xsd/jasperreport.xsd —
+  an internet URL. Xerces validated against that published schema, which predates
+  the <noData> band, so compiling this template failed with
+  "Invalid content was found starting with element 'pageFooter'" even though the
+  band order is exactly what the current schema requires. Removing the attribute
+  makes validation use the schema bundled in the jasperreports jar, which matches
+  the runtime actually rendering the report — and stops the build depending on
+  network access to a third-party host.
+-->
 <jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
-              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd"
               name="tenant-summary" pageWidth="595" pageHeight="842" columnWidth="515"
               leftMargin="40" rightMargin="40" topMargin="36" bottomMargin="36"
               uuid="6f8820c3-725f-406b-9f6d-7c4a7c6a59c5">

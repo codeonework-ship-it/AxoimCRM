@@ -15,10 +15,43 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class EpicWorkspaceControllerTest {
+
+    /**
+     * One construction point for the controller under test.
+     *
+     * <p>Every test here asserts delegation to {@link EpicWorkspaceService}; the
+     * other collaborators exist only so the controller can be built. Naming them
+     * once means adding a dependency to the controller breaks this method rather
+     * than every test in the class, which is what happened when the marketing,
+     * SLA, partner and simulation services were added and six identical
+     * constructor calls all stopped compiling at once.
+     */
+    private static EpicWorkspaceController controllerFor(EpicWorkspaceService service) {
+        return controllerFor(service, mock(WorkspaceExportService.class), mock(WorkspaceActionService.class));
+    }
+
+    private static EpicWorkspaceController controllerFor(EpicWorkspaceService service,
+                                                         WorkspaceExportService exports,
+                                                         WorkspaceActionService actions) {
+        return controllerFor(service, exports, actions, mock(com.axiom.automation.SimulationService.class));
+    }
+
+    private static EpicWorkspaceController controllerFor(EpicWorkspaceService service,
+                                                         WorkspaceExportService exports,
+                                                         WorkspaceActionService actions,
+                                                         com.axiom.automation.SimulationService simulations) {
+        return new EpicWorkspaceController(
+                service,
+                exports,
+                actions,
+                mock(MarketingPerformanceService.class),
+                mock(CaseSlaService.class),
+                mock(PartnerDealService.class), simulations);
+    }
+
     @Test void delegatesForecastPaginationAndFilters() {
         EpicWorkspaceService service = mock(EpicWorkspaceService.class);
-        EpicWorkspaceController controller = new EpicWorkspaceController(
-                service, mock(WorkspaceExportService.class), mock(WorkspaceActionService.class));
+        EpicWorkspaceController controller = controllerFor(service);
         EpicWorkspaceService.WorkspacePage page = new EpicWorkspaceService.WorkspacePage(
                 "FORECASTING", "Forecast", "desc", List.of(), PageResult.of(List.of(), 2, 100, 0));
         when(service.forecast("commit", "SUBMITTED", 2)).thenReturn(page);
@@ -29,8 +62,7 @@ class EpicWorkspaceControllerTest {
 
     @Test void delegatesMigrationPaginationAndFilters() {
         EpicWorkspaceService service = mock(EpicWorkspaceService.class);
-        EpicWorkspaceController controller = new EpicWorkspaceController(
-                service, mock(WorkspaceExportService.class), mock(WorkspaceActionService.class));
+        EpicWorkspaceController controller = controllerFor(service);
         EpicWorkspaceService.WorkspacePage page = new EpicWorkspaceService.WorkspacePage(
                 "MIGRATION", "Migration", "desc", List.of(), PageResult.of(List.of(), 1, 100, 0));
         when(service.migrations("contacts", "READY_TO_IMPORT", 1)).thenReturn(page);
@@ -41,8 +73,7 @@ class EpicWorkspaceControllerTest {
 
     @Test void delegatesNextFiveEpicWorkspaces() {
         EpicWorkspaceService service = mock(EpicWorkspaceService.class);
-        EpicWorkspaceController controller = new EpicWorkspaceController(
-                service, mock(WorkspaceExportService.class), mock(WorkspaceActionService.class));
+        EpicWorkspaceController controller = controllerFor(service);
         EpicWorkspaceService.WorkspacePage page = new EpicWorkspaceService.WorkspacePage(
                 "CHANNEL", "Partners", "desc", List.of(), PageResult.of(List.of(), 0, 100, 0));
 
@@ -66,8 +97,7 @@ class EpicWorkspaceControllerTest {
 
     @Test void delegatesFinalFiveEpicWorkspaces() {
         EpicWorkspaceService service = mock(EpicWorkspaceService.class);
-        EpicWorkspaceController controller = new EpicWorkspaceController(
-                service, mock(WorkspaceExportService.class), mock(WorkspaceActionService.class));
+        EpicWorkspaceController controller = controllerFor(service);
         EpicWorkspaceService.WorkspacePage page = new EpicWorkspaceService.WorkspacePage(
                 "INTEGRATION", "Integrations", "desc", List.of(), PageResult.of(List.of(), 0, 100, 0));
 
@@ -92,8 +122,7 @@ class EpicWorkspaceControllerTest {
     @Test void exportsFilteredWorkspacePageAsAttachment() {
         EpicWorkspaceService service = mock(EpicWorkspaceService.class);
         WorkspaceExportService exports = mock(WorkspaceExportService.class);
-        EpicWorkspaceController controller = new EpicWorkspaceController(
-                service, exports, mock(WorkspaceActionService.class));
+        EpicWorkspaceController controller = controllerFor(service, exports, mock(WorkspaceActionService.class));
         WorkspaceExportService.FilePayload file = new WorkspaceExportService.FilePayload(
                 "ok".getBytes(StandardCharsets.UTF_8), "text/plain", "forecast-workspace-page-1.txt");
         when(exports.export("forecast", WorkspaceExportService.ExportFormat.XLSX, "commit", "SUBMITTED", 0)).thenReturn(file);
@@ -111,10 +140,9 @@ class EpicWorkspaceControllerTest {
     @Test void delegatesGovernedWorkspaceActions() {
         EpicWorkspaceService service = mock(EpicWorkspaceService.class);
         WorkspaceActionService actions = mock(WorkspaceActionService.class);
-        EpicWorkspaceController controller = new EpicWorkspaceController(
-                service, mock(WorkspaceExportService.class), actions);
+        com.axiom.automation.SimulationService simulations = mock(com.axiom.automation.SimulationService.class);
+        EpicWorkspaceController controller = controllerFor(service, mock(WorkspaceExportService.class), actions, simulations);
         UUID id = UUID.randomUUID();
-        UUID runId = UUID.randomUUID();
         WorkspaceActionService.ForecastSubmitRequest submit = new WorkspaceActionService.ForecastSubmitRequest("commit lock");
         WorkspaceActionService.CaseResolveRequest resolve = new WorkspaceActionService.CaseResolveRequest("fixed");
         WorkspaceActionService.AutomationSimulateRequest simulate = new WorkspaceActionService.AutomationSimulateRequest(50);
@@ -127,12 +155,15 @@ class EpicWorkspaceControllerTest {
         WorkspaceActionService.AuditPackExportRequest auditPack = new WorkspaceActionService.AuditPackExportRequest("SECURE_DOWNLOAD");
         WorkspaceActionService.ActionResult forecast = new WorkspaceActionService.ActionResult(
                 id, "forecast", "SUBMITTED", "ok", Map.of());
-        WorkspaceActionService.ActionResult automation = new WorkspaceActionService.ActionResult(
-                runId, "automation", "SIMULATED", "ok", Map.of());
+        com.axiom.automation.SimulationService.SimulationResult simulationResult =
+                new com.axiom.automation.SimulationService.SimulationResult(
+                        "AUT-1", "Rule", "OPPORTUNITY", 1, "UPDATE", 2, 1, 3,
+                        false, "read only", List.of(), List.of());
 
         when(actions.submitForecast(id, submit)).thenReturn(forecast);
         when(actions.resolveCase(id, resolve)).thenReturn(forecast);
-        when(actions.simulateAutomation(id, simulate)).thenReturn(automation);
+        when(simulations.simulate(org.mockito.ArgumentMatchers.eq(id), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(simulationResult);
         when(actions.validateMigration(id)).thenReturn(forecast);
         when(actions.acknowledgeMobileSync(id)).thenReturn(forecast);
         when(actions.activateContract(id, activateContract)).thenReturn(forecast);
@@ -148,7 +179,7 @@ class EpicWorkspaceControllerTest {
 
         assertEquals(forecast, controller.submitForecast(id, submit));
         assertEquals(forecast, controller.resolveCase(id, resolve));
-        assertEquals(automation, controller.simulateAutomation(id, simulate));
+        assertEquals("SIMULATED", controller.simulateAutomation(id, simulate).status());
         assertEquals(forecast, controller.validateMigration(id));
         assertEquals(forecast, controller.acknowledgeMobileSync(id));
         assertEquals(forecast, controller.activateContract(id, activateContract));
@@ -163,7 +194,7 @@ class EpicWorkspaceControllerTest {
         assertEquals(forecast, controller.offerCommodityEnquiry(id));
         verify(actions).submitForecast(id, submit);
         verify(actions).resolveCase(id, resolve);
-        verify(actions).simulateAutomation(id, simulate);
+        verify(simulations).recordSimulationRun(id, simulationResult);
         verify(actions).validateMigration(id);
         verify(actions).acknowledgeMobileSync(id);
         verify(actions).activateContract(id, activateContract);

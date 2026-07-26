@@ -1,5 +1,6 @@
 package com.axiom.api;
 
+import com.axiom.leads.LeadIngestionService;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -14,7 +15,7 @@ class LeadControllerTest {
     @Test void delegatesDisqualificationWithReasonAndRecycleDate() {
         QueryService queries = mock(QueryService.class);
         LeadService service = mock(LeadService.class);
-        LeadController controller = new LeadController(queries, service);
+        LeadController controller = new LeadController(queries, service, mock(LeadIngestionService.class));
         UUID id = UUID.randomUUID();
         LocalDate recycle = LocalDate.now().plusDays(30);
         LeadService.DisqualificationResult result = new LeadService.DisqualificationResult(

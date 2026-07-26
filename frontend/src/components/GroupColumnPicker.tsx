@@ -32,12 +32,12 @@ export function GroupColumnPicker({
   }
 
   return (
-    <div className="group-column-picker" id={`${id}-group-columns`} role="group" aria-label="Choose grid group columns">
-      <div className="group-column-help">
+    <div className="grid-tool-row group-column-picker" id={`${id}-group-columns`} role="group" aria-label="Choose grid group columns">
+      <div className="grid-tool-label">
         <span>Group</span>
         <InfoTag text={helpText} label="Group columns help" />
       </div>
-      <div className="group-column-options">
+      <div className="grid-tool-controls group-column-options">
         {columns.map((column) => (
           <label className={`group-column-option${selectedSet.has(column.key) ? " is-selected" : ""}`} key={column.key}>
             <input
@@ -50,7 +50,9 @@ export function GroupColumnPicker({
           </label>
         ))}
       </div>
-      <button type="button" className="link-btn" disabled={selected.length === 0} onClick={() => onChange([])}>Clear</button>
+      <div className="grid-tool-trailing">
+        <button type="button" className="link-btn" disabled={selected.length === 0} onClick={() => onChange([])}>Clear</button>
+      </div>
     </div>
   );
 }

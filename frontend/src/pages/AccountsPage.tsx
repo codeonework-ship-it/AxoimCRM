@@ -1,9 +1,10 @@
 import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, isUnreachable, type Account, type AccountDetail, type AccountHierarchy } from "../api/client";
+import { api, isUnreachable, type Account, type AccountDetail, type AccountHealth, type AccountHierarchy, type AccountRollup } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataViewFrame } from "../components/DataViewFrame";
+import { GridFilterRow } from "../components/GridFilterRow";
 import { InfoTag } from "../components/InfoTag";
 import { MasterToolbar, canManageMasters } from "../components/MasterToolbar";
 import { useToasts } from "../components/Toasts";
@@ -43,6 +44,28 @@ export function AccountsPage() {
     queryFn: () => api.accountHierarchy(selectedId as string),
     enabled: !!selectedId,
     retry: 1,
+  });
+  const rollupQ = useQuery({
+    queryKey: ["accounts", selectedId, "rollup"],
+    queryFn: () => api.accountRollup(selectedId as string),
+    enabled: !!selectedId,
+    retry: 1,
+  });
+  const healthQ = useQuery({
+    queryKey: ["accounts", selectedId, "health"],
+    queryFn: () => api.accountHealth(selectedId as string),
+    enabled: !!selectedId,
+    retry: 1,
+  });
+  const recomputeHealth = useMutation({
+    mutationFn: (id: string) => api.recomputeAccountHealth(id),
+    onSuccess: (health) => {
+      queryClient.setQueryData(["accounts", selectedId, "health"], health);
+      toasts.push("info", "Account health refreshed", health.changeExplanation);
+      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      void queryClient.invalidateQueries({ queryKey: ["accounts", selectedId, "detail"] });
+    },
+    onError: (error) => toasts.push("error", "Health could not be refreshed", error instanceof Error ? error.message : "Refresh failed."),
   });
 
   const deleteMutation = useMutation({
@@ -92,7 +115,6 @@ export function AccountsPage() {
         groupColumns={ACCOUNT_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
         selectedGroupColumns={groupColumns}
         onGroupColumnsChange={setGroupColumns}
-        filterColumns={ACCOUNT_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
         columnFilters={columnFilters}
         onColumnFiltersChange={setColumnFilters}
         exportFilename="accounts-current-view"
@@ -106,7 +128,16 @@ export function AccountsPage() {
     >
       {accountsQ.isLoading && <GridLoader label="Reading client register" rows={6} columns={4} />}
       {accountsQ.isError && <p className="empty-note">Accounts failed to load{accountsQ.error instanceof Error ? `: ${accountsQ.error.message}` : "."}</p>}
-      {accountsQ.isSuccess && <div className="table-wrap"><table className="data-table"><thead><tr><th>Name</th><th>Industry</th><th>Owner</th><th className="table-action">Action</th></tr></thead>
+      {accountsQ.isSuccess && <div className="table-wrap"><table className="data-table"><thead><tr><th>Name</th><th>Industry</th><th>Owner</th><th className="table-action">Action</th></tr>
+        {/* Filters live in the header, one per column, so the box you type in is
+            always the box above the data it narrows. `trailing` accounts for the
+            Action column so the cells do not shift left by one. */}
+        <GridFilterRow
+          columns={ACCOUNT_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
+          filters={columnFilters}
+          onChange={setColumnFilters}
+          trailing={1}
+        /></thead>
       <tbody>{accounts.map((account) => {
         const group = activeGroupColumns.length > 0 ? groupLabelFor(account, activeGroupColumns) : "";
         const showGroup = activeGroupColumns.length > 0 && group !== previousGroup; previousGroup = group;
@@ -124,11 +155,27 @@ export function AccountsPage() {
         </div>
       </footer>}
     </DataViewFrame>
-    <AccountDrawer detail={detailQ.data} hierarchy={hierarchyQ.data} loading={detailQ.isLoading || hierarchyQ.isLoading} error={detailQ.isError || hierarchyQ.isError} onClose={() => setSelectedId(null)} />
+    <AccountDrawer detail={detailQ.data} hierarchy={hierarchyQ.data} rollup={rollupQ.data}
+      health={healthQ.data ?? undefined}
+      loading={detailQ.isLoading || hierarchyQ.isLoading || rollupQ.isLoading || healthQ.isLoading}
+      error={detailQ.isError || hierarchyQ.isError || rollupQ.isError || healthQ.isError}
+      refreshing={recomputeHealth.isPending}
+      onRefreshHealth={() => selectedId && recomputeHealth.mutate(selectedId)}
+      onClose={() => setSelectedId(null)} />
   </>;
 }
 
-function AccountDrawer({ detail, hierarchy, loading, error, onClose }: { detail?: AccountDetail; hierarchy?: AccountHierarchy; loading: boolean; error: boolean; onClose: () => void }) {
+function AccountDrawer({ detail, hierarchy, rollup, health, loading, error, refreshing, onRefreshHealth, onClose }: {
+  detail?: AccountDetail;
+  hierarchy?: AccountHierarchy;
+  rollup?: AccountRollup;
+  health?: AccountHealth;
+  loading: boolean;
+  error: boolean;
+  refreshing: boolean;
+  onRefreshHealth: () => void;
+  onClose: () => void;
+}) {
   if (!loading && !detail && !error) return null;
   return <div className="drawer-scrim" role="presentation" onMouseDown={onClose}>
     <aside className="audit-drawer account-360-drawer" role="dialog" aria-modal="true" aria-label="Account 360" onMouseDown={(event) => event.stopPropagation()}>
@@ -137,8 +184,23 @@ function AccountDrawer({ detail, hierarchy, loading, error, onClose }: { detail?
       {error && <p className="empty-note">Account 360 failed to load.</p>}
       {detail && <div className="audit-list">
         <article className="audit-event"><strong>Profile</strong><p>{[detail.recordType, detail.industry, detail.segment, detail.status].filter(Boolean).join(" · ") || "Standard account"}</p><small>Owner {detail.ownerName ?? "-"} · territory {detail.territory ?? "-"}</small></article>
-        <article className="audit-event"><strong>Health</strong><p>{detail.healthBand ?? "Unscored"} {detail.healthScore == null ? "" : `(${detail.healthScore})`}</p><small>{detail.fieldsHiddenByPermission.length > 0 ? `Hidden fields: ${detail.fieldsHiddenByPermission.join(", ")}` : "No fields hidden for this role"}</small></article>
+        <article className="audit-event"><strong>Health</strong>
+          <p>{health?.band ?? detail.healthBand ?? "Unscored"} {health ? `(${health.score})` : detail.healthScore == null ? "" : `(${detail.healthScore})`}</p>
+          <small>{health?.changeExplanation ?? (detail.fieldsHiddenByPermission.length > 0 ? `Hidden fields: ${detail.fieldsHiddenByPermission.join(", ")}` : "Compute health to see the contributing factors.")}</small>
+          <button type="button" className="btn btn-sm" disabled={refreshing} onClick={onRefreshHealth}>{refreshing ? "Computing..." : "Recompute health"}</button>
+          {health && <div className="health-factor-list">{health.factors.map((factor) => <div key={factor.code} className="health-factor">
+            <span><strong>{factor.label}</strong><small>{factor.observed}</small></span>
+            <span className={`chip ${factor.direction === "NEGATIVE" ? "chip-crit" : "chip-active"}`}>{Math.round(factor.weight * 100)}% · {factor.score}</span>
+            <p>{factor.explanation}</p>
+          </div>)}</div>}
+        </article>
         <article className="audit-event"><strong>Commercial</strong><p>{detail.annualRevenue == null ? "Revenue hidden or unavailable" : `${detail.currencyCode ?? ""} ${detail.annualRevenue.toLocaleString()}`}</p><small>{detail.employeeCount == null ? "Employee count unavailable" : `${detail.employeeCount.toLocaleString()} employees`}</small></article>
+        {rollup && <article className="audit-event"><strong>Account and hierarchy roll-up</strong>
+          <div className="rollup-compare"><span><small>This account</small><b>{rollup.accountOnly.openPipelineValue.toLocaleString()}</b><em>open pipeline · {rollup.accountOnly.openOpportunityCount} deals</em></span>
+            <span><small>Visible hierarchy</small><b>{rollup.hierarchy.openPipelineValue.toLocaleString()}</b><em>open pipeline · {rollup.hierarchy.openOpportunityCount} deals</em></span></div>
+          <small>{rollup.restricted ? rollup.restrictionNote : `${rollup.hierarchy.accountsIncluded} account(s) included. Closed won: ${rollup.hierarchy.closedWonRevenue.toLocaleString()}.`}</small>
+          {rollup.unavailableMeasures.map((measure) => <p className="empty-note" key={measure.code}>{measure.label}: {measure.reason}</p>)}
+        </article>}
         {hierarchy && <article className="audit-event"><strong>Hierarchy</strong><p>{hierarchy.ultimateParentName ?? detail.name}</p><small>{hierarchy.restricted ? hierarchy.restrictionNote : `${hierarchy.nodes.length} visible node(s)`}</small>
           <div className="hierarchy-mini">{hierarchy.nodes.map((node) => <div key={node.id} className={node.isSelf ? "is-self" : ""} style={{ paddingLeft: `${Math.min(node.depth, 4) * 12}px` }}>{node.name} <span>{node.status}</span></div>)}</div>
         </article>}

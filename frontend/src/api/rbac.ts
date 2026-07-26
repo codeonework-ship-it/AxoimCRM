@@ -363,6 +363,38 @@ export interface FloorReport {
   crossTenant: boolean;
 }
 
+export interface AccessReviewCampaign {
+  id: string;
+  code: string;
+  name: string;
+  scopeNote: string | null;
+  deadlineAt: string;
+  status: "DRAFT" | "OPEN" | "CLOSED";
+  createdAt: string;
+  totalItems: number;
+  pendingItems: number;
+  confirmedItems: number;
+  revokedItems: number;
+  overdue: boolean;
+}
+
+export interface AccessReviewItem {
+  id: string;
+  campaignId: string;
+  grantType: string;
+  grantRef: string;
+  subjectUserId: string;
+  subjectEmail: string;
+  description: string;
+  reviewerId: string | null;
+  reviewerName: string | null;
+  decision: "PENDING" | "CONFIRMED" | "REVOKED" | "AUTO_REVOKED";
+  decidedBy: string | null;
+  decidedAt: string | null;
+  note: string | null;
+  createdAt: string;
+}
+
 export interface ActivityRow {
   id: string;
   actorId: string | null;
@@ -530,6 +562,16 @@ export const rbac = {
     request<TenantUser>("POST", `${RBAC}/users/role`, { userId, role, reason }),
   repairFloor: (userId: string, role: string, reason: string) =>
     request<TenantUser>("POST", `${RBAC}/tenant-floor/repair`, { userId, role, reason }),
+
+  // Access recertification
+  accessReviews: () => request<AccessReviewCampaign[]>("GET", `${RBAC}/access-reviews`),
+  createAccessReview: (body: { code: string; name: string; scopeNote?: string; deadlineAt: string }) =>
+    request<AccessReviewCampaign>("POST", `${RBAC}/access-reviews`, body),
+  accessReviewItems: (campaignId: string) =>
+    request<AccessReviewItem[]>("GET", `${RBAC}/access-reviews/${encodeURIComponent(campaignId)}/items`),
+  decideAccessReviewItem: (itemId: string, decision: "CONFIRMED" | "REVOKED", note?: string) =>
+    request<AccessReviewItem>("POST", `${RBAC}/access-reviews/items/${encodeURIComponent(itemId)}/decision`,
+      { decision, note }),
 };
 
 export const activityApi = {

@@ -55,13 +55,14 @@ export function PipelinePage() {
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOverStage, setDragOverStage] = useState<string | null>(null);
   const [refusedId, setRefusedId] = useState<string | null>(null);
+  const [preflightId, setPreflightId] = useState<string | null>(null);
   const [gateResult, setGateResult] = useState<WorkflowGateStatus | null>(null);
   const refusedTimer = useRef<number | undefined>(undefined);
   useEffect(() => () => window.clearTimeout(refusedTimer.current), []);
 
   const moveMutation = useMutation({
-    mutationFn: ({ oppId, stageId }: { oppId: string; stageId: string }) =>
-      api.moveOpportunity(oppId, stageId),
+    mutationFn: ({ oppId, stageId, reason }: { oppId: string; stageId: string; reason?: string }) =>
+      api.moveOpportunity(oppId, stageId, reason),
   });
 
   const gateMutation = useMutation({
@@ -78,50 +79,55 @@ export function PipelinePage() {
       error instanceof Error ? error.message : "Could not evaluate the process."),
   });
 
-  function handleDrop(e: DragEvent, toStageId: string) {
-    e.preventDefault();
-    setDragOverStage(null);
-    const oppId = e.dataTransfer.getData("text/axiom-opp-id");
-    if (!oppId) return;
-
+  async function attemptMove(oppId: string, toStageId: string) {
     const snapshot = stages;
     const next = moveCard(stages, oppId, toStageId);
     if (!next) return;
-
-    setStages(next); // optimistic
-    moveMutation.mutate(
-      { oppId, stageId: toStageId },
-      {
+    setPreflightId(oppId);
+    try {
+      const gate = await api.previewOpportunityStage(oppId, toStageId);
+      if (!gate.allowed) {
+        toasts.push("error", "Stage requirements are missing", gate.refusal
+          ?? gate.unsatisfied.map((issue) => `${issue.criterion}: ${issue.action}`).join(" "));
+        setRefusedId(oppId);
+        window.clearTimeout(refusedTimer.current);
+        refusedTimer.current = window.setTimeout(() => setRefusedId(null), 600);
+        return;
+      }
+      let reason: string | undefined;
+      if (gate.reasonRequired) {
+        const answer = window.prompt(
+          `${gate.transitionKind === "BACKWARD" ? "Moving backward" : "Skipping stages"} requires a reason.`,
+          "Customer process changed; reviewed by the opportunity owner.",
+        );
+        if (!answer?.trim()) return;
+        reason = answer.trim();
+      }
+      setStages(next);
+      moveMutation.mutate({ oppId, stageId: toStageId, reason }, {
         onSuccess: () => {
           void queryClient.invalidateQueries({ queryKey: ["pipeline", "board"] });
           void queryClient.invalidateQueries({ queryKey: ["dashboard", "summary"] });
           void queryClient.invalidateQueries({ queryKey: ["notifications"] });
         },
         onError: (err) => {
-          // Snap the card back exactly where it was.
           setStages(snapshot);
-          if (err instanceof ApiError && err.status === 409) {
-            // The server's exact gate message, verbatim — the refusal is
-            // deliberate, so say precisely why.
-            toasts.push("error", "Stage gate", err.message);
-            setRefusedId(oppId);
-            window.clearTimeout(refusedTimer.current);
-            refusedTimer.current = window.setTimeout(
-              () => setRefusedId(null),
-              600,
-            );
-          } else if (isUnreachable(err)) {
-            toasts.push("error", "Link down", "API unreachable — move not saved.");
-          } else {
-            toasts.push(
-              "error",
-              "Move failed",
-              err instanceof Error ? err.message : "Unknown error.",
-            );
-          }
+          toasts.push("error", err instanceof ApiError && err.status === 409 ? "Stage gate" : "Move failed",
+            err instanceof Error ? err.message : "The opportunity was not moved.");
         },
-      },
-    );
+      });
+    } catch (err) {
+      toasts.push("error", "Stage preflight failed", err instanceof Error ? err.message : "The stage could not be checked.");
+    } finally {
+      setPreflightId(null);
+    }
+  }
+
+  function handleDrop(e: DragEvent, toStageId: string) {
+    e.preventDefault();
+    setDragOverStage(null);
+    const oppId = e.dataTransfer.getData("text/axiom-opp-id");
+    if (oppId) void attemptMove(oppId, toStageId);
   }
 
   if (isUnreachable(boardQ.error)) {
@@ -236,26 +242,9 @@ export function PipelinePage() {
                         <select
                           value={stage.id}
                           aria-label={`Move ${opp.name} to another stage`}
-                          disabled={moveMutation.isPending}
+                          disabled={moveMutation.isPending || preflightId === opp.id}
                           onChange={(event) => {
-                            const snapshot = stages;
-                            const next = moveCard(stages, opp.id, event.target.value);
-                            if (!next) return;
-                            setStages(next);
-                            moveMutation.mutate(
-                              { oppId: opp.id, stageId: event.target.value },
-                              {
-                                onSuccess: () => {
-                                  void queryClient.invalidateQueries({ queryKey: ["pipeline", "board"] });
-                                  void queryClient.invalidateQueries({ queryKey: ["dashboard", "summary"] });
-                                  void queryClient.invalidateQueries({ queryKey: ["notifications"] });
-                                },
-                                onError: (err) => {
-                                  setStages(snapshot);
-                                  toasts.push("error", "Move refused", err instanceof Error ? err.message : "Stage requirements were not met.");
-                                },
-                              },
-                            );
+                            void attemptMove(opp.id, event.target.value);
                           }}
                         >
                           {[...stages].sort((a, b) => a.sortOrder - b.sortOrder).map((target) => (

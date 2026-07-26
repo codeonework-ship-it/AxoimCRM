@@ -1,9 +1,10 @@
 import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, isUnreachable, type ActivityRow } from "../api/client";
+import { api, isUnreachable, type ActivityRow, type EmailTemplate } from "../api/client";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataGridToolbar } from "../components/DataGridToolbar";
 import { DataViewFrame } from "../components/DataViewFrame";
+import { GridFilterHeader } from "../components/GridFilterRow";
 import { InfoTag } from "../components/InfoTag";
 import { useToasts } from "../components/Toasts";
 import { formatDate } from "../lib/format";
@@ -35,6 +36,11 @@ export function ActivitiesPage() {
   const [type, setType] = useState("");
   const [status, setStatus] = useState("OPEN");
   const [groupColumns, setGroupColumns, columnFilters, setColumnFilters] = usePersistedGridState("activities", { groupColumns: ["related"] });
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [templateDraft, setTemplateDraft] = useState({
+    apiName: "", name: "", folder: "General", sharingScope: "TENANT",
+    subject: "", body: "", mergeFields: "",
+  });
   const [draft, setDraft] = useState({
     activityType: "TASK",
     subject: "",
@@ -55,6 +61,32 @@ export function ActivitiesPage() {
     retry: 1,
   });
   const summaryQ = useQuery({ queryKey: ["activities", "summary"], queryFn: api.activitySummary, retry: 1 });
+  const templatesQ = useQuery({
+    queryKey: ["engagement", "email-templates"], queryFn: api.emailTemplates,
+    enabled: showTemplates, retry: 1,
+  });
+  const createTemplate = useMutation({
+    mutationFn: () => api.createEmailTemplate({
+      ...templateDraft,
+      mergeFields: templateDraft.mergeFields.split(",").map((value) => value.trim()).filter(Boolean),
+      changeNote: "Initial approved version",
+    }),
+    onSuccess: () => {
+      toasts.push("info", "Email template created", "Version 1 is now available without overwriting history.");
+      setTemplateDraft({ apiName: "", name: "", folder: "General", sharingScope: "TENANT", subject: "", body: "", mergeFields: "" });
+      void queryClient.invalidateQueries({ queryKey: ["engagement", "email-templates"] });
+    },
+    onError: (error) => toasts.push("error", "Template rejected", error instanceof Error ? error.message : "Template could not be saved."),
+  });
+  const reviseTemplate = useMutation({
+    mutationFn: ({ template, subject, body, changeNote }: { template: EmailTemplate; subject: string; body: string; changeNote: string }) =>
+      api.reviseEmailTemplate(template.id, { subject, body, mergeFields: template.mergeFields, changeNote }),
+    onSuccess: (template) => {
+      toasts.push("info", "New template version saved", `${template.name} is now at version ${template.currentVersion}.`);
+      void queryClient.invalidateQueries({ queryKey: ["engagement", "email-templates"] });
+    },
+    onError: (error) => toasts.push("error", "Revision rejected", error instanceof Error ? error.message : "Revision could not be saved."),
+  });
   const createMutation = useMutation({
     mutationFn: () => api.createActivity({
       activityType: draft.activityType,
@@ -125,6 +157,43 @@ export function ActivitiesPage() {
       <div className="kpi"><span className="label">Last contacted</span><div className="kpi-value activity-date">{formatDate(summaryQ.data?.lastContactedAt)}</div><div className="kpi-sub">{summaryQ.data?.daysSinceLastActivity == null ? "No contact yet" : `${summaryQ.data.daysSinceLastActivity} days ago`}</div></div>
     </div>
 
+    <section className="panel engagement-template-panel" aria-label="Versioned email templates">
+      <header className="engagement-template-head">
+        <div><span className="eyebrow">Reusable engagement</span><h2>Email template library</h2><p>Every edit creates a new immutable version, so sent-message evidence stays exact.</p></div>
+        <button className="btn btn-sm" onClick={() => setShowTemplates((value) => !value)}>{showTemplates ? "Hide templates" : "Manage templates"}</button>
+      </header>
+      {showTemplates && <>
+        <div className="template-create-grid">
+          <input value={templateDraft.apiName} onChange={(event) => setTemplateDraft((value) => ({ ...value, apiName: event.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "_") }))} placeholder="API name, e.g. renewal_follow_up" title="Stable lowercase name used by automation." />
+          <input value={templateDraft.name} onChange={(event) => setTemplateDraft((value) => ({ ...value, name: event.target.value }))} placeholder="Template name" title="Plain-language name users will recognize." />
+          <input value={templateDraft.folder} onChange={(event) => setTemplateDraft((value) => ({ ...value, folder: event.target.value }))} placeholder="Folder" />
+          <select value={templateDraft.sharingScope} onChange={(event) => setTemplateDraft((value) => ({ ...value, sharingScope: event.target.value }))}><option value="PRIVATE">Private</option><option value="TENANT">Whole workspace</option><option value="ROLE">Shared roles</option></select>
+          <input className="template-wide" value={templateDraft.subject} onChange={(event) => setTemplateDraft((value) => ({ ...value, subject: event.target.value }))} placeholder="Email subject" />
+          <input className="template-wide" value={templateDraft.mergeFields} onChange={(event) => setTemplateDraft((value) => ({ ...value, mergeFields: event.target.value }))} placeholder="Merge fields, comma separated: first_name, account_name" />
+          <textarea className="template-wide" value={templateDraft.body} onChange={(event) => setTemplateDraft((value) => ({ ...value, body: event.target.value }))} placeholder="Email body" />
+          <button className="btn btn-primary btn-sm" disabled={createTemplate.isPending || !templateDraft.apiName || !templateDraft.name || !templateDraft.subject || !templateDraft.body} onClick={() => createTemplate.mutate()}>{createTemplate.isPending ? "Saving..." : "Create template"}</button>
+        </div>
+        {templatesQ.isLoading && <GridLoader label="Reading template library" rows={3} columns={4} />}
+        <div className="template-card-grid">
+          {(templatesQ.data ?? []).map((template) => <article className="template-card" key={template.id}>
+            <div><strong>{template.name}</strong><span className="chip">v{template.currentVersion}</span></div>
+            <small>{template.folder} · {template.sharingScope} · owner {template.ownerName}</small>
+            <p>{template.subject}</p>
+            <code>{template.mergeFields.length ? template.mergeFields.join(", ") : "No merge fields"}</code>
+            {template.canEdit && <button className="btn btn-sm" disabled={reviseTemplate.isPending} onClick={() => {
+              const subject = window.prompt("Subject for the new immutable version", template.subject);
+              if (subject == null) return;
+              const body = window.prompt("Body for the new immutable version", template.body);
+              if (body == null) return;
+              const changeNote = window.prompt("What changed and why?", "Updated after content review.");
+              if (changeNote?.trim()) reviseTemplate.mutate({ template, subject, body, changeNote });
+            }}>Create new version</button>}
+          </article>)}
+        </div>
+        {templatesQ.isSuccess && templatesQ.data.length === 0 && <p className="empty-note">No visible templates yet. Create the first governed version above.</p>}
+      </>}
+    </section>
+
     <section className="list-controls activity-controls" aria-label="Activity search and filters">
       <label><span>Search <InfoTag text="Type words from the subject, notes, or outcome to narrow activities." label="Activity search help" /></span><input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }} placeholder="Subject, notes, outcome" /></label>
       <label><span>Type <InfoTag text="Choose the kind of activity, such as task, call, email log, or note." label="Activity type help" /></span><select value={type} onChange={(event) => { setType(event.target.value); setPage(0); }}><option value="">All types</option>{TYPES.map((value) => <option key={value} value={value}>{value}</option>)}</select></label>
@@ -142,7 +211,6 @@ export function ActivitiesPage() {
         groupColumns={ACTIVITY_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
         selectedGroupColumns={groupColumns}
         onGroupColumnsChange={setGroupColumns}
-        filterColumns={ACTIVITY_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
         columnFilters={columnFilters}
         onColumnFiltersChange={setColumnFilters}
         auditEntityType="ACTIVITY"
@@ -182,11 +250,27 @@ export function ActivitiesPage() {
           <input title="Short call result, such as CONNECTED or LEFT_MESSAGE." value={draft.disposition} onChange={(event) => setDraft((value) => ({ ...value, disposition: event.target.value.toUpperCase() }))} placeholder="Disposition" />
         </div>}
         <textarea title="Add the useful details: notes, agenda, email summary, or call outcome." value={draft.body} onChange={(event) => setDraft((value) => ({ ...value, body: event.target.value }))} placeholder="Notes, agenda, email summary, or call outcome detail" />
-        <button className="btn btn-primary btn-sm" disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>{createMutation.isPending ? "Saving..." : "Create activity"}</button>
+        {/* The button lives in its own actions row, not as a bare child of the
+            panel's grid. A grid item stretches to its column by default, so
+            directly parented it rendered 1,554px wide — a primary action the
+            full width of the workspace, which reads as a banner rather than as
+            a button. The row also gives it the same trailing alignment as every
+            other form in the product. */}
+        <div className="inline-actions activity-create-actions">
+          <button className="btn btn-primary btn-sm" disabled={createMutation.isPending} onClick={() => createMutation.mutate()}>{createMutation.isPending ? "Saving..." : "Create activity"}</button>
+        </div>
       </section>
 
       {activitiesQ.isLoading && <GridLoader label="Reading engagement timeline" rows={6} columns={5} />}
       {activitiesQ.isError && <p className="empty-note">Activities failed to load{activitiesQ.error instanceof Error ? `: ${activitiesQ.error.message}` : "."}</p>}
+      {/* Timeline cards, so the filters are the grid's header rather than a
+          <thead> row — same component and controls as the table grids. */}
+      {activitiesQ.isSuccess && <GridFilterHeader
+        columns={ACTIVITY_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
+        filters={columnFilters}
+        onChange={setColumnFilters}
+        label="Filter activity columns"
+      />}
       {activitiesQ.isSuccess && rows.length === 0 && <p className="empty-note">No activities match the current query.</p>}
       {activeGroupColumns.length > 0 && grouped.map(([group, items]) => <section className="activity-group" key={group}>
         <h2>{group}</h2>

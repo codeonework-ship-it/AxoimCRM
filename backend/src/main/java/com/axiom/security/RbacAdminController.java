@@ -60,11 +60,13 @@ public class RbacAdminController {
     private final AccessExplainerService explainer;
     private final TenantRoleFloorService floor;
     private final SensitiveFieldService sensitiveFields;
+    private final AccessReviewService accessReviews;
 
     public RbacAdminController(RoleHierarchyService roles, PermissionAdminService permissions,
                                SharingRuleService sharing, SodService sod,
                                DelegatedAdminService delegatedAdmin, AccessExplainerService explainer,
-                               TenantRoleFloorService floor, SensitiveFieldService sensitiveFields) {
+                               TenantRoleFloorService floor, SensitiveFieldService sensitiveFields,
+                               AccessReviewService accessReviews) {
         this.roles = roles;
         this.permissions = permissions;
         this.sharing = sharing;
@@ -73,6 +75,7 @@ public class RbacAdminController {
         this.explainer = explainer;
         this.floor = floor;
         this.sensitiveFields = sensitiveFields;
+        this.accessReviews = accessReviews;
     }
 
     // ---------------------------------------------------------------- requests
@@ -85,6 +88,7 @@ public class RbacAdminController {
     public record UserGroupRequest(@NotBlank String code, @NotBlank String name) {}
     public record MembershipRequest(@NotNull UUID userId) {}
     public record FindingResolution(@NotBlank String status, String note) {}
+    public record AccessReviewDecision(@NotBlank String decision, String note) {}
 
     /** What the screen needs to render every picker in one round trip. */
     public record RbacOverview(List<PermissionAdminService.PermissionDescriptor> permissions,
@@ -474,5 +478,31 @@ public class RbacAdminController {
     public TenantRoleFloorService.TenantUser repairFloor(
             @RequestBody @Valid TenantRoleFloorService.RepairRequest request) {
         return floor.repair(request);
+    }
+
+    // --------------------------------------------------------- access reviews
+
+    @GetMapping("/access-reviews")
+    public List<AccessReviewService.Campaign> accessReviews() {
+        return accessReviews.campaigns();
+    }
+
+    @PostMapping("/access-reviews")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AccessReviewService.Campaign createAccessReview(
+            @RequestBody @Valid AccessReviewService.CreateRequest request) {
+        return accessReviews.create(request);
+    }
+
+    @GetMapping("/access-reviews/{campaignId}/items")
+    public List<AccessReviewService.Item> accessReviewItems(@PathVariable UUID campaignId) {
+        return accessReviews.items(campaignId);
+    }
+
+    @PostMapping("/access-reviews/items/{itemId}/decision")
+    public AccessReviewService.Item decideAccessReviewItem(
+            @PathVariable UUID itemId, @RequestBody @Valid AccessReviewDecision request) {
+        return accessReviews.decide(itemId,
+                new AccessReviewService.DecisionRequest(request.decision(), request.note()));
     }
 }

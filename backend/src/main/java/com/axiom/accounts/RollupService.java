@@ -59,6 +59,11 @@ public class RollupService {
                              List<UnavailableMeasure> unavailableMeasures) {}
 
     public RollupView rollup(UUID accountId) {
+        RecordAccess.Scope scope = RecordAccess.current();
+        List<Object> anchorArgs = new ArrayList<>();
+        anchorArgs.add(TenantContext.get().tenantId());
+        anchorArgs.add(accountId);
+        String anchorOwnerFilter = scope.ownerPredicate("a.owner_id", anchorArgs);
         Anchor anchor;
         try {
             anchor = jdbc.queryForObject("""
@@ -67,15 +72,14 @@ public class RollupService {
                     from crm.account a
                     left join crm.account up on up.tenant_id = a.tenant_id and up.id = a.ultimate_parent_id
                     where a.tenant_id = ? and a.id = ? and a.deleted_at is null
-                    """, (rs, i) -> new Anchor(rs.getString("name"), rs.getString("hierarchy_path"),
+                    """ + anchorOwnerFilter, (rs, i) -> new Anchor(rs.getString("name"), rs.getString("hierarchy_path"),
                             rs.getInt("hierarchy_depth"), rs.getObject("ultimate_parent_id", UUID.class),
                             rs.getString("ultimate_parent_name")),
-                    TenantContext.get().tenantId(), accountId);
+                    anchorArgs.toArray());
         } catch (EmptyResultDataAccessException ex) {
             throw new NotFoundException("Account not found");
         }
 
-        RecordAccess.Scope scope = RecordAccess.current();
         Figures self = figures(anchor.path(), false, scope);
         Figures family = figures(anchor.path(), true, scope);
 

@@ -210,6 +210,16 @@ export interface IdpTestResult {
   note: string;
 }
 
+export interface IdpCertificateAlert {
+  id: string;
+  providerId: string;
+  providerName: string;
+  certificateNotAfter: string;
+  severity: "WARNING" | "EXPIRED";
+  notifiedAt: string;
+  recipientCount: number;
+}
+
 export const idpApi = {
   list: () => authed<IdpConfig[]>("GET", "/api/v1/identity/idp"),
   create: (body: IdpMutation) => authed<IdpConfig>("POST", "/api/v1/identity/idp", body),
@@ -219,6 +229,8 @@ export const idpApi = {
   route: (email: string) =>
     authed<{ method: string; idpConfigId: string | null; displayName: string | null; protocol: string | null; note: string }>(
       "GET", `/api/v1/identity/idp/route?email=${encodeURIComponent(email)}`),
+  certificateAlerts: () => authed<IdpCertificateAlert[]>("GET", "/api/v1/identity/idp/certificate-alerts"),
+  sweepCertificateAlerts: () => authed<{ alertsCreated: number }>("POST", "/api/v1/identity/idp/certificate-alerts/sweep"),
 };
 
 /* ------------------------------------------------------ trial accounts ---- */

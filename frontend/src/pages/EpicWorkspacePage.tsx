@@ -1,10 +1,11 @@
 import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, isUnreachable, type WorkflowGateStatus, type WorkspaceRow } from "../api/client";
+import { api, isUnreachable, type ForecastScenario, type WorkflowGateStatus, type WorkspaceRow } from "../api/client";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataGridToolbar } from "../components/DataGridToolbar";
 import { DataTable, type Column } from "../components/DataTable";
 import { DataViewFrame } from "../components/DataViewFrame";
+import { GridFilterRow, type GridFilterColumn } from "../components/GridFilterRow";
 import { InfoTag } from "../components/InfoTag";
 import { GridLoader } from "../components/Loaders";
 import { useToasts } from "../components/Toasts";
@@ -78,6 +79,22 @@ const WORKSPACE_GROUP_COLUMNS: GroupColumn<WorkspaceRow>[] = [
   { key: "target", label: "Target date", value: (row) => row.targetDate ? formatDate(row.targetDate) : null },
 ];
 
+/*
+ * One entry per rendered column of the workspace table, in render order. The
+ * group list above is ordered differently and omits Signals and Action, which
+ * is why this is separate: a filter row built from that list would put the
+ * Status box under Amount.
+ */
+const WORKSPACE_FILTER_COLUMNS: GridFilterColumn[] = [
+  { key: "code", label: "Code" },
+  { key: "record", label: "Record" },
+  { key: "owner", label: "Owner" },
+  { key: "amount", label: "Amount" },
+  { key: "target", label: "Target" },
+  { key: "status", label: "Status" },
+  { key: "signals", label: "Signals", kind: "none" },
+];
+
 const WORKFLOW_GATE_COLUMNS: Column<WorkflowGateStatus>[] = [
   { key: "objectType", header: "Object", value: (row) => row.objectType, filter: "enum", groupable: true, cellClass: "mono" },
   { key: "recordId", header: "Record", value: (row) => row.recordId, filter: "text", groupable: false, cellClass: "mono" },
@@ -101,6 +118,7 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [gateResult, setGateResult] = useState<WorkflowGateStatus | null>(null);
+  const [scenarioResult, setScenarioResult] = useState<ForecastScenario | null>(null);
   const [groupColumns, setGroupColumns, columnFilters, setColumnFilters] = usePersistedGridState(`workspace-${module}`);
   const toasts = useToasts();
   const queryClient = useQueryClient();
@@ -134,6 +152,35 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
     },
     onError: (error) => toasts.push("error", "Workflow gate check failed",
       error instanceof Error ? error.message : "Gate check failed."),
+  });
+  const renewalMutation = useMutation({
+    mutationFn: ({ row, rationale }: { row: WorkspaceRow; rationale: string }) => api.prepareContractRenewal(row.id, rationale),
+    onSuccess: (result) => {
+      toasts.push("info", result.alreadyGenerated ? "Renewal already prepared" : "Renewal draft prepared", result.message);
+      void queryClient.invalidateQueries({ queryKey: ["workspace", "contracts"] });
+      void queryClient.invalidateQueries({ queryKey: ["audit"] });
+    },
+    onError: (error) => toasts.push("error", "Renewal preparation failed", error instanceof Error ? error.message : "Renewal could not be prepared."),
+  });
+  const scenarioMutation = useMutation({
+    mutationFn: ({ row, name, adjustment, confidence, riskReduction }: { row: WorkspaceRow; name: string; adjustment: number; confidence?: number; riskReduction: number }) =>
+      api.createForecastScenario(row.id, { name, amountAdjustmentPct: adjustment, confidencePct: confidence, riskReduction }),
+    onSuccess: (scenario) => {
+      setScenarioResult(scenario);
+      toasts.push("info", "Forecast scenario saved", scenario.note);
+      void queryClient.invalidateQueries({ queryKey: ["audit"] });
+    },
+    onError: (error) => toasts.push("error", "Scenario rejected", error instanceof Error ? error.message : "Scenario could not be saved."),
+  });
+  const controlMutation = useMutation({
+    mutationFn: ({ row, input }: { row: WorkspaceRow; input?: string }) => runClosureControl(module, row, input),
+    onSuccess: (result) => {
+      toasts.push("info", result.title, result.message);
+      void queryClient.invalidateQueries({ queryKey: ["workspace", module] });
+      void queryClient.invalidateQueries({ queryKey: ["audit"] });
+    },
+    onError: (error) => toasts.push("error", "Governed control failed",
+      error instanceof Error ? error.message : "The control could not be completed."),
   });
 
   if (isUnreachable(workspaceQ.error)) {
@@ -200,7 +247,6 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
         groupColumns={WORKSPACE_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
         selectedGroupColumns={groupColumns}
         onGroupColumnsChange={setGroupColumns}
-        filterColumns={WORKSPACE_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
         columnFilters={columnFilters}
         onColumnFiltersChange={setColumnFilters}
         auditEntityType={auditEntityFor(module)}
@@ -220,13 +266,41 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
       {workspaceQ.isLoading && <GridLoader label="Reading operational workspace" rows={6} columns={6} />}
       {workspaceQ.isError && <p className="empty-note">Workspace failed to load{workspaceQ.error instanceof Error ? `: ${workspaceQ.error.message}` : "."}</p>}
       {workspaceQ.isSuccess && <WorkspaceTable
+        filters={columnFilters}
+        onFiltersChange={setColumnFilters}
         rows={visibleRows}
         groupColumns={activeGroupColumns}
         module={module}
         busyId={actionMutation.variables?.id}
         gateBusyId={gateMutation.variables?.id}
+        revenueBusyId={renewalMutation.variables?.row.id ?? scenarioMutation.variables?.row.id}
+        controlBusyId={controlMutation.variables?.row.id}
         onAction={(row) => actionMutation.mutate(row)}
         onCheckGates={(row) => gateMutation.mutate(row)}
+        onRenewal={(row) => {
+          const rationale = window.prompt(`Prepare a renewal draft for ${row.code}. Why is renewal expected?`, "Renewal window reached; commercial review required.");
+          if (rationale?.trim()) renewalMutation.mutate({ row, rationale: rationale.trim() });
+        }}
+        onScenario={(row) => {
+          const name = window.prompt(`Scenario name for ${row.code}`, "Upside review");
+          if (!name?.trim()) return;
+          const adjustment = Number(window.prompt("Amount adjustment percentage (-100 to 500)", "10"));
+          const confidence = Number(window.prompt("Confidence percentage (0 to 100)", String(row.metrics.confidencePct ?? 70)));
+          const riskReduction = Number(window.prompt("How many risk signals are assumed resolved?", "1"));
+          if (![adjustment, confidence, riskReduction].every(Number.isFinite)) {
+            toasts.push("error", "Scenario values are invalid", "Use numbers for adjustment, confidence and risk reduction.");
+            return;
+          }
+          scenarioMutation.mutate({ row, name: name.trim(), adjustment, confidence, riskReduction });
+        }}
+        onControl={(row) => {
+          let input: string | undefined;
+          if (module === "partners") {
+            input = window.prompt(`Open opportunity UUID to register for ${row.code}`, "")?.trim();
+            if (!input) return;
+          }
+          controlMutation.mutate({ row, input });
+        }}
       />}
       {workspaceQ.isSuccess && <footer className="page-controls" aria-label="Workspace pagination">
         <span>Showing {visibleRows.length} of {total} records - 100 rows per page</span>
@@ -238,6 +312,7 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
       </footer>}
     </DataViewFrame>
     <WorkflowGateDrawer result={gateResult} onClose={() => setGateResult(null)} />
+    <ForecastScenarioDrawer scenario={scenarioResult} onClose={() => setScenarioResult(null)} />
   </>;
 }
 
@@ -309,18 +384,26 @@ function WorkflowGateConsole() {
   );
 }
 
-function WorkspaceTable({ rows, groupColumns, module, busyId, gateBusyId, onAction, onCheckGates }: {
+function WorkspaceTable({ rows, groupColumns, filters, onFiltersChange, module, busyId, gateBusyId, revenueBusyId, controlBusyId, onAction, onCheckGates, onRenewal, onScenario, onControl }: {
   rows: WorkspaceRow[];
   groupColumns: GroupColumn<WorkspaceRow>[];
+  filters: Record<string, string>;
+  onFiltersChange: (next: Record<string, string>) => void;
   module: WorkspaceModule;
   busyId?: string;
   gateBusyId?: string;
+  revenueBusyId?: string;
+  controlBusyId?: string;
   onAction: (row: WorkspaceRow) => void;
   onCheckGates: (row: WorkspaceRow) => void;
+  onRenewal: (row: WorkspaceRow) => void;
+  onScenario: (row: WorkspaceRow) => void;
+  onControl: (row: WorkspaceRow) => void;
 }) {
   let previousGroup = "";
   return <div className="table-wrap"><table className="data-table cpq-table epic-table">
-    <thead><tr><th>Code</th><th>Record</th><th>Owner</th><th>Amount</th><th>Target</th><th>Status</th><th>Signals</th><th>Action</th></tr></thead>
+    <thead><tr><th>Code</th><th>Record</th><th>Owner</th><th>Amount</th><th>Target</th><th>Status</th><th>Signals</th><th>Action</th></tr>
+    <GridFilterRow columns={WORKSPACE_FILTER_COLUMNS} filters={filters} onChange={onFiltersChange} trailing={1} /></thead>
     <tbody>
       {rows.map((row) => {
         const group = groupColumns.length > 0 ? groupLabelFor(row, groupColumns) : "";
@@ -345,6 +428,12 @@ function WorkspaceTable({ rows, groupColumns, module, busyId, gateBusyId, onActi
                 ? <button className="btn btn-primary btn-sm" disabled={busyId === row.id || gateBusyId === row.id}
                     onClick={() => onAction(row)}>{busyId === row.id ? "Working..." : action}</button>
                 : !gate && <span className="empty-note">No action</span>}
+              {module === "contracts" && ["ACTIVE", "EXPIRING", "EXPIRED"].includes(row.status) && <button className="btn btn-sm" disabled={revenueBusyId === row.id} onClick={() => onRenewal(row)}>{revenueBusyId === row.id ? "Preparing..." : "Prepare renewal"}</button>}
+              {module === "forecast" && <button className="btn btn-sm" disabled={revenueBusyId === row.id} onClick={() => onScenario(row)}>{revenueBusyId === row.id ? "Modelling..." : "Scenario"}</button>}
+              {["campaigns", "cases", "partners", "automation"].includes(module) && <button className="btn btn-sm"
+                disabled={controlBusyId === row.id} onClick={() => onControl(row)}>
+                {controlBusyId === row.id ? "Working..." : controlLabel(module)}
+              </button>}
             </div></td>
           </tr>
         </Fragment>;
@@ -352,6 +441,42 @@ function WorkspaceTable({ rows, groupColumns, module, busyId, gateBusyId, onActi
       {rows.length === 0 && <tr><td colSpan={8} className="empty-note">No records match the current query.</td></tr>}
     </tbody>
   </table></div>;
+}
+
+function controlLabel(module: WorkspaceModule): string {
+  if (module === "campaigns") return "Capture performance";
+  if (module === "cases") return "Check SLA";
+  if (module === "partners") return "Register deal";
+  if (module === "automation") return "Restore version";
+  return "Govern";
+}
+
+async function runClosureControl(module: WorkspaceModule, row: WorkspaceRow, input?: string): Promise<{ title: string; message: string }> {
+  if (module === "campaigns") {
+    const result = await api.captureCampaignPerformance(row.id);
+    const roi = result.roiPercent == null ? "not available because budget is zero" : `${result.roiPercent.toFixed(2)}%`;
+    return { title: "Campaign performance captured", message: `${result.responses}/${result.members} responded; governed ROI is ${roi}.` };
+  }
+  if (module === "cases") {
+    const result = await api.sweepCaseSla(row.id);
+    return { title: result.missedMilestones > 0 ? "Case escalated" : "SLA is current", message: result.message };
+  }
+  if (module === "partners") {
+    if (!input) throw new Error("Choose an opportunity UUID.");
+    const result = await api.registerPartnerDeal(row.id, input);
+    return { title: result.conflictCount > 0 ? "Deal held for conflict review" : "Deal protected",
+      message: `${result.registrationNumber}: ${result.conflictStatus.toLowerCase()} (${result.conflictCount} open conflicts).` };
+  }
+  if (module === "automation") {
+    const versions = await api.automationRuleVersions(row.id);
+    const previous = versions.filter((version) => !version.active).sort((a, b) => b.versionNo - a.versionNo)[0];
+    if (!previous) throw new Error("This rule has no prior version to restore.");
+    const confirmed = window.confirm(`Restore ${row.code} version ${previous.versionNo}? A new version will preserve the full audit history.`);
+    if (!confirmed) throw new Error("Restore cancelled.");
+    await api.restoreAutomationRuleVersion(row.id, previous.versionNo);
+    return { title: "Automation version restored", message: `Version ${previous.versionNo} was copied forward as the new active version.` };
+  }
+  throw new Error("No additional control is available for this module.");
 }
 
 function workflowTransitionFor(module: WorkspaceModule, row: WorkspaceRow): { objectType: string; targetState: string } | null {
@@ -369,9 +494,6 @@ function workflowTransitionFor(module: WorkspaceModule, row: WorkspaceRow): { ob
   }
   if (module === "partners" && ["ONBOARDING", "SUSPENDED"].includes(row.status)) {
     return { objectType: "PARTNER_ACCOUNT", targetState: "ACTIVE" };
-  }
-  if (module === "automation" && row.status !== "RETIRED") {
-    return { objectType: "AUTOMATION_RULE", targetState: "true" };
   }
   if (module === "analytics" && row.status === "ACTIVE") {
     return { objectType: "ANALYTICS_DASHBOARD", targetState: "ACTIVE" };
@@ -476,6 +598,31 @@ async function runWorkspaceAction(module: WorkspaceModule, row: WorkspaceRow) {
   }
   if (module === "commodity") return api.offerCommodityEnquiry(row.id);
   throw new Error("No governed action is available for this workspace.");
+}
+
+function ForecastScenarioDrawer({ scenario, onClose }: { scenario: ForecastScenario | null; onClose: () => void }) {
+  if (!scenario) return null;
+  return <div className="drawer-scrim" role="presentation" onMouseDown={onClose}>
+    <aside className="audit-drawer forecast-scenario-drawer" role="dialog" aria-modal="true" aria-label="Forecast scenario comparison" onMouseDown={(event) => event.stopPropagation()}>
+      <header className="drawer-head">
+        <div><span className="eyebrow">Saved scenario</span><h2>{scenario.name}</h2></div>
+        <button className="icon-btn" onClick={onClose} aria-label="Close forecast scenario">×</button>
+      </header>
+      <div className="scenario-totals">
+        <div><span>Baseline</span><strong>{formatMoney(scenario.baselineAmount)}</strong></div>
+        <div><span>Scenario</span><strong>{formatMoney(scenario.scenarioAmount)}</strong></div>
+        <div><span>Risk-adjusted</span><strong>{formatMoney(scenario.weightedAmount)}</strong></div>
+      </div>
+      <p className="drawer-note">{scenario.note}</p>
+      <div className="audit-list">
+        {scenario.explanation.map((factor) => <article className="audit-event" key={factor.code}>
+          <strong>{factor.label}</strong>
+          <p>{factor.baseline} → {factor.scenario}</p>
+          <small>{factor.effect}</small>
+        </article>)}
+      </div>
+    </aside>
+  </div>;
 }
 
 function titleFromModule(module: WorkspaceModule): string {

@@ -4,6 +4,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { highlightSegments, searchApi, type SearchHit } from "../api/search";
 import { useAuth } from "../auth/AuthContext";
 import { GridLoader, InlineLoader, LoaderStatus, PanelLoader } from "../components/Loaders";
+import { useToasts } from "../components/Toasts";
 
 /**
  * Global search (FR-ADM-004).
@@ -70,6 +71,7 @@ export function SearchPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const toasts = useToasts();
   const [params, setParams] = useSearchParams();
 
   const submitted = (params.get("q") ?? "").trim();
@@ -122,7 +124,15 @@ export function SearchPage() {
 
   const reindexM = useMutation({
     mutationFn: () => searchApi.reindex(reindexType || null, "Requested from the search workspace"),
-    onSuccess: (run) => setWatchedRun(run.id),
+    onSuccess: (run) => {
+      setWatchedRun(run.id);
+      toasts.push("info", "Search rebuild queued", "Progress will update here while records are indexed.");
+    },
+    onError: (error) => toasts.push(
+      "error",
+      "Search rebuild could not start",
+      error instanceof Error ? error.message : "Please retry the rebuild.",
+    ),
   });
 
   const activeRun = runQ.data ?? statusQ.data?.activeRun ?? null;

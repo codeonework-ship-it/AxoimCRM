@@ -398,6 +398,57 @@ The parts always add up exactly to the total change — no mystery residue. Clic
 
 ---
 
+## Reports and Analytics Studio
+
+Open **Reports** and choose one of two workspaces:
+
+- **Reports Studio** is the governed Jasper grid. Filter or search any column, sort or group the portfolio, choose a report, read its business question and audience, then review the complete browser-safe report inside Axiom before downloading PDF, Excel or Word.
+- **Custom Reports** is the no-code authoring workspace for report building, dashboards, calculated measures, conditional formatting, sharing and delivery policies.
+
+The separation is intentional: choosing and reading an approved operating report is a different job from designing a new analytical definition. The two workspaces share the same tenant security, export rights and audit trail.
+
+### Use a standard CRM report
+
+The catalogue is arranged into Executive, Sales, Growth, Customer, Commercial and Governance collections. Each grid row tells you the plain-language decision the report supports, who normally uses it, available formats and Jasper readiness. The twenty-one-report portfolio includes revenue summary, pipeline, forecast, quota, stage velocity, ARR movement, whitespace, Customer 360, discount governance, demand, activity, health, service, quote, campaign and data-quality analysis.
+
+1. Open **Reports Studio** and use the column filters, sorting or **Group** choices to find a report by collection, title, business question, recommended role, format or status.
+2. Choose **View Report** in the grid. Axiom renders every row from the same governed query supplied to Jasper in a browser-safe document viewer; choose **Full View** when you need the largest reading area.
+3. Review **Decision Supported** to confirm it answers the question you have.
+4. Choose **Download PDF** for a presentation-ready document, **Download Excel** for further analysis or **Download Word** for a document you can annotate.
+5. Choose **Schedule Report** only when the same governed report is needed repeatedly. A schedule does not give the recipient more access than they already have.
+
+Every generated document names the tenant, collection, audience, business question and generation time. An empty report says there is no matching data; it never substitutes unrelated rows.
+
+### Build a report
+
+1. Choose **Report builder**, then select a dataset such as Opportunities, Accounts, Leads or Activities.
+2. Drag fields into **Detail columns**, **Row groups**, **Measures** or **Pivot columns**. On touch devices or with a keyboard, click a field to add it and use the × on a field chip to remove it.
+3. Choose **Tabular**, **Summary** or **Pivot**. Add a filter before grouping if you only need part of the dataset.
+4. For an Accounts or Opportunities report, use **Cross-module relationship** to ask a question such as “accounts without activity in the last 90 days.”
+5. Choose **Run preview**. The preview tells you when the projected data was refreshed, whether access narrowed the result and whether the row limit was reached.
+6. Choose **Drill into records** to see the contributing records. Axiom checks your access again at that moment; a report is never a shortcut around record security.
+7. Give the report a name and code, then choose **Save report**.
+
+Calculated measures use normal arithmetic over output field names—for example, `amount * probability`. They are formulas, not SQL. Conditional formatting lets you colour a result when it is above, below or equal to a comparison value.
+
+### Design a dashboard
+
+Choose **Dashboards**. Create a dashboard, select its audience and layout, then add saved reports as KPI, bar, line, area, donut, funnel, table, pivot or summary widgets. Width and height use a twelve-column canvas, so the same dashboard rearranges cleanly on narrower screens.
+
+### Share, discuss, embed and deliver
+
+Choose **Share & deliver** to:
+
+- share a report with a user, role or the tenant while preserving each viewer's own access;
+- attach review comments to the governed report definition;
+- schedule PDF, Excel, Word or link delivery;
+- alert recipients only when a governed KPI crosses a threshold; or
+- create an authenticated embedded view restricted to exact allowed web origins.
+
+The screen states `PENDING_ADAPTER` until an external mail provider is configured. This means Axiom has accepted and governed the delivery policy, but does not falsely claim that an outside email was sent.
+
+---
+
 ## The AI assistant
 
 The assistant summarizes accounts before your calls, suggests your next best action, drafts emails and call prep, and answers plain-language questions about your data ("which of my deals have gone quiet this month?").
@@ -633,6 +684,72 @@ Practically, this means two things:
 
 Connectors never contain a password themselves. They refer to a credential *by its name*, which is why
 rotating one is a single action rather than a hunt.
+
+## Core administration and revenue controls
+
+### Certificate expiry alerts
+
+Open **Access governance → Identity providers**. Axiom checks enabled SAML signing certificates every day and notifies tenant administrators 30 days before expiry. Use **Check certificate expiry** after replacing a certificate. Running the check repeatedly is safe; the same certificate warning is not duplicated.
+
+### Access reviews
+
+Open **Authorization → Access reviews**. Enter a code, name and future deadline, then choose **Open review**. Axiom snapshots current roles, permission bundles, manual shares and delegated administration. Use **Confirm** when access is still needed or **Revoke** to remove it immediately. You cannot decide your own access; another tenant administrator must review it.
+
+### Historical reference labels
+
+Open **Reference Data**, choose a value set, then select a stored code and the business date from the **Resolve as of date** controls. An inactive value still appears on historical records and reports, but Axiom clearly states that it is unavailable for new records.
+
+### Account health and hierarchy totals
+
+Open **Accounts → View 360**. **Recompute health** refreshes the weighted score. Every factor shows what Axiom observed, how much the factor weighs, whether it helps or hurts, and the recommended action. The roll-up compares the selected account with the visible hierarchy. If record permissions exclude part of the hierarchy, the drawer says the result is restricted without revealing hidden counts.
+
+### Capturing leads
+
+Open **Leads → Capture leads**. The single form validates, checks duplicates, scores, routes and starts the response SLA in one operation. For a batch, paste CSV using the header shown in the panel and process up to 1,000 rows. Valid rows commit even when other rows fail; the result lists every rejected row and its correction message.
+
+## Revenue execution controls
+
+### Moving a deal safely
+
+Open **Pipeline** and choose another stage from a deal card, or drag the card. Axiom checks the current stage's pinned exit rules and the new stage's entry rules before moving anything. If something is missing, the message tells you what Axiom observed and the next corrective action. Moving backward or skipping stages asks for a business reason.
+
+### Versioned email templates
+
+Open **Activities → Manage templates**. Create a reusable subject and body, choose who may see it, and list merge-field names separated by commas. **Create new version** asks for the revised subject, body and a change note. It does not overwrite an earlier version, so previously sent content remains provable.
+
+### Revising a quote
+
+Open **Quotes & CPQ** and choose **New revision** on the current quote. Explain what changed. Axiom creates the next draft with the same products, bundles, prices and pricing-adjustment evidence, then marks the former version as superseded. Ordered quotes cannot be revised from this screen.
+
+### Preparing a contract renewal
+
+Open **Contracts** and choose **Prepare renewal** for an active, expiring or expired contract. Add the renewal rationale. Axiom creates one draft beginning the day after the source ends and copies eligible subscriptions. Repeating the action returns the existing renewal rather than creating a duplicate.
+
+### Comparing a forecast scenario
+
+Open **Forecast** and choose **Scenario**. Name the scenario and enter the amount adjustment, confidence and assumed resolved risks. The right-side comparison explains every factor and the risk-adjusted outcome. Saving a scenario never changes the submitted forecast.
+
+## Customer operations controls
+
+### Capturing campaign performance
+
+Open **Campaigns** and choose **Capture performance**. Axiom freezes the current member, response, MQL, SQL, budget and influenced-pipeline totals as evidence. ROI uses net influenced pipeline against budget. A zero-budget campaign is shown as “not available” rather than an invented percentage. Capturing again creates a new snapshot; it never edits the earlier one.
+
+### Checking a case SLA
+
+Open **Cases** and choose **Check SLA**. Any open milestone whose due time has passed is marked missed and receives one escalation record. Running the check again is safe and does not duplicate the escalation. Resolved and closed cases are never reopened by this control.
+
+### Registering a partner deal
+
+Open **Partners** and choose **Register deal**, then paste the UUID of an open opportunity. Axiom checks for another active protected partner registration for the same customer. A clear registration is approved with a protection window; an overlap stays submitted and is held for review with conflict evidence.
+
+### Restoring an automation rule
+
+Open **Automation** and choose **Restore version**. Axiom selects the latest prior version and asks for confirmation. Restore copies that definition forward as a new active version, so the audit history remains linear. **Simulate** continues to be side-effect free and uses the same canonical rule definition shown in the workspace.
+
+### Scheduling a report
+
+Open **Reports** and choose **Schedule** on a report card. Enter the recipient and a daily, weekly or monthly frequency. **Run due schedules** generates the governed Jasper attachment and advances the next run time. The current first-party boundary generates and records the attachment; external email transport remains pending until its approved adapter is connected.
 
 ---
 

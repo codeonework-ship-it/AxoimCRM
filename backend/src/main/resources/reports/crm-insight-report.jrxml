@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  No xsi:schemaLocation on purpose.
+
+  It used to point at http://jasperreports.sourceforge.net/xsd/jasperreport.xsd —
+  an internet URL. Xerces validated against that published schema, which predates
+  the <noData> band, so compiling this template failed with
+  "Invalid content was found starting with element 'pageFooter'" even though the
+  band order is exactly what the current schema requires. Removing the attribute
+  makes validation use the schema bundled in the jasperreports jar, which matches
+  the runtime actually rendering the report — and stops the build depending on
+  network access to a third-party host.
+-->
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports"
+              name="crm-insight-report" pageWidth="842" pageHeight="595" orientation="Landscape"
+              columnWidth="770" leftMargin="36" rightMargin="36" topMargin="28" bottomMargin="28"
+              uuid="ab577015-37b4-4e83-b6ad-6942b1747e5e">
+    <parameter name="REPORT_TITLE" class="java.lang.String"/>
+    <parameter name="REPORT_DESCRIPTION" class="java.lang.String"/>
+    <parameter name="REPORT_CATEGORY" class="java.lang.String"/>
+    <parameter name="BUSINESS_QUESTION" class="java.lang.String"/>
+    <parameter name="REPORT_AUDIENCE" class="java.lang.String"/>
+    <parameter name="TENANT_NAME" class="java.lang.String"/>
+    <parameter name="GENERATED_AT" class="java.lang.String"/>
+    <parameter name="DIMENSION_LABEL" class="java.lang.String"/>
+    <parameter name="VALUE_LABEL" class="java.lang.String"/>
+    <parameter name="DETAIL_LABEL" class="java.lang.String"/>
+    <field name="metric" class="java.lang.String"/>
+    <field name="value" class="java.lang.String"/>
+    <field name="detail" class="java.lang.String"/>
+    <field name="signal" class="java.lang.String"/>
+    <title>
+        <band height="128">
+            <rectangle radius="0">
+                <reportElement mode="Opaque" x="0" y="0" width="770" height="122" forecolor="#16263A" backcolor="#08111E"/>
+                <graphicElement><pen lineWidth="0.0"/></graphicElement>
+            </rectangle>
+            <staticText>
+                <reportElement x="20" y="14" width="150" height="16" forecolor="#58D5F7"/>
+                <textElement><font fontName="SansSerif" size="9" isBold="true"/></textElement>
+                <text><![CDATA[AXIOM CRM  ·  1.0]]></text>
+            </staticText>
+            <textField>
+                <reportElement x="590" y="14" width="160" height="16" forecolor="#8EA4BC"/>
+                <textElement textAlignment="Right"><font fontName="SansSerif" size="8" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA[$P{REPORT_CATEGORY}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="StretchHeight">
+                <reportElement x="20" y="36" width="730" height="28" forecolor="#F4F8FC"/>
+                <textElement><font fontName="SansSerif" size="20" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA[$P{REPORT_TITLE}]]></textFieldExpression>
+            </textField>
+            <textField textAdjust="StretchHeight">
+                <reportElement x="20" y="66" width="730" height="18" forecolor="#AFC0D2"/>
+                <textElement><font fontName="SansSerif" size="9"/></textElement>
+                <textFieldExpression><![CDATA[$P{REPORT_DESCRIPTION}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement x="20" y="92" width="490" height="16" forecolor="#58D5F7"/>
+                <textElement><font fontName="SansSerif" size="8" isBold="true"/></textElement>
+                <textFieldExpression><![CDATA["DECISION  ·  " + $P{BUSINESS_QUESTION}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement x="520" y="90" width="230" height="12" forecolor="#AFC0D2"/>
+                <textElement textAlignment="Right"><font fontName="SansSerif" size="7"/></textElement>
+                <textFieldExpression><![CDATA[$P{TENANT_NAME} + "  ·  " + $P{REPORT_AUDIENCE}]]></textFieldExpression>
+            </textField>
+            <textField>
+                <reportElement x="520" y="104" width="230" height="12" forecolor="#7389A1"/>
+                <textElement textAlignment="Right"><font fontName="SansSerif" size="7"/></textElement>
+                <textFieldExpression><![CDATA["Generated " + $P{GENERATED_AT}]]></textFieldExpression>
+            </textField>
+        </band>
+    </title>
+    <columnHeader>
+        <band height="30">
+            <rectangle><reportElement mode="Opaque" x="0" y="0" width="770" height="26" forecolor="#D5E0EA" backcolor="#E8EFF5"/><graphicElement><pen lineWidth="0.0"/></graphicElement></rectangle>
+            <textField><reportElement x="12" y="0" width="176" height="26" forecolor="#26384C"/><textElement verticalAlignment="Middle"><font fontName="SansSerif" size="8" isBold="true"/></textElement><textFieldExpression><![CDATA[$P{DIMENSION_LABEL}]]></textFieldExpression></textField>
+            <textField><reportElement x="198" y="0" width="122" height="26" forecolor="#26384C"/><textElement verticalAlignment="Middle"><font fontName="SansSerif" size="8" isBold="true"/></textElement><textFieldExpression><![CDATA[$P{VALUE_LABEL}]]></textFieldExpression></textField>
+            <textField><reportElement x="330" y="0" width="324" height="26" forecolor="#26384C"/><textElement verticalAlignment="Middle"><font fontName="SansSerif" size="8" isBold="true"/></textElement><textFieldExpression><![CDATA[$P{DETAIL_LABEL}]]></textFieldExpression></textField>
+            <staticText><reportElement x="664" y="0" width="94" height="26" forecolor="#26384C"/><textElement verticalAlignment="Middle"><font fontName="SansSerif" size="8" isBold="true"/></textElement><text><![CDATA[Signal]]></text></staticText>
+        </band>
+    </columnHeader>
+    <detail>
+        <band height="30">
+            <line><reportElement x="0" y="29" width="770" height="1" forecolor="#DCE5ED"/><graphicElement><pen lineWidth="0.5"/></graphicElement></line>
+            <textField textAdjust="StretchHeight"><reportElement x="12" y="4" width="176" height="20" forecolor="#17283A"/><textElement verticalAlignment="Middle"><font fontName="SansSerif" size="9" isBold="true"/></textElement><textFieldExpression><![CDATA[$F{metric}]]></textFieldExpression></textField>
+            <textField textAdjust="StretchHeight"><reportElement x="198" y="4" width="122" height="20" forecolor="#087C9B"/><textElement verticalAlignment="Middle"><font fontName="SansSerif" size="10" isBold="true"/></textElement><textFieldExpression><![CDATA[$F{value}]]></textFieldExpression></textField>
+            <textField textAdjust="StretchHeight"><reportElement x="330" y="4" width="324" height="20" forecolor="#536579"/><textElement verticalAlignment="Middle"><font fontName="SansSerif" size="8"/></textElement><textFieldExpression><![CDATA[$F{detail}]]></textFieldExpression></textField>
+            <textField textAdjust="StretchHeight"><reportElement x="664" y="4" width="94" height="20" forecolor="#087C9B"/><textElement verticalAlignment="Middle"><font fontName="SansSerif" size="7" isBold="true"/></textElement><textFieldExpression><![CDATA[$F{signal}]]></textFieldExpression></textField>
+        </band>
+    </detail>
+    <pageFooter>
+        <band height="24">
+            <staticText><reportElement x="0" y="8" width="400" height="12" forecolor="#718096"/><textElement><font fontName="SansSerif" size="7"/></textElement><text><![CDATA[Governed by tenant access, RBAC and export audit controls]]></text></staticText>
+            <textField><reportElement x="670" y="8" width="100" height="12" forecolor="#718096"/><textElement textAlignment="Right"><font fontName="SansSerif" size="7"/></textElement><textFieldExpression><![CDATA["Page " + $V{PAGE_NUMBER}]]></textFieldExpression></textField>
+        </band>
+    </pageFooter>
+    <noData>
+        <band height="60">
+            <staticText><reportElement x="0" y="12" width="770" height="24" forecolor="#64748B"/><textElement textAlignment="Center"><font fontName="SansSerif" size="10"/></textElement><text><![CDATA[No records match the governed report scope.]]></text></staticText>
+        </band>
+    </noData>
+</jasperReport>

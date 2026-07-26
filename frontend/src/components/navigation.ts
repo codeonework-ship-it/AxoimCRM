@@ -72,9 +72,7 @@ export interface ModuleGroup {
 /** Badge and chrome keys, so call sites cannot typo a key path. */
 export const NAV_BADGE_KEYS = {
   planned: "nav.badge.planned",
-  beta: "nav.badge.beta",
   plannedTitle: "nav.badge.plannedTitle",
-  betaTitle: "nav.badge.betaTitle",
 } as const;
 
 /** Platform-scoped roles see the operator sections. */
@@ -100,6 +98,7 @@ export const MODULE_GROUPS: ModuleGroup[] = [
       { label: "Leads", labelKey: "nav.module.leads", to: "/leads", icon: LeadsIcon, epic: "E05", status: "partial" },
       { label: "Pipeline", labelKey: "nav.module.pipeline", to: "/pipeline", icon: PipelineIcon, epic: "E06", status: "partial" },
       { label: "Accounts", labelKey: "nav.module.accounts", to: "/accounts", icon: AccountsIcon, epic: "E04", status: "partial" },
+      { label: "Contacts", labelKey: "nav.module.contacts", to: "/contacts", icon: AccountsIcon, epic: "E04", status: "ready" },
       { label: "Forecast", labelKey: "nav.module.forecast", to: "/forecast", icon: ForecastIcon, epic: "E10", status: "partial" },
     ],
   },

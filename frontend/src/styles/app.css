@@ -8,6 +8,126 @@
   box-sizing: border-box;
 }
 
+/* --------------------------------------------------------------------------
+   Analytics Studio — dense desktop authoring with a deliberate responsive
+   collapse. The builder never depends on viewport-fixed heights, so the field
+   palette, preview and configuration remain usable on tablets and zoomed views.
+   -------------------------------------------------------------------------- */
+.report-studio { margin-top: 18px; overflow: clip; }
+.studio-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 22px 24px; border-bottom: 1px solid var(--line); }
+.studio-head h2, .builder-config h3, .dashboard-config h3, .dashboard-stage h3, .governance-workspace h3 { margin: 4px 0 6px; }
+.studio-head p, .dashboard-stage p, .governance-workspace p { margin: 0; color: var(--muted); }
+.studio-tabs { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.studio-tabs .btn { min-width: 132px; }
+.builder-shell { display: grid; grid-template-columns: minmax(190px, 240px) minmax(0, 1fr) minmax(250px, 310px); min-height: 700px; }
+.builder-fields, .builder-config, .dashboard-list, .dashboard-config { background: color-mix(in srgb, var(--panel) 92%, var(--bg)); padding: 18px; }
+.builder-fields { border-right: 1px solid var(--line); }
+.builder-config { border-left: 1px solid var(--line); }
+.builder-fields .field, .builder-config .field { display: grid; gap: 7px; margin-bottom: 16px; }
+.builder-fields label > span, .builder-config label > span { font: 700 10px/1.2 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.field-search-title { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 20px 0 10px; }
+.field-search-title small { color: var(--muted); }
+.field-palette { display: grid; gap: 6px; max-height: 590px; overflow: auto; scrollbar-gutter: stable; }
+.field-palette button, .saved-report-list button, .dashboard-list button { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 38px; padding: 8px 10px; border: 1px solid transparent; background: transparent; color: var(--text); text-align: left; }
+.field-palette button:hover, .saved-report-list button:hover, .dashboard-list button:hover, .dashboard-list button.active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, transparent); text-decoration: none; }
+.field-palette button small, .saved-report-list small, .dashboard-list small { color: var(--muted); font: 600 9px/1.2 var(--mono); letter-spacing: .08em; }
+.builder-canvas { padding: 18px; min-width: 0; background-image: linear-gradient(color-mix(in srgb, var(--line) 28%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--line) 28%, transparent) 1px, transparent 1px); background-size: 32px 32px; }
+.builder-commandbar, .preview-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.segmented { display: inline-flex; border: 1px solid var(--line); }
+.segmented button { min-height: 34px; min-width: 92px; padding: 0 14px; border: 0; border-right: 1px solid var(--line); background: var(--panel); color: var(--muted); }
+.segmented button:last-child { border-right: 0; }
+.segmented button.active { background: var(--accent); color: var(--on-accent, #001018); }
+.drop-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 16px 0; }
+.drop-zone { min-height: 112px; padding: 13px; border: 1px dashed var(--line-strong, var(--line)); background: color-mix(in srgb, var(--panel) 92%, transparent); }
+.drop-zone > strong, .drop-zone > small { display: block; }
+.drop-zone > small { margin: 4px 0 10px; color: var(--muted); }
+.drop-zone > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.drop-zone button, .tag-list button { min-height: 28px; padding: 4px 8px; border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 10%, var(--panel)); color: var(--text); }
+.drop-zone em { color: var(--muted); font-size: 12px; }
+.report-preview { min-height: 320px; border: 1px solid var(--line); background: var(--panel); padding: 16px; box-shadow: 0 14px 40px color-mix(in srgb, #000 10%, transparent); }
+.report-preview.empty { display: grid; align-content: center; justify-items: center; text-align: center; }
+.report-preview.empty p { max-width: 540px; color: var(--muted); }
+.preview-head > div { display: flex; align-items: center; gap: 10px; }
+.preview-head > div:first-child { display: block; }
+.preview-head h3 small { margin-left: 8px; color: var(--muted); font-weight: 400; }
+.freshness, .scope-badge { padding: 6px 9px; border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--line)); color: var(--accent); font: 700 9px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+.freshness.warn { border-color: var(--warning, #f59e0b); color: var(--warning, #f59e0b); }
+.studio-guidance { padding: 10px 12px; border-left: 3px solid var(--warning, #f59e0b); background: color-mix(in srgb, var(--warning, #f59e0b) 9%, transparent); }
+.studio-result { margin-top: 14px; min-width: 680px; }
+.studio-result th small { display: block; margin-top: 3px; color: var(--muted); font-size: 8px; }
+.studio-result td { transition: background .15s ease; }
+.drill-results { margin-top: 12px; }
+.drill-results pre { max-height: 260px; overflow: auto; padding: 12px; background: var(--bg); border: 1px solid var(--line); font-size: 11px; }
+.builder-config details { margin-top: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.builder-config summary, .dashboard-config summary { margin-bottom: 10px; cursor: pointer; font-weight: 700; }
+.builder-config input, .builder-config select, .dashboard-config input, .dashboard-config select, .dashboard-config textarea, .delivery-form input, .delivery-form select { width: 100%; min-height: 38px; margin-bottom: 8px; }
+.field-pair, .color-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.color-pair label { display: flex; align-items: center; justify-content: space-between; color: var(--muted); font-size: 11px; }
+.color-pair input { width: 44px; padding: 2px; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+.saved-report-list { display: grid; gap: 5px; }
+.saved-report-list button { display: grid; justify-content: stretch; }
+.info-tag { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 4px; border: 1px solid var(--accent); border-radius: 50%; color: var(--accent); font: 700 9px/1 var(--mono); cursor: help; }
+
+.dashboard-designer { display: grid; grid-template-columns: 220px minmax(0, 1fr) 300px; min-height: 640px; }
+.dashboard-list { display: grid; align-content: start; gap: 6px; border-right: 1px solid var(--line); }
+.dashboard-list button { display: grid; }
+.section-label { margin: 0 8px 10px; color: var(--muted); font: 700 10px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.dashboard-stage { padding: 22px; min-width: 0; }
+.dashboard-stage-head { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.dashboard-config { border-left: 1px solid var(--line); }
+.dashboard-config details { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+.dashboard-config textarea { min-height: 84px; resize: vertical; }
+.widget-grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-auto-rows: 38px; gap: 10px; }
+.dashboard-widget { grid-column: calc(var(--x) + 1) / span var(--w); grid-row: span var(--h); min-height: 150px; padding: 14px; border: 1px solid var(--line); background: var(--panel); overflow: hidden; }
+.dashboard-widget h4 { margin: 5px 0; }
+.dashboard-widget p { font-size: 11px; }
+.widget-placeholder { display: flex; align-items: end; gap: 7px; height: 60px; margin-top: 16px; }
+.widget-placeholder i { flex: 1; height: 28%; background: color-mix(in srgb, var(--accent) 68%, transparent); }
+.widget-placeholder i:nth-child(2) { height: 68%; }.widget-placeholder i:nth-child(3) { height: 45%; }.widget-placeholder i:nth-child(4) { height: 86%; }
+.widget-placeholder.line { align-items: center; transform: skewY(-8deg); }.widget-placeholder.kpi i:not(:first-child) { display: none; }.widget-placeholder.kpi i:first-child { height: 12px; }
+.empty-studio { grid-column: 1 / -1; padding: 42px; border: 1px dashed var(--line); color: var(--muted); text-align: center; }
+
+.governance-workspace { padding: 22px; }
+.governance-compose { display: grid; grid-template-columns: minmax(240px, 1fr) minmax(360px, 1.4fr); gap: 28px; padding: 20px; border: 1px solid var(--line); background: color-mix(in srgb, var(--panel) 94%, var(--bg)); }
+.delivery-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.performance-strip { display: grid; grid-template-columns: repeat(4, minmax(110px, 1fr)) minmax(240px, 2fr); gap: 1px; margin-top: 16px; background: var(--line); border: 1px solid var(--line); }
+.performance-strip > * { padding: 14px; background: var(--panel); }
+.performance-strip div { display: grid; gap: 5px; }.performance-strip strong { font: 700 22px/1 var(--mono); }.performance-strip span { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.governance-columns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+.governance-columns > section { padding: 16px; border: 1px solid var(--line); }
+.governance-columns article { display: grid; gap: 4px; padding: 10px 0; border-top: 1px solid var(--line); }
+.governance-columns article small { color: var(--muted); }
+.collaboration-compose { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 16px; }
+.collaboration-compose input { min-height: 38px; }
+
+@media (max-width: 1180px) {
+  .builder-shell { grid-template-columns: 210px minmax(0, 1fr); }
+  .builder-config { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .builder-config > h3 { grid-column: 1 / -1; }
+  .dashboard-designer { grid-template-columns: 190px minmax(0, 1fr); }
+  .dashboard-config { grid-column: 1 / -1; border-left: 0; border-top: 1px solid var(--line); }
+  .performance-strip { grid-template-columns: repeat(4, 1fr); }.performance-strip p { grid-column: 1 / -1; }
+}
+/* The navigation rail reduces the authoring canvas before the browser itself
+   reaches phone width. Collapse at 1100px so tablet, Electron split-view and
+   zoomed desktop sessions do not inherit a three-column builder that is wider
+   than their actual content area. */
+@media (max-width: 1100px) {
+  .studio-head, .builder-commandbar, .preview-head { align-items: stretch; flex-direction: column; }
+  .studio-tabs { justify-content: stretch; }.studio-tabs .btn { flex: 1; min-width: 0; }
+  .builder-shell, .dashboard-designer { display: block; }
+  .builder-fields { border-right: 0; border-bottom: 1px solid var(--line); }
+  .field-palette { grid-template-columns: repeat(2, minmax(0, 1fr)); max-height: 260px; }
+  .builder-config { display: block; }
+  .drop-grid, .governance-compose, .governance-columns { grid-template-columns: 1fr; }
+  .collaboration-compose { grid-template-columns: 1fr; }
+  .segmented { width: 100%; }.segmented button { flex: 1; min-width: 0; }
+  .dashboard-list { border-right: 0; border-bottom: 1px solid var(--line); }
+  .widget-grid { display: block; }.dashboard-widget { margin-bottom: 10px; }
+  .performance-strip { grid-template-columns: repeat(2, 1fr); }
+}
+
 html,
 body,
 #root {
@@ -127,10 +247,7 @@ button {
   user-select: none;
 }
 
-.btn:hover {
-  border-color: var(--ion-600);
-  color: var(--ion-600);
-}
+/* No hover rule here by design — see "BUTTONS DO NOT RESTYLE ON HOVER" below. */
 
 .btn:disabled {
   opacity: 0.5;
@@ -153,11 +270,6 @@ button {
   :root:not([data-theme="light"]) .btn-primary {
     color: #041018;
   }
-}
-
-.btn-primary:hover {
-  background: var(--ion-500);
-  color: inherit;
 }
 
 .btn-sm {
@@ -331,10 +443,6 @@ button {
   color: var(--ink-soft);
 }
 
-.icon-btn:hover {
-  border-color: var(--line-strong);
-  color: var(--ink);
-}
 
 .bell-dot {
   position: absolute;
@@ -435,7 +543,7 @@ button {
 }
 
 .link-btn:hover {
-  text-decoration: underline;
+  text-decoration: none;
 }
 
 /* ---- KPI tiles -------------------------------------------------- */
@@ -775,6 +883,112 @@ button {
   color: var(--slate);
   border-bottom: 1px solid var(--line-strong);
   background: var(--paper-sunk);
+}
+
+/* ==========================================================================
+   In-header column filters.
+
+   The filter row is a second <tr> in <thead>, so it inherits the header's fill
+   and sits in the same cell box as the column label above it. That is the whole
+   mechanism: there is no width to keep in sync with the data columns, because
+   the table's layout algorithm is already computing one width for both.
+
+   Styled a shade lighter than the label row so the header reads as two bands —
+   "what the column is" then "narrow it down" — rather than as one tall block or,
+   worse, as a first data row.
+   ========================================================================== */
+.grid-filter-row > th {
+  padding: 6px 10px 8px;
+  border-bottom: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--paper-sunk) 72%, var(--paper));
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  vertical-align: middle;
+}
+
+.grid-filter-row input,
+.grid-filter-row select {
+  inline-size: 100%;
+  min-inline-size: 0;
+  /* min-width:0 on the cell as well: without it a long placeholder sets the
+     column's minimum width and the filter row starts widening the data
+     columns, which is the tail wagging the dog. */
+  block-size: var(--control-sm-height, 32px);
+  min-block-size: var(--control-sm-height, 32px);
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.grid-filter-row > th.is-blank { padding: 0; }
+
+/* Card-grid variant: the same filters as the table header, for grids whose rows
+   are cards and therefore have no <thead> to sit in. Rendered as the first child
+   inside the grid container so it reads as that grid's header rather than as
+   another toolbar band floating above it. `grid-column: 1 / -1` makes it span
+   whatever card layout it is dropped into without knowing the column count. */
+.grid-filter-header {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  align-items: end;
+  gap: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-strong);
+  background: color-mix(in srgb, var(--paper-sunk) 72%, var(--paper));
+}
+
+.grid-filter-head-cell {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.grid-filter-head-cell > span {
+  overflow: hidden;
+  color: var(--slate);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.grid-filter-head-cell input,
+.grid-filter-head-cell select {
+  inline-size: 100%;
+  min-inline-size: 0;
+  block-size: var(--control-sm-height, 32px);
+  min-block-size: var(--control-sm-height, 32px);
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.grid-filter-head-cell input:not(:placeholder-shown) { border-color: var(--ion-600); }
+
+.grid-filter-clear {
+  align-self: end;
+  justify-self: end;
+  min-block-size: var(--control-sm-height, 32px);
+  white-space: nowrap;
+}
+
+/* A filtered column is worth seeing at a glance when the row is scrolled far
+   from the toolbar's active-filter chips. */
+.grid-filter-row input:not(:placeholder-shown),
+.grid-filter-row select:not(:invalid):focus {
+  border-color: var(--ion-600);
 }
 
 .data-table td {
@@ -1534,11 +1748,27 @@ button {
 
 /* ---- Page furniture ---------------------------------------------------- */
 
+/* Title on the left, actions on the right edge — not trailing the description.
+   Without `justify-content` the action group simply sat wherever the longest
+   description line ended, so the primary action landed in a different place on
+   every page and, on Leads, immediately after "4 total" with nothing between
+   them. The title block takes the free space; the actions keep their intrinsic
+   width and stay put. */
 .page-head {
   display: flex;
   align-items: baseline;
-  gap: 12px;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 18px;
+}
+
+.page-head > :first-child {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.page-head > .inline-actions {
+  flex: 0 0 auto;
 }
 
 .page-head h1 {
@@ -1972,23 +2202,22 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   background:color-mix(in srgb,var(--paper-raised) 92%,transparent);
 }
 .master-toolbar .btn.active { border-color:var(--ion-600); color:var(--ion-600); background:var(--ion-100); }
+/* The three tool rows stack here at one width. `gap` is the only spacing
+   between them — no per-row margins, because a margin on one row is how the
+   band starts drifting out of rhythm the moment a row is conditionally hidden. */
 .data-grid-tools-stack {
   display:grid;
-  gap:10px;
+  gap:8px;
   min-width:0;
   width:100%;
 }
 .data-grid-toolbar {
   margin:0;
 }
-.data-view-actions .data-grid-toolbar {
-  max-width:100%;
-  padding:0;
-  border:0;
-  background:transparent;
-}
-.data-view-actions .data-grid-toolbar .cpq-note {
-  align-self:center;
+/* The actions row keeps the same border and fill as Group and Column search.
+   Stripping the frame from one row of three is what made the band read as a
+   pile of unrelated widgets rather than one instrument. */
+.data-grid-tools-stack .cpq-note {
   white-space:nowrap;
 }
 .grid-view-summary {
@@ -2007,30 +2236,90 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   text-transform:uppercase;
   white-space:nowrap;
 }
-.group-column-picker,
-.grid-column-filter-strip {
-  display:flex;
-  align-items:center;
-  gap:8px;
+/* ==========================================================================
+   Data-grid tool rows — one grid, one gutter.
+
+   Every row of a data workspace toolbar (Actions, Group, Column search) uses
+   this same three-track grid: a fixed label gutter, a flexible control area,
+   and a trailing action that hugs the right edge. That single shared track
+   definition is what makes the section labels start at one x, the controls
+   start at a second x, and the Clear links finish at a third — across every
+   row, on every screen, regardless of how many controls a row contains.
+
+   Before this the rows were independent wrapping flex containers. Each one
+   placed its label wherever its own content began, so the labels stair-stepped,
+   trailing links floated to wherever the last control happened to end, and a
+   row with one more checkbox than its neighbour pushed everything out of true.
+   No amount of per-row padding fixes that; only a shared track does.
+   ========================================================================== */
+.grid-tool-row {
+  display:grid;
+  grid-template-columns:var(--grid-label-gutter) minmax(0,1fr) auto;
+  align-items:start;
+  column-gap:12px;
+  row-gap:8px;
   min-width:0;
   max-width:100%;
-  padding:7px;
+  padding:8px 10px;
   border:1px solid var(--line);
   background:color-mix(in srgb,var(--paper-raised) 88%,transparent);
 }
-.group-column-help {
+
+/* The label sits in the gutter, aligned to the first row of controls beside it
+   rather than to the centre of a block that may be one row or four rows tall. */
+.grid-tool-label {
   display:flex;
   align-items:center;
-  justify-content:flex-start;
-  gap:8px;
-  flex:0 0 auto;
-  min-height:30px;
-  padding:0 8px;
+  gap:6px;
+  min-width:0;
+  min-height:var(--control-sm-height,32px);
   color:var(--ion-600);
   font-size:10px;
   font-weight:800;
-  letter-spacing:.16em;
+  letter-spacing:.14em;
+  line-height:1.2;
   text-transform:uppercase;
+}
+.grid-tool-label>span {
+  min-width:0;
+  overflow-wrap:anywhere;
+}
+.grid-tool-label em {
+  flex:0 0 auto;
+  min-width:18px;
+  padding:2px 5px;
+  border:1px solid var(--line-strong);
+  background:var(--ion-100);
+  color:var(--ion-700);
+  font-style:normal;
+  font-size:9.5px;
+  letter-spacing:.06em;
+  text-align:center;
+}
+
+.grid-tool-controls {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px;
+  min-width:0;
+}
+
+/* Trailing column: always right-aligned, always on the first row's baseline, so
+   a Clear link and an export summary chip never drift relative to each other. */
+.grid-tool-trailing {
+  display:flex;
+  align-items:center;
+  justify-content:flex-end;
+  gap:8px;
+  min-height:var(--control-sm-height,32px);
+  white-space:nowrap;
+}
+.grid-tool-trailing:empty { display:none; }
+
+.group-column-picker {
+  min-width:0;
+  max-width:100%;
 }
 .group-column-options {
   display:flex;
@@ -2067,60 +2356,6 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   overflow:hidden;
   text-overflow:ellipsis;
   white-space:nowrap;
-}
-.grid-column-filter-title {
-  display:flex;
-  align-items:center;
-  gap:8px;
-  flex:0 0 auto;
-  min-height:34px;
-  padding:0 8px;
-  color:var(--ion-600);
-  font-size:10px;
-  font-weight:800;
-  letter-spacing:.16em;
-  text-transform:uppercase;
-}
-.grid-column-filter-title em {
-  min-width:max-content;
-  padding:3px 6px;
-  border:1px solid var(--line-strong);
-  background:var(--ion-100);
-  color:var(--ion-700);
-  font-style:normal;
-  letter-spacing:.08em;
-}
-.grid-column-filter-fields {
-  display:grid;
-  grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));
-  gap:8px;
-  flex:1 1 520px;
-  min-width:min(100%, 280px);
-}
-.grid-column-filter-field {
-  display:grid;
-  gap:4px;
-  min-width:0;
-}
-.grid-column-filter-field span {
-  overflow:hidden;
-  color:var(--slate);
-  font-size:9px;
-  font-weight:800;
-  letter-spacing:.13em;
-  text-overflow:ellipsis;
-  text-transform:uppercase;
-  white-space:nowrap;
-}
-.grid-column-filter-field input {
-  width:100%;
-  min-height:32px;
-  border:1px solid var(--line);
-  background:var(--paper);
-  color:var(--ink);
-  padding:0 9px;
-  font:inherit;
-  font-size:12px;
 }
 .active-filter-chips {
   display:flex;
@@ -2422,9 +2657,38 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   .master-toolbar { gap:6px; padding:9px; }
   .master-toolbar .btn { flex:1 1 auto; justify-content:center; }
   .toolbar-divider { display:none; }
+  /* Below this width a 136px gutter costs more than the alignment it buys, so
+     the row stacks: label, then controls, then the trailing action. The labels
+     still share an edge — it is just the container's edge now. */
+  .grid-tool-row {
+    grid-template-columns:minmax(0,1fr);
+    row-gap:6px;
+  }
+  .grid-tool-label { min-height:0; }
+  .grid-tool-trailing { justify-content:flex-start; min-height:0; }
   .page-controls { align-items:flex-start; flex-direction:column; }
   .page-controls>div { width:100%; justify-content:space-between; }
   .reference-entry-form { grid-template-columns:1fr; }
+}
+
+/* The application rail can reduce the usable workspace to tablet width even
+   when the browser itself is wider than 680px. Switch the three-track grid to
+   a stacked instrument at that point so the export actions and the catalogue
+   summary never squeeze each other or create horizontal page overflow. */
+@media (max-width:1100px) {
+  .data-grid-toolbar.grid-tool-row {
+    grid-template-columns:minmax(0,1fr);
+    row-gap:8px;
+  }
+  .data-grid-toolbar .grid-tool-label { min-height:0; }
+  .data-grid-toolbar .grid-tool-controls { width:100%; }
+  .data-grid-toolbar .grid-tool-trailing {
+    justify-content:flex-start;
+    min-height:0;
+    white-space:normal;
+  }
+  .data-grid-toolbar .grid-view-summary,
+  .data-grid-toolbar .cpq-note { white-space:normal; }
 }
 
 /* Narrow viewports: the tab strip stays a single scrollable row rather than
@@ -2445,14 +2709,22 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   background:color-mix(in srgb,var(--paper-raised) 92%,transparent);
 }
 
+/* Two stacked full-width rows, not one flex line.
+
+   The old rule was `display:flex; justify-content:space-between` with the title
+   on the left and the whole tool cluster on the right at `min-width:740px`.
+   That made the title and the toolbar fight over one row: the toolbar wrapped
+   to four or five lines and the title was crushed into the remainder, wrapping
+   mid-phrase ("Reference value-set / console") and floating at the vertical
+   centre of a block many times its own height. Giving each concern its own
+   full-width row removes the competition entirely. */
 .data-view-head {
   position:sticky;
   top:calc(-1 * var(--shell-content-top-pad, 0px));
   z-index:36;
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:12px;
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  gap:10px;
   margin:-1px -1px 0;
   padding:12px 15px;
   border:1px solid var(--line);
@@ -2461,18 +2733,33 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   backdrop-filter:blur(10px) saturate(1.15);
 }
 
+/* Row one: who this workspace is, and how you want to look at it. */
+.data-view-identity {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  min-width:0;
+}
+.data-view-heading { min-width:0; }
+.data-view-view-controls {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  flex:0 0 auto;
+}
+
 .data-view-head h2 {
   margin:2px 0 0;
   font-size:16px;
 }
 
+/* Row two: the tool band. Full width, so `.data-grid-tools-stack` inside it can
+   lay its rows out on the shared label gutter instead of on scraps of space. */
 .data-view-actions {
-  display:flex;
-  align-items:center;
+  display:grid;
   gap:8px;
-  flex-wrap:wrap;
-  justify-content:flex-end;
-  min-width:min(740px,100%);
+  min-width:0;
 }
 
 .data-view-body {
@@ -2629,6 +2916,54 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   background:var(--paper-raised);
 }
 
+.report-card {
+  display:flex;
+  flex-direction:column;
+  min-height:320px;
+  gap:16px;
+  border-top:2px solid var(--ion-600);
+  transition:border-color 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+}
+
+.report-card:hover {
+  border-color:var(--ion-600);
+  transform:translateY(-2px);
+  box-shadow:0 12px 30px color-mix(in srgb,var(--ink) 10%,transparent);
+}
+
+.report-card-content { display:flex; flex:1 1 auto; flex-direction:column; min-width:0; }
+.report-card-meta { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.report-card-meta code { overflow:hidden; color:var(--slate); font:600 9px/1.2 var(--font-mono); text-overflow:ellipsis; white-space:nowrap; }
+
+.report-business-question {
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+  margin-top:12px;
+  padding:10px 12px;
+  border-left:2px solid var(--ion-600);
+  background:var(--paper-sunk);
+}
+.report-business-question span,
+.report-audience>span {
+  color:var(--slate);
+  font-size:9px;
+  font-weight:750;
+  letter-spacing:.13em;
+  text-transform:uppercase;
+}
+.report-business-question strong { color:var(--ink-soft); font-size:11px; line-height:1.45; }
+.report-audience { display:flex; flex-direction:column; gap:6px; margin-top:12px; }
+.report-audience>div { display:flex; flex-wrap:wrap; gap:5px; }
+.report-audience small { padding:3px 7px; border:1px solid var(--line); color:var(--ink-soft); font-size:9px; font-weight:650; }
+.report-card .report-actions { margin-top:auto; padding-top:2px; border-top:1px solid var(--line); }
+
+.report-portfolio-count { display:flex; align-items:stretch; border:1px solid var(--line); background:var(--paper-raised); }
+.report-portfolio-count>span { min-width:72px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; padding:7px 10px; }
+.report-portfolio-count>span+span { border-left:1px solid var(--line); }
+.report-portfolio-count strong { color:var(--ink); font:750 14px/1 var(--font-mono); }
+.report-portfolio-count small { color:var(--slate); font-size:8px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; }
+
 .report-card h2,
 .config-card h2 {
   margin:4px 0 7px;
@@ -2646,6 +2981,266 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   display:flex;
   gap:8px;
   flex-wrap:wrap;
+}
+
+/* ==========================================================================
+   Reports Studio
+
+   Standard Jasper documents and user-authored analytics are two different
+   jobs. This workspace makes that separation visible: the standard library is
+   a selection-and-reading experience, while Custom Reports remains an authoring
+   environment. The accessible preview and Jasper downloads use the same query
+   contract so their business meaning cannot drift.
+   ========================================================================== */
+.reports-page-head { align-items:center; }
+.report-workspace-tabs {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:1px;
+  margin-bottom:16px;
+  border:1px solid var(--line);
+  background:var(--line);
+}
+.report-workspace-tabs button {
+  display:grid;
+  gap:5px;
+  min-height:76px;
+  padding:14px 18px;
+  border:0;
+  border-top:2px solid transparent;
+  background:var(--paper-raised);
+  color:var(--ink-soft);
+  text-align:left;
+}
+.report-workspace-tabs button:hover,
+.report-workspace-tabs button.active {
+  border-top-color:var(--ion-600);
+  background:color-mix(in srgb,var(--ion-100) 42%,var(--paper-raised));
+}
+.report-workspace-tabs button.active strong { color:var(--ion-600); }
+.report-workspace-tabs strong { font-size:13px; }
+.report-workspace-tabs span { color:var(--slate); font-size:11px; line-height:1.4; }
+
+.jasper-report-grid { margin-bottom:16px; overflow:hidden; }
+.jasper-report-grid-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:20px;
+  padding:17px 19px;
+  border-bottom:1px solid var(--line);
+  background:color-mix(in srgb,var(--paper-sunk) 65%,var(--paper-raised));
+}
+.jasper-report-grid-head h2 { margin:4px 0; font-size:19px; }
+.jasper-report-grid-head p { margin:0; color:var(--slate); font-size:11px; }
+.jasper-engine-status {
+  display:grid;
+  grid-template-columns:9px auto;
+  align-items:center;
+  column-gap:9px;
+  min-width:190px;
+  padding:9px 12px;
+  border:1px solid var(--line);
+  background:var(--paper-raised);
+}
+.jasper-engine-status>span { grid-row:1 / 3; width:8px; height:8px; border-radius:50%; background:var(--ion-600); box-shadow:0 0 10px var(--ion-600); }
+.jasper-engine-status strong { color:var(--ink); font-size:10px; }
+.jasper-engine-status small { color:var(--slate); font:700 8px/1.2 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
+.jasper-report-grid>.data-table-frame { border:0; }
+.jasper-grid-report-name { display:grid; min-width:210px; gap:4px; }
+.jasper-grid-report-name strong { color:var(--ink); font-size:11px; line-height:1.35; }
+.jasper-grid-report-name code { color:var(--slate); font-size:8px; }
+.jasper-grid-question { min-width:280px; max-width:430px; line-height:1.45; }
+
+.reports-studio-shell {
+  display:grid;
+  grid-template-columns:minmax(280px,330px) minmax(0,1fr);
+  min-height:760px;
+  border:1px solid var(--line);
+  background:var(--paper-raised);
+}
+.report-library {
+  min-width:0;
+  padding:18px;
+  border-right:1px solid var(--line);
+  background:color-mix(in srgb,var(--paper-sunk) 72%,var(--paper-raised));
+}
+.report-library header { padding-bottom:15px; border-bottom:1px solid var(--line); }
+.report-library h2 { margin:4px 0 5px; font-size:19px; }
+.report-library header p { margin:0; color:var(--slate); font-size:11px; }
+.report-library-search { display:grid; gap:6px; margin-top:14px; }
+.report-library-search>span {
+  color:var(--slate);
+  font-size:9px;
+  font-weight:750;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+}
+.report-library-search input {
+  width:100%;
+  min-height:38px;
+  padding:0 11px;
+  border:1px solid var(--line);
+  background:var(--paper);
+  color:var(--ink);
+}
+.report-collection-filter { display:flex; flex-wrap:wrap; gap:5px; margin:12px 0; }
+.report-collection-filter button {
+  min-height:27px;
+  padding:0 8px;
+  border:1px solid var(--line);
+  background:var(--paper-raised);
+  color:var(--slate);
+  font-size:9px;
+  font-weight:750;
+  letter-spacing:.06em;
+}
+.report-collection-filter button:hover,
+.report-collection-filter button.active { border-color:var(--ion-600); background:var(--ion-100); color:var(--ion-600); }
+.report-library-list {
+  display:grid;
+  gap:6px;
+  max-height:590px;
+  padding-right:4px;
+  overflow:auto;
+  scrollbar-gutter:stable;
+}
+.report-library-item {
+  position:relative;
+  display:grid;
+  gap:4px;
+  width:100%;
+  min-width:0;
+  padding:12px 13px;
+  border:1px solid var(--line);
+  border-left:2px solid transparent;
+  background:var(--paper-raised);
+  color:var(--ink);
+  text-align:left;
+}
+.report-library-item:hover,
+.report-library-item.active { border-color:var(--ion-600); border-left-color:var(--ion-600); background:var(--ion-100); }
+.report-library-item>span { color:var(--ion-600); font:700 8px/1.2 var(--font-mono); letter-spacing:.12em; text-transform:uppercase; }
+.report-library-item>strong { overflow:hidden; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+.report-library-item>small { display:-webkit-box; overflow:hidden; color:var(--slate); font-size:10px; line-height:1.4; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+
+.report-document-workspace { display:flex; min-width:0; flex-direction:column; border:1px solid var(--line); background:var(--paper); }
+.report-document-head { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; padding:20px 22px 16px; border-bottom:1px solid var(--line); }
+.report-document-head>div:first-child { min-width:0; max-width:720px; }
+.report-document-head h2 { margin:6px 0 5px; font-size:24px; }
+.report-document-head p { margin:0; color:var(--slate); font-size:12px; }
+.report-document-actions { display:flex; justify-content:flex-end; flex-wrap:wrap; gap:7px; }
+.report-document-actions .btn { min-width:126px; }
+.report-decision-strip {
+  display:grid;
+  grid-template-columns:minmax(0,1.5fr) repeat(2,minmax(170px,.75fr));
+  gap:1px;
+  border-bottom:1px solid var(--line);
+  background:var(--line);
+}
+.report-decision-strip>div { min-width:0; padding:12px 16px; background:var(--paper-raised); }
+.report-decision-strip span { display:block; margin-bottom:5px; color:var(--ion-600); font:750 8.5px/1.2 var(--font-mono); letter-spacing:.12em; text-transform:uppercase; }
+.report-decision-strip strong,
+.report-decision-strip p { margin:0; color:var(--ink-soft); font-size:11px; line-height:1.4; }
+.report-preview-toolbar { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:10px 14px; border-bottom:1px solid var(--line); background:var(--paper-sunk); }
+.report-preview-toolbar>div { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.report-preview-toolbar small { color:var(--slate); font-size:9px; }
+.report-preview-frame { position:relative; min-height:560px; flex:1 1 auto; padding:14px; overflow:auto; background:color-mix(in srgb,var(--paper-sunk) 88%,#000); }
+.report-preview-state { min-height:480px; display:grid; align-content:center; justify-items:center; gap:8px; padding:32px; color:var(--ink-soft); text-align:center; }
+.report-preview-state p { max-width:540px; margin:0; color:var(--slate); }
+.report-preview-state.is-error strong { color:var(--red,#ff5d5d); }
+.report-rendered-document { min-height:100%; border:1px solid var(--line-strong); background:var(--paper-raised); box-shadow:0 18px 54px rgba(0,0,0,.28); }
+.report-rendered-document>header { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; padding:24px 26px 18px; border-top:3px solid var(--ion-600); border-bottom:1px solid var(--line); }
+.report-rendered-document>header h3 { margin:6px 0 4px; font-size:22px; }
+.report-rendered-document>header p { max-width:720px; margin:0; color:var(--slate); font-size:11px; }
+.report-rendered-document dl { min-width:220px; margin:0; }
+.report-rendered-document dl>div { display:grid; grid-template-columns:76px minmax(0,1fr); gap:9px; padding:4px 0; }
+.report-rendered-document dt { color:var(--slate); font:700 8px/1.4 var(--font-mono); letter-spacing:.11em; text-transform:uppercase; }
+.report-rendered-document dd { margin:0; color:var(--ink-soft); font-size:10px; text-align:right; }
+.report-rendered-question { display:grid; gap:5px; padding:13px 26px; border-bottom:1px solid var(--line); background:var(--paper-sunk); }
+.report-rendered-question span { color:var(--ion-600); font:750 8px/1.2 var(--font-mono); letter-spacing:.13em; text-transform:uppercase; }
+.report-rendered-question strong { font-size:12px; }
+.report-rendered-document .table-wrap { border:0; }
+.report-rendered-table th { padding:11px 14px; }
+.report-rendered-table td { vertical-align:top; }
+.report-rendered-table td:nth-child(2) { font-weight:750; }
+.report-signal { display:inline-flex; min-height:24px; align-items:center; padding:0 8px; border:1px solid var(--line); color:var(--slate); font-size:9px; font-weight:750; white-space:nowrap; }
+.report-signal.signal-positive { border-color:color-mix(in srgb,var(--ion-600) 65%,var(--line)); background:var(--ion-100); color:var(--ion-600); }
+.report-signal.signal-risk { border-color:color-mix(in srgb,var(--red,#ff5d5d) 65%,var(--line)); background:color-mix(in srgb,var(--red,#ff5d5d) 9%,transparent); color:var(--red,#ff5d5d); }
+.report-rendered-document>footer { display:flex; justify-content:space-between; gap:16px; padding:11px 14px; border-top:1px solid var(--line); color:var(--slate); font:700 8px/1.2 var(--font-mono); letter-spacing:.1em; text-transform:uppercase; }
+.report-document-full {
+  position:fixed;
+  inset:10px;
+  z-index:220;
+  min-height:0;
+  border:1px solid var(--line-strong);
+  box-shadow:0 28px 100px rgba(0,0,0,.62);
+}
+.report-document-full .report-preview-frame { min-height:0; overflow:hidden; }
+.report-document-full .report-preview-frame { overflow:auto; }
+.report-subscriptions { margin-top:16px; }
+.report-subscription-head { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:18px 20px; }
+.report-subscription-head h2 { margin:4px 0; }
+.report-subscription-head p { margin:0; color:var(--slate); font-size:11px; }
+
+.report-schedule-dialog {
+  width:min(680px,100%);
+  max-height:calc(100dvh - 48px);
+  overflow:auto;
+  border:1px solid var(--line-strong);
+  border-top:2px solid var(--ion-600);
+  background:var(--paper-raised);
+  box-shadow:0 24px 80px rgba(0,0,0,.52);
+}
+.report-schedule-dialog .modal-head { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; padding:20px 22px; border-bottom:1px solid var(--line); }
+.report-schedule-dialog .modal-head h2 { margin:4px 0; }
+.report-schedule-dialog .modal-head p { margin:0; color:var(--slate); }
+.report-schedule-dialog .form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; padding:20px 22px; }
+.report-schedule-dialog label { display:grid; gap:7px; }
+.report-schedule-dialog label>span { color:var(--slate); font-size:9px; font-weight:750; letter-spacing:.12em; text-transform:uppercase; }
+.report-schedule-dialog input,
+.report-schedule-dialog select { width:100%; min-height:40px; padding:0 10px; border:1px solid var(--line); background:var(--paper); color:var(--ink); }
+.report-schedule-dialog .span-2 { grid-column:1 / -1; }
+.report-schedule-dialog .form-note { margin:0 22px; padding:11px 13px; border-left:2px solid var(--ion-600); background:var(--paper-sunk); color:var(--slate); font-size:11px; }
+.report-schedule-dialog .modal-actions { display:flex; justify-content:flex-end; gap:8px; padding:18px 22px 20px; }
+
+/* Title Case is a visual contract for page titles, grid names and column
+   headings. CSS capitalisation preserves authored acronyms such as CRM, API,
+   SLA and RBAC instead of lower-casing them in a generic string helper. */
+:root body h1,
+:root body h2,
+:root body h3,
+:root body .data-view-title,
+:root body .data-table thead th {
+  text-transform:capitalize;
+}
+
+@media (max-width:1180px) {
+  .report-document-head { flex-direction:column; }
+  .report-document-actions { justify-content:flex-start; }
+  .report-decision-strip { grid-template-columns:1fr; }
+}
+@media (max-width:900px) {
+  .jasper-report-grid-head { align-items:flex-start; flex-direction:column; }
+  .jasper-engine-status { width:100%; }
+  .reports-studio-shell { grid-template-columns:1fr; }
+  .report-library { border-right:0; border-bottom:1px solid var(--line); }
+  .report-library-list { grid-template-columns:repeat(2,minmax(0,1fr)); max-height:360px; }
+}
+@media (max-width:680px) {
+  .report-workspace-tabs { grid-template-columns:1fr; }
+  .report-library-list { grid-template-columns:1fr; }
+  .report-document-head { padding:16px; }
+  .report-document-actions .btn { flex:1 1 130px; min-width:0; }
+  .report-preview-toolbar { align-items:flex-start; flex-direction:column; }
+  .report-preview-toolbar>div:last-child { width:100%; }
+  .report-preview-toolbar .btn { flex:1; }
+  .report-preview-frame { min-height:430px; padding:8px; }
+  .report-rendered-document>header { flex-direction:column; padding:18px; }
+  .report-rendered-document dl { width:100%; min-width:0; }
+  .report-subscription-head { align-items:flex-start; flex-direction:column; }
+  .report-schedule-dialog .form-grid { grid-template-columns:1fr; }
+  .report-schedule-dialog .span-2 { grid-column:auto; }
 }
 
 .admin-tabs {
@@ -2818,18 +3413,12 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   .data-view-full {
     inset:0;
   }
-  .data-view-head {
+  .data-view-identity {
     align-items:flex-start;
     flex-direction:column;
+    gap:10px;
   }
-  .data-view-actions {
-    width:100%;
-    justify-content:flex-start;
-    min-width:0;
-  }
-  .data-view-actions .data-grid-toolbar {
-    width:100%;
-  }
+  .data-view-view-controls { width:100%; }
   .admin-form,
   .alert-config-grid,
   .report-grid,
@@ -3496,18 +4085,36 @@ tbody tr:hover td { background: var(--paper-sunk); }
   font-size: 11.5px;
   font-weight: 700;
   letter-spacing: 0.09em;
-  transition: border-color 120ms ease, color 120ms ease, background 120ms ease,
-    transform 120ms ease, box-shadow 120ms ease;
 }
-.btn:hover {
-  border-color: var(--ion-600);
-  color: var(--ink);
-  background: var(--paper-raised);
-  box-shadow: inset 0 0 0 1px var(--ion-600), 0 2px 8px rgba(10, 16, 32, 0.10);
-  transform: translateY(-1px);
-}
-.btn:active { transform: translateY(0); background: var(--paper-sunk); }
-.btn:disabled { transform: none; box-shadow: none; }
+
+/* ===========================================================================
+   BUTTONS DO NOT RESTYLE ON HOVER. This is the product rule, and it is enforced
+   by ABSENCE — there is no `.btn:hover` block here, and none in any of the five
+   theme skins either.
+
+   Two constraints combine to get here:
+
+     1. A button must look the same wherever and whenever it appears. Hover
+        recolouring made the same control read as a different control depending
+        on where the pointer happened to be, and on a dense CRM screen with
+        thirty-odd controls the pointer is always over something.
+     2. No 3D controls — no lift, press, bevel or gloss. So the usual
+        alternative to a colour change (translateY plus a shadow) is out too.
+
+   Enforced by absence rather than by an override block on purpose: an override
+   fights the theme skins for specificity and loses the moment someone adds a
+   more specific selector, whereas a state with no declarations simply keeps the
+   resting style, in every theme, for free. If you are here to add a hover
+   effect, that is the rule you are about to break.
+
+   WHAT STILL GIVES FEEDBACK, and must not be removed:
+     - `cursor: pointer` marks the control as clickable.
+     - `:focus-visible` keeps its ring. Focus is NOT hover: it is keyboard
+       position, WCAG 2.4.7 requires it to be visible, and a keyboard user has
+       no pointer to substitute for it.
+     - `:disabled` keeps its dimming, because that is state, not decoration.
+   =========================================================================== */
+.btn:disabled { box-shadow: none; }
 
 /* ---- Primary: the energon key ------------------------------------------- */
 .btn-primary,
@@ -3524,28 +4131,11 @@ tbody tr:hover td { background: var(--paper-sunk); }
   clip-path: var(--chamfer);
   box-shadow: 0 2px 12px rgba(11, 95, 190, 0.35);
 }
-.btn-primary:hover {
-  background: linear-gradient(180deg, var(--ion-500), var(--ion-600));
-  filter: brightness(1.07);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 18px rgba(11, 95, 190, 0.45);
-}
-.btn-primary:active { transform: translateY(0); filter: brightness(0.97); }
-/* Travelling light sweep — the "dynamic" in the suite. Reduced-motion users
-   get an instant (invisible) transition via the global cap. */
-.btn-primary::after {
-  content: "";
-  position: absolute;
-  top: -40%;
-  bottom: -40%;
-  left: -60%;
-  width: 38%;
-  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.45), transparent);
-  transform: skewX(-18deg);
-  transition: left 480ms ease;
-  pointer-events: none;
-}
-.btn-primary:hover::after { left: 130%; }
+/* The travelling light sweep that used to run across this button on hover is
+   gone with the rest of the hover styling: it was a moving highlight, which is
+   both a colour change and the gloss half of a 3D control. `overflow: hidden`
+   and `position: relative` above are kept — the clip-path chamfer relies on
+   them. */
 .btn-primary:disabled {
   background: var(--line-strong);
   color: var(--paper-raised);
@@ -3561,7 +4151,8 @@ tbody tr:hover td { background: var(--paper-sunk); }
   clip-path: var(--chamfer);
   box-shadow: 0 2px 12px rgba(201, 59, 59, 0.35);
 }
-.btn-danger:hover { filter: brightness(1.06); transform: translateY(-1px); color: #fff; }
+/* .btn-danger has no hover rule either — the destructive key is the one control
+   where a shifting appearance is least welcome. */
 
 .btn-sm, .btn.btn-sm { height: 28px; padding: 0 11px; font-size: 10.5px; }
 .btn-primary.btn-sm { height: 30px; padding: 0 13px; }
@@ -3579,18 +4170,9 @@ tbody tr:hover td { background: var(--paper-sunk); }
   text-transform: uppercase;
 }
 .link-btn::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 2px;
-  background: currentColor;
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 160ms ease;
+  content: none;
 }
-.link-btn:hover::after { transform: scaleX(1); }
+.link-btn:hover::after { transform: none; }
 .link-btn.danger-link { color: var(--crit); }
 
 /* ---- Icon buttons -------------------------------------------------------- */
@@ -3601,7 +4183,7 @@ tbody tr:hover td { background: var(--paper-sunk); }
   border-radius: var(--radius);
   transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
 }
-.icon-btn:hover { border-color: var(--line-strong); background: var(--paper-sunk); color: var(--ink); }
+/* Icon buttons are buttons: same no-hover-restyle rule. */
 
 /* ---- Form controls: defined fields, unmistakable focus ------------------- */
 input[type="text"], input[type="email"], input[type="password"],
@@ -3725,6 +4307,11 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
   --control-width: 132px;
   --control-narrow-width: 92px;
   --control-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ion-600) 28%, transparent);
+  /* The single shared gutter every data-grid tool row reserves for its section
+     label. One value, one edge — widened here and Group, Column search and
+     Actions all move together, which is the only way they stay in line. Sized
+     to hold "COLUMN SEARCH" at 10px/.14em plus its help icon without wrapping. */
+  --grid-label-gutter: 136px;
 }
 
 :root body .btn,
@@ -3851,7 +4438,33 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
   opacity: 0.55;
 }
 
-:root body .data-grid-toolbar,
+/* One height for every control in a tool row.
+
+   Measured on the live page before this rule existed: search inputs rendered at
+   40px (motora.css sets a 40px floor on all inputs), action buttons at 32px,
+   and group checkboxes at 30.6px. Three heights in one band is read as
+   misalignment even when every left edge is perfect, because the eye tracks the
+   top and bottom edges of adjacent controls, not their containers.
+
+   This wins over the theme layer on specificity rather than source order, so it
+   holds no matter which of the four themes is active and no matter whether
+   app.css or motora.css is loaded last. */
+:root body .grid-tool-row input,
+:root body .grid-tool-row select,
+:root body .grid-tool-row .btn,
+:root body .grid-tool-row .group-column-option {
+  block-size: var(--control-sm-height);
+  min-block-size: var(--control-sm-height);
+  padding-block: 0;
+}
+:root body .grid-tool-row .group-column-option {
+  min-inline-size: 0;
+}
+
+/* `.data-grid-toolbar` is deliberately absent here. It is a `.grid-tool-row`
+   now, and `align-items:center` on a grid row would vertically centre the
+   section label against a control block that may be four lines tall — exactly
+   the drift the shared gutter exists to remove. It aligns to `start`. */
 :root body .master-toolbar,
 :root body .report-actions,
 :root body .quote-doc-actions,
@@ -3959,13 +4572,21 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
 
 :root body .search-box {
   min-inline-size: 320px;
-  block-size: var(--control-height);
-  min-block-size: var(--control-height);
+  block-size: var(--control-icon-size);
+  min-block-size: var(--control-icon-size);
 }
 
 :root body .manual-button {
   inline-size: 132px;
   min-inline-size: 132px;
+  block-size: var(--control-icon-size);
+  min-block-size: var(--control-icon-size);
+}
+
+:root body .topbar .locale-trigger,
+:root body .topbar .user-trigger {
+  block-size: var(--control-icon-size);
+  min-block-size: var(--control-icon-size);
 }
 
 :root body .user-menu {
@@ -4078,4 +4699,592 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
   :root body .user-trigger > svg {
     display: none;
   }
+}
+.inline-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* An inline create panel puts its action at the trailing edge, matching
+   .record-form-actions, so a form reads the same way whether it is in a dialog
+   or in the page. */
+.activity-create-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* ===========================================================================
+   A BUTTON IS SIZED BY ITS LABEL, NEVER BY ITS CONTAINER.
+
+   Grid items stretch to fill their track unless told otherwise, so any button
+   dropped directly into a `display: grid` panel silently becomes as wide as the
+   panel. That is how the Activities "Create activity" button ended up 1,554px
+   wide on a 1,920px screen: nothing in its own CSS was wrong, it was simply a
+   grid child and grid stretched it.
+
+   This is a whole class of defect rather than one mistake, and it recurs every
+   time someone adds a button to a grid-based panel — which is why the guard
+   belongs here rather than in a per-page rule. `justify-self` applies only to
+   grid items and is ignored everywhere else, so this cannot disturb the flex
+   toolbars, and `justify-items` is left alone so a container that genuinely
+   wants centred children still gets them.
+
+   Buttons that are MEANT to fill their container opt in with .btn-block, which
+   is the honest way round: filling the width becomes a decision someone made
+   rather than a default nobody noticed.
+   =========================================================================== */
+.btn:not(.btn-block),
+button.btn-sm:not(.btn-block) {
+  justify-self: start;
+}
+
+/* Opt-in full width, for a mobile primary action or a single-action drawer. */
+.btn-block {
+  justify-self: stretch;
+  width: 100%;
+}
+
+.compact-head {
+  margin-bottom: var(--space-3);
+}
+
+.inline-result {
+  display: grid;
+  gap: var(--space-1);
+  min-width: min(100%, 22rem);
+  padding: var(--space-3);
+}
+
+.lead-capture-panel {
+  display: grid;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  padding: var(--space-4);
+}
+
+.lead-bulk-capture {
+  display: grid;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+.lead-bulk-capture textarea {
+  width: 100%;
+  min-height: 9rem;
+  resize: vertical;
+  font-family: var(--font-mono);
+}
+
+.health-factor-list {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.health-factor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--line);
+}
+
+.health-factor span:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.health-factor p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.rollup-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+.rollup-compare > span {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2);
+  border: 1px solid var(--line);
+}
+
+@media (max-width: 48rem) {
+  .rollup-compare { grid-template-columns: 1fr; }
+}
+
+/* E07-E10 governed revenue execution controls */
+.engagement-template-panel { margin-bottom: 18px; padding: 18px; }
+.engagement-template-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
+.engagement-template-head h2, .engagement-template-head p { margin: 3px 0 0; }
+.template-create-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.template-create-grid .template-wide { grid-column: span 2; }
+.template-create-grid textarea.template-wide { min-height: 84px; }
+.template-card-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.template-card { display: grid; align-content: start; gap: 8px; min-width: 0; padding: 14px; border: 1px solid var(--line); background: var(--panel-2); }
+.template-card > div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.template-card p, .template-card small, .template-card code { margin: 0; overflow-wrap: anywhere; }
+.quote-doc-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 190px; }
+.quote-doc-actions .quote-revise { flex-basis: 100%; text-align: left; }
+.forecast-scenario-drawer { width: min(560px, 100vw); }
+.scenario-totals { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 14px; border-bottom: 1px solid var(--line); }
+.scenario-totals div { display: grid; gap: 4px; padding: 12px; border: 1px solid var(--line); background: var(--panel-2); }
+.scenario-totals span { color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; }
+.drawer-note { margin: 0; padding: 14px; border-bottom: 1px solid var(--line); color: var(--muted); }
+
+@media (max-width: 900px) {
+  .template-create-grid, .template-card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 620px) {
+  .engagement-template-head { align-items: stretch; flex-direction: column; }
+  .template-create-grid, .template-card-grid, .scenario-totals { grid-template-columns: 1fr; }
+  .template-create-grid .template-wide { grid-column: auto; }
+}
+
+/* Page titles should read as product headings, not source-code comments. The
+   eyebrow vocabulary remains available inside drawers and data panels where it
+   is useful as compact metadata, but it is removed from every page-level title
+   and the Home hero. */
+:root body .page-head > :first-child > .eyebrow:first-child,
+:root body .command-hero .hero-copy > .eyebrow:first-child {
+  display: none;
+}
+
+/* Theme options are selection cards, not universal single-line action buttons.
+   These rules deliberately outrank the shared button-geometry contract that
+   otherwise centres and clips the two-line theme descriptions. */
+:root body .theme-pop {
+  width: min(360px, calc(100vw - 24px));
+  padding: 12px;
+  gap: 6px;
+}
+
+:root body .theme-pop-head {
+  display: grid;
+  gap: 3px;
+  padding: 2px 4px 9px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+}
+
+:root body .theme-pop-head strong {
+  color: var(--ink);
+  font-size: 12px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+:root body .theme-pop-head span {
+  color: var(--slate);
+  font-size: 11px;
+}
+
+:root body .theme-pop .theme-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 12px;
+  align-items: center;
+  justify-content: initial;
+  gap: 10px;
+  inline-size: 100%;
+  min-inline-size: 0;
+  block-size: auto;
+  min-block-size: 56px;
+  padding: 8px 10px;
+  white-space: normal;
+  text-align: left;
+}
+
+:root body .theme-pop .theme-meta {
+  align-items: flex-start;
+  overflow: visible;
+  text-align: left;
+}
+
+:root body .theme-pop .theme-meta strong,
+:root body .theme-pop .theme-meta small {
+  inline-size: 100%;
+  text-align: left;
+}
+
+/* Toasts sit below the fixed shell header, stay above drawers/popovers and use
+   a predictable content hierarchy across CRUD, workflow and alert operations. */
+:root body .toast-region {
+  top: 72px;
+  z-index: 1400;
+  width: min(380px, calc(100vw - 32px));
+}
+
+:root body .toast {
+  position: relative;
+  display: flex;
+  opacity: 1;
+  min-height: 70px;
+  padding: 13px 42px 15px 14px;
+  overflow: hidden;
+  backdrop-filter: blur(14px) saturate(1.2);
+}
+
+:root body .toast-copy {
+  min-width: 0;
+}
+
+:root body .toast-copy p {
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+:root body .toast-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  cursor: pointer;
+}
+
+:root body .toast-progress {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  background: currentColor;
+  opacity: .55;
+  transform-origin: left;
+  animation: toast-progress 6s linear forwards;
+}
+
+@keyframes toast-progress {
+  to { transform: scaleX(0); }
+}
+
+@media (max-width: 560px) {
+  :root body .toast-region {
+    top: 64px;
+    right: 10px;
+    width: calc(100vw - 20px);
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root body .toast,
+  :root body .toast-progress {
+    animation: none;
+  }
+}
+
+/* ==========================================================================
+   Record authoring — the create/edit/clone dialog and the detail drawer.
+
+   Both reuse `.panel` and the existing field vocabulary, so all four themes
+   apply without a theme-specific rule. What is defined here is only geometry
+   and the three states the shared dialog owns: conflict, duplicate candidates,
+   and the two-column field grid.
+   ========================================================================== */
+
+.record-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: grid;
+  place-items: center;
+  padding: var(--space-4);
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(3px);
+  overflow-y: auto;
+}
+
+.record-dialog {
+  inline-size: min(760px, 100%);
+  max-block-size: calc(100vh - 2 * var(--space-4));
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.record-dialog-head,
+.record-drawer-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.record-dialog-head h2,
+.record-drawer-head h2 { margin: 2px 0 0; font-size: 17px; }
+.record-drawer-head p { margin: 3px 0 0; color: var(--slate); font-size: 12px; }
+
+/* Two columns on desktop, one on narrow. Half-width by default because most
+   record fields are short; `field-wide` opts a field back to full width. */
+.record-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.record-form-grid .field-wide { grid-column: 1 / -1; }
+.record-form-grid .field-help { color: var(--slate); font-size: 10.5px; }
+.record-form-grid .req { color: var(--red, #ff5d5d); font-style: normal; }
+
+.record-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line);
+}
+
+/* A save conflict is not styled as an error. The save did not fail through any
+   fault of this user; someone else got there first, and the visual weight should
+   say "read this" rather than "you broke something". */
+.record-dialog .form-conflict {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--amber, #ffb547);
+  background: color-mix(in srgb, var(--amber, #ffb547) 10%, transparent);
+}
+.record-dialog .form-conflict p { margin: 6px 0 0; font-size: 12px; }
+.record-dialog .form-conflict .sub { color: var(--slate); font-size: 11px; }
+
+.record-dialog .form-duplicates {
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line-strong);
+  background: var(--paper-sunk);
+}
+.record-dialog .form-duplicates ul { margin: var(--space-2) 0; padding: 0; list-style: none; }
+.record-dialog .form-duplicates li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 5px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+.record-dialog .form-duplicates small { color: var(--slate); white-space: nowrap; }
+
+/* ---- detail drawer ---- */
+
+.record-drawer {
+  inline-size: min(620px, 100%);
+  max-block-size: calc(100vh - 2 * var(--space-4));
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.record-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-4);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+.record-facts dt {
+  color: var(--slate);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+.record-facts dd { margin: 3px 0 0; font-size: 12.5px; }
+
+.related-list { margin-bottom: var(--space-4); }
+.related-list > header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+.related-list h3 {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--ion-600);
+}
+.related-list ul { margin: 0; padding: 0; list-style: none; }
+.related-list li {
+  display: grid;
+  gap: 2px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--line);
+}
+.related-list li strong { font-size: 12.5px; font-weight: 600; }
+.related-list li small { color: var(--slate); font-size: 11px; }
+.related-list .empty-note { padding: 8px 0; font-size: 11.5px; }
+
+/* ==========================================================================
+   Saved views and bulk actions.
+
+   Both are `grid-tool-row`s, so nothing here re-states the gutter, the control
+   height or the alignment — they inherit all of it. What is defined is only the
+   inline forms those two rows add, the selection column, and the outcome report.
+   ========================================================================== */
+
+.saved-view-form,
+.bulk-form {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.saved-view-form input,
+.bulk-form input,
+.bulk-form select {
+  min-inline-size: 150px;
+  block-size: var(--control-sm-height);
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 12px;
+}
+
+/* Compact inline toggles: a full field label would double the row height for a
+   two-word choice. */
+.saved-view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--slate);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.saved-view-toggle input { inline-size: 15px; block-size: 15px; accent-color: var(--ion-600); }
+
+.bulk-count {
+  padding: 0 10px;
+  border: 1px solid var(--ion-600);
+  background: var(--ion-100);
+  color: var(--ion-700);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  line-height: var(--control-sm-height);
+  white-space: nowrap;
+}
+
+/* ---- selection column ---- */
+
+.data-table th.select-cell,
+.data-table td.select-cell {
+  inline-size: 36px;
+  padding-inline: 10px;
+  text-align: center;
+}
+.data-table .select-cell input {
+  inline-size: 15px;
+  block-size: 15px;
+  margin: 0;
+  accent-color: var(--ion-600);
+  cursor: pointer;
+}
+
+/* A selected row is tinted rather than outlined: an outline on a table row fights
+   the cell borders and reads as a rendering fault. */
+.data-table tbody tr.is-selected > td {
+  background: color-mix(in srgb, var(--ion-600) 9%, transparent);
+}
+
+/* ---- outcome report ---- */
+
+.bulk-outcome {
+  inline-size: min(880px, 100%);
+  max-block-size: calc(100vh - 2 * var(--space-4));
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.bulk-tallies {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.bulk-tallies > div {
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  background: var(--paper-sunk);
+  text-align: center;
+}
+.bulk-tallies strong { display: block; font-size: 20px; font-weight: 700; }
+.bulk-tallies span {
+  color: var(--slate);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* Outcome chips reuse the existing chip vocabulary so all four themes apply. */
+.chip-applied { border-color: var(--ion-600); background: var(--ion-100); color: var(--ion-700); }
+.chip-skipped { border-color: var(--amber, #ffb547);
+  background: color-mix(in srgb, var(--amber, #ffb547) 14%, transparent); }
+.chip-failed  { border-color: var(--red, #ff5d5d);
+  background: color-mix(in srgb, var(--red, #ff5d5d) 14%, transparent); }
+
+@media (max-width: 48rem) {
+  .bulk-tallies { grid-template-columns: 1fr; }
+}
+
+/* The saved-view and bulk-action rows sit as direct children of .data-view-actions,
+   alongside the toolbar's own stack. Giving them the same gap keeps the band in one
+   rhythm — without this the toolbar's internal 8px and the outer grid's 8px would
+   compound between the stack and the rows that follow it. */
+.data-view-actions > .grid-tool-row { margin: 0; }
+
+/* ==========================================================================
+   Global Title Case Contract
+
+   These selectors are intentionally last. Several theme and navigation rules
+   use uppercase as decorative styling earlier in the cascade; page titles,
+   grid names, column names and navigation titles must instead follow the same
+   readable Title Case contract in every theme and route. CSS only capitalises
+   word starts, so authored acronyms such as CRM, API, PDF, SLA and RBAC remain
+   intact.
+   ========================================================================== */
+:root body h1,
+:root body h2,
+:root body h3,
+:root body .data-view-title,
+:root body .data-table thead th,
+:root body .grid-filter-head-cell > span,
+:root body .group-column-option span,
+:root body .rail-section,
+:root body .rail-btn > span,
+:root body .topbar-title,
+:root body .admin-tabs button,
+:root body .master-tab,
+:root body .studio-tabs .btn {
+  text-transform: capitalize;
 }

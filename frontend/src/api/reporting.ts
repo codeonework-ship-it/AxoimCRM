@@ -134,6 +134,20 @@ export interface RelatedFilter {
   withinDays?: number | null;
 }
 
+export interface CalculatedMeasure {
+  code: string;
+  label: string;
+  formula: string;
+}
+
+export interface ConditionalRule {
+  field: string;
+  operator: "EQ" | "NE" | "GT" | "GTE" | "LT" | "LTE" | "CONTAINS";
+  value: string;
+  foreground?: string | null;
+  background?: string | null;
+}
+
 export interface ReportRequest {
   dataset: string;
   format?: ReportFormat;
@@ -146,6 +160,8 @@ export interface ReportRequest {
   sortDirection?: "ASC" | "DESC" | null;
   limit?: number | null;
   related?: RelatedFilter | null;
+  calculatedMeasures?: CalculatedMeasure[] | null;
+  conditionalRules?: ConditionalRule[] | null;
 }
 
 export interface ReportColumn {
@@ -173,6 +189,93 @@ export interface ReportResult {
   drillField: string | null;
   elapsedMs: number;
   staleness: Staleness;
+  conditionalRules: ConditionalRule[];
+}
+
+export interface StudioWidget {
+  id: string;
+  title: string;
+  visualizationType: "KPI" | "BAR" | "LINE" | "AREA" | "DONUT" | "FUNNEL" | "TABLE" | "PIVOT" | "SUMMARY";
+  reportCode: string | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  configuration: Record<string, unknown>;
+  sortOrder: number;
+}
+
+export interface StudioDashboard {
+  id: string;
+  code: string;
+  name: string;
+  description: string | null;
+  status: string;
+  layoutMode: "GRID" | "FREEFORM";
+  audience: "PRIVATE" | "SHARED" | "TENANT";
+  refreshIntervalMinutes: number;
+  ownerId: string;
+  lastRefreshedAt: string | null;
+  widgets: StudioWidget[];
+}
+
+export interface StudioShare {
+  id: string;
+  targetType: "REPORT" | "DASHBOARD";
+  targetCode: string;
+  principalType: "USER" | "ROLE" | "TENANT";
+  principalKey: string;
+  permission: "VIEW" | "EDIT";
+  createdAt: string;
+}
+
+export interface ReportComment {
+  id: string;
+  targetType: "REPORT" | "DASHBOARD";
+  targetCode: string;
+  body: string;
+  createdBy: string;
+  createdAt: string;
+  resolvedAt: string | null;
+}
+
+export interface DeliveryPolicy {
+  id: string;
+  targetType: "REPORT" | "DASHBOARD";
+  targetCode: string;
+  name: string;
+  artifactFormat: "PDF" | "XLSX" | "DOCX" | "LINK";
+  frequency: "DAILY" | "WEEKLY" | "MONTHLY" | "THRESHOLD";
+  recipients: string[];
+  thresholdMetricCode: string | null;
+  thresholdOperator: string | null;
+  thresholdValue: number | null;
+  enabled: boolean;
+  nextRunAt: string;
+  lastEvaluatedValue: number | null;
+  lastTriggeredAt: string | null;
+  deliveryState: string;
+}
+
+export interface EmbedView {
+  id: string;
+  targetType: "REPORT" | "DASHBOARD";
+  targetCode: string;
+  embedCode: string;
+  allowedOrigins: string[];
+  requireLogin: boolean;
+  active: boolean;
+  relativeUrl: string;
+}
+
+export interface AnalyticsPerformance {
+  executions: number;
+  timeouts: number;
+  truncated: number;
+  p95Ms: number;
+  maximumMs: number;
+  averageRows: number;
+  assessment: string;
 }
 
 export interface SavedReport {
@@ -407,6 +510,57 @@ export const reportingApi = {
 
   reconciliationHistory(): Promise<ReconciliationCheck[]> {
     return request<ReconciliationCheck[]>("/analytics/reconciliation?limit=30");
+  },
+
+  dashboards(): Promise<StudioDashboard[]> {
+    return request<StudioDashboard[]>("/analytics/studio/dashboards");
+  },
+
+  saveDashboard(body: { code: string; name: string; description?: string; layoutMode: string; audience: string; refreshIntervalMinutes: number }) {
+    return request<StudioDashboard>("/analytics/studio/dashboards", { method: "POST", body: JSON.stringify(body) });
+  },
+
+  saveWidget(dashboardCode: string, body: Omit<StudioWidget, "id"> & { id?: string }) {
+    return request<StudioWidget>(`/analytics/studio/dashboards/${encodeURIComponent(dashboardCode)}/widgets`, {
+      method: "POST", body: JSON.stringify(body),
+    });
+  },
+
+  shares(): Promise<StudioShare[]> {
+    return request<StudioShare[]>("/analytics/studio/shares");
+  },
+
+  share(body: Omit<StudioShare, "id" | "createdAt">) {
+    return request<StudioShare>("/analytics/studio/shares", { method: "POST", body: JSON.stringify(body) });
+  },
+
+  comments(targetType: string, targetCode: string): Promise<ReportComment[]> {
+    const params = new URLSearchParams({ targetType, targetCode });
+    return request<ReportComment[]>(`/analytics/studio/comments?${params.toString()}`);
+  },
+
+  comment(body: { targetType: string; targetCode: string; body: string }) {
+    return request<ReportComment>("/analytics/studio/comments", { method: "POST", body: JSON.stringify(body) });
+  },
+
+  deliveries(): Promise<DeliveryPolicy[]> {
+    return request<DeliveryPolicy[]>("/analytics/studio/deliveries");
+  },
+
+  scheduleDelivery(body: Record<string, unknown>) {
+    return request<DeliveryPolicy>("/analytics/studio/deliveries", { method: "POST", body: JSON.stringify(body) });
+  },
+
+  embeds(): Promise<EmbedView[]> {
+    return request<EmbedView[]>("/analytics/studio/embeds");
+  },
+
+  createEmbed(body: { targetType: string; targetCode: string; embedCode: string; allowedOrigins: string[] }) {
+    return request<EmbedView>("/analytics/studio/embeds", { method: "POST", body: JSON.stringify(body) });
+  },
+
+  performance(): Promise<AnalyticsPerformance> {
+    return request<AnalyticsPerformance>("/analytics/studio/performance");
   },
 };
 

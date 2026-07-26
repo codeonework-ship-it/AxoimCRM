@@ -1,5 +1,7 @@
 package com.axiom.analytics;
 
+import com.axiom.automation.ExpressionEvaluator;
+import com.axiom.automation.ExpressionParser;
 import com.axiom.security.AccessContext;
 import com.axiom.security.AuthorizationService;
 import com.axiom.security.SecurableObject;
@@ -68,6 +70,15 @@ public class ReportQueryService {
     public record RelatedFilter(@Size(max = 32) String related, @Size(max = 16) String mode,
                                 Integer withinDays) {}
 
+    /** A safe row/aggregate formula evaluated by Axiom's closed expression language. */
+    public record CalculatedMeasure(@Size(max = 64) String code, @Size(max = 120) String label,
+                                    @Size(max = 500) String formula) {}
+
+    /** Presentation metadata. The query engine validates it; clients decide how to render it. */
+    public record ConditionalRule(@Size(max = 64) String field, @Size(max = 16) String operator,
+                                  @Size(max = 120) String value, @Size(max = 16) String foreground,
+                                  @Size(max = 16) String background) {}
+
     public record ReportRequest(@Size(max = 32) String dataset,
                                 @Size(max = 16) String format,
                                 List<String> columns,
@@ -78,7 +89,17 @@ public class ReportQueryService {
                                 @Size(max = 80) String sortBy,
                                 @Size(max = 8) String sortDirection,
                                 Integer limit,
-                                RelatedFilter related) {}
+                                RelatedFilter related,
+                                List<CalculatedMeasure> calculatedMeasures,
+                                List<ConditionalRule> conditionalRules) {
+        /** Source-compatible constructor for existing callers and stored definitions. */
+        public ReportRequest(String dataset, String format, List<String> columns, List<Filter> filters,
+                             List<String> groupBy, String columnGroup, List<Summary> summaries,
+                             String sortBy, String sortDirection, Integer limit, RelatedFilter related) {
+            this(dataset, format, columns, filters, groupBy, columnGroup, summaries, sortBy,
+                    sortDirection, limit, related, List.of(), List.of());
+        }
+    }
 
     // ------------------------------------------------------------------ response
 
@@ -89,7 +110,18 @@ public class ReportQueryService {
                                int rowCount, boolean truncated, int rowLimit, String guidance,
                                boolean accessRestricted, List<String> withheldFields,
                                String drillField, long elapsedMs,
-                               ProjectionStatusService.Staleness staleness) {}
+                               ProjectionStatusService.Staleness staleness,
+                               List<ConditionalRule> conditionalRules) {
+        public ReportResult(String dataset, String format, List<Column> columns,
+                            List<Map<String, Object>> rows, Map<String, Object> grandTotals,
+                            int rowCount, boolean truncated, int rowLimit, String guidance,
+                            boolean accessRestricted, List<String> withheldFields,
+                            String drillField, long elapsedMs,
+                            ProjectionStatusService.Staleness staleness) {
+            this(dataset, format, columns, rows, grandTotals, rowCount, truncated, rowLimit,
+                    guidance, accessRestricted, withheldFields, drillField, elapsedMs, staleness, List.of());
+        }
+    }
 
     private enum Format { TABULAR, SUMMARY, MATRIX }
 
@@ -131,13 +163,15 @@ public class ReportQueryService {
                 case SUMMARY -> summary(dataset, request, where, limit, withheld);
                 case MATRIX -> matrix(dataset, request, where, limit, withheld);
             };
+            result = decorate(result, request);
 
             long elapsed = Math.round((System.nanoTime() - started) / 1_000_000.0);
             ReportResult finished = new ReportResult(result.dataset(), result.format(), result.columns(),
                     result.rows(), result.grandTotals(), result.rowCount(), result.truncated(),
                     limit, result.guidance(), where.scope().restricted(), List.copyOf(withheld),
                     result.drillField(), elapsed,
-                    status.stalenessFor(tenantId, stalenessInputs(dataset, request)));
+                    status.stalenessFor(tenantId, stalenessInputs(dataset, request)),
+                    result.conditionalRules());
 
             logExecution(tenantId, dataset, format, finished,
                     finished.truncated() ? "TRUNCATED" : "OK", finished.guidance());
@@ -274,6 +308,100 @@ public class ReportQueryService {
                 rows.size(), truncated, limit,
                 truncated ? guardrails.truncationGuidance(dataset, limit) : null,
                 false, List.of(), rowGroups.get(0).alias(), 0, null);
+    }
+
+    // ------------------------------------------------------------------ calculated measures and visual rules
+
+    private ReportResult decorate(ReportResult result, ReportRequest request) {
+        List<CalculatedMeasure> measures = request == null || request.calculatedMeasures() == null
+                ? List.of() : request.calculatedMeasures().stream().filter(java.util.Objects::nonNull).toList();
+        if (measures.size() > 12) throw new IllegalArgumentException("A report supports at most 12 calculated measures");
+
+        List<Column> columns = new ArrayList<>(result.columns());
+        // The lambda's inferred element type is LinkedHashMap, and
+        // List<LinkedHashMap> is not a List<Map> — generics are invariant. The
+        // explicit <Map<String, Object>> witness keeps the copy and satisfies it.
+        List<Map<String, Object>> rows = result.rows().stream()
+                .<Map<String, Object>>map(LinkedHashMap::new).toList();
+        Map<String, Object> totals = new LinkedHashMap<>(result.grandTotals());
+        Set<String> available = new LinkedHashSet<>();
+        columns.forEach(column -> available.add(column.field()));
+
+        for (CalculatedMeasure measure : measures) {
+            if (measure.code() == null || !measure.code().matches("^[a-z][A-Za-z0-9_]{0,63}$")) {
+                throw new IllegalArgumentException("Calculated measure code must start with a lower-case letter and contain only letters, digits or underscores");
+            }
+            if (measure.label() == null || measure.label().isBlank() || measure.formula() == null || measure.formula().isBlank()) {
+                throw new IllegalArgumentException("Calculated measure label and formula are required");
+            }
+            if (!available.add(measure.code())) {
+                throw new IllegalArgumentException("Calculated measure code '" + measure.code() + "' is already in use");
+            }
+            ExpressionParser.Node parsed = ExpressionParser.parse(measure.formula());
+            Set<String> references = new LinkedHashSet<>();
+            collectReferences(parsed, references);
+            List<String> missing = references.stream().filter(reference -> !available.contains(reference)).toList();
+            if (!missing.isEmpty()) {
+                throw new IllegalArgumentException("Formula '" + measure.label() + "' references unavailable fields: "
+                        + String.join(", ", missing) + ". Available: " + String.join(", ", available));
+            }
+            for (Map<String, Object> row : rows) {
+                Object value = ExpressionEvaluator.evaluate(parsed, ExpressionEvaluator.Context.of(row, Map.of()));
+                if (value != null && !(value instanceof Number)) {
+                    throw new IllegalArgumentException("Calculated measure '" + measure.label() + "' must produce a number");
+                }
+                row.put(measure.code(), value);
+            }
+            if (references.stream().allMatch(totals::containsKey)) {
+                Object value = ExpressionEvaluator.evaluate(parsed, ExpressionEvaluator.Context.of(totals, Map.of()));
+                if (value == null || value instanceof Number) totals.put(measure.code(), value);
+            }
+            columns.add(new Column(measure.code(), measure.label().trim(), "NUMBER", "MEASURE"));
+        }
+
+        List<ConditionalRule> rules = validateConditionalRules(request, available);
+        return new ReportResult(result.dataset(), result.format(), List.copyOf(columns), rows, totals,
+                result.rowCount(), result.truncated(), result.rowLimit(), result.guidance(),
+                result.accessRestricted(), result.withheldFields(), result.drillField(), result.elapsedMs(),
+                result.staleness(), rules);
+    }
+
+    private static List<ConditionalRule> validateConditionalRules(ReportRequest request, Set<String> available) {
+        List<ConditionalRule> rules = request == null || request.conditionalRules() == null
+                ? List.of() : request.conditionalRules().stream().filter(java.util.Objects::nonNull).toList();
+        if (rules.size() > 20) throw new IllegalArgumentException("A report supports at most 20 conditional formatting rules");
+        Set<String> operators = Set.of("EQ", "NE", "GT", "GTE", "LT", "LTE", "CONTAINS");
+        for (ConditionalRule rule : rules) {
+            if (!available.contains(rule.field())) throw new IllegalArgumentException(
+                    "Conditional formatting field '" + rule.field() + "' is not in the report output");
+            String operator = rule.operator() == null ? "" : rule.operator().toUpperCase(Locale.ROOT);
+            if (!operators.contains(operator)) throw new IllegalArgumentException(
+                    "Conditional formatting operator must be EQ, NE, GT, GTE, LT, LTE or CONTAINS");
+            if (rule.value() == null) throw new IllegalArgumentException("Conditional formatting comparison value is required");
+            validateColour(rule.foreground());
+            validateColour(rule.background());
+        }
+        return List.copyOf(rules);
+    }
+
+    private static void validateColour(String colour) {
+        if (colour != null && !colour.isBlank() && !colour.matches("^#[0-9a-fA-F]{6}$")) {
+            throw new IllegalArgumentException("Conditional formatting colours must use six-digit hex notation, for example #C2410C");
+        }
+    }
+
+    private static void collectReferences(ExpressionParser.Node node, Set<String> references) {
+        if (node instanceof ExpressionParser.Reference reference) {
+            if (reference.scope() != null) throw new IllegalArgumentException("Calculated measures use report fields without NEW or OLD prefixes");
+            references.add(reference.field());
+        } else if (node instanceof ExpressionParser.Unary unary) {
+            collectReferences(unary.operand(), references);
+        } else if (node instanceof ExpressionParser.Binary binary) {
+            collectReferences(binary.left(), references);
+            collectReferences(binary.right(), references);
+        } else if (node instanceof ExpressionParser.FunctionCall call) {
+            call.arguments().forEach(argument -> collectReferences(argument, references));
+        }
     }
 
     // ------------------------------------------------------------------ where
