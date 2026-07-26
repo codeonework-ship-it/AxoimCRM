@@ -24,6 +24,7 @@ function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
+    useContentSize: true,
     minWidth: 1024,
     minHeight: 700,
     backgroundColor: "#0A0D14",
@@ -37,6 +38,11 @@ function createWindow() {
   });
 
   mainWindow.once("ready-to-show", () => mainWindow?.show());
+  mainWindow.webContents.once("did-finish-load", () => {
+    // Chromium's native device-scale handling keeps text and vector UI crisp.
+    // Reset any zoom persisted by Electron's session before showing the shell.
+    mainWindow?.webContents.setZoomFactor(1);
+  });
 
   // External links open in the default browser, never inside the shell.
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {

@@ -11,6 +11,7 @@ import { GridLoader } from "../components/Loaders";
 import { GridFilterHeader } from "../components/GridFilterRow";
 import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
+import { useAppDialog } from "../components/AppDialog";
 
 const CONVERTIBLE = new Set(["NEW", "QUALIFIED"]);
 const STATUSES = ["NEW", "WORKING", "NURTURING", "QUALIFIED", "CONVERTED", "DISQUALIFIED"];
@@ -28,6 +29,7 @@ export function LeadsPage() {
   const [statusFilter, setStatusFilter] = useState("");
   const queryClient = useQueryClient();
   const toasts = useToasts();
+  const dialog = useAppDialog();
   const { user } = useAuth();
   const [captureOpen, setCaptureOpen] = useState(false);
   const [leadDraft, setLeadDraft] = useState<LeadIngestRequest>({ firstName: "", lastName: "", company: "", email: "", source: "MANUAL" });
@@ -90,11 +92,13 @@ export function LeadsPage() {
     });
   }
 
-  function disqualify(lead: Lead) {
-    const reasonCode = window.prompt("Disqualification reason code", "NOT_A_FIT");
+  async function disqualify(lead: Lead) {
+    const reasonCode = await dialog.prompt({ title: "Disqualify Lead", message: `Choose the reason code for disqualifying ${lead.name}.`, label: "Reason Code", defaultValue: "NOT_A_FIT", required: true, confirmLabel: "Next" });
     if (!reasonCode) return;
-    const recycleDate = window.prompt("Recycle date (YYYY-MM-DD, optional)", "");
-    const note = window.prompt("Short note (optional)", "");
+    const recycleDate = await dialog.prompt({ title: "Recycle Timing", message: "Optionally enter when this lead can return to the qualification queue.", label: "Recycle Date (YYYY-MM-DD)", placeholder: "YYYY-MM-DD", confirmLabel: "Next" });
+    if (recycleDate === null) return;
+    const note = await dialog.prompt({ title: "Disqualification Note", message: "Optionally record a short explanation for the lead history.", label: "Note", multiline: true, confirmLabel: "Disqualify Lead", tone: "danger" });
+    if (note === null) return;
     disqualifyMutation.mutate({
       id: lead.id,
       reasonCode,
@@ -198,7 +202,10 @@ export function LeadsPage() {
         <span className={`chip chip-${lead.status.toLowerCase()}`} style={{ marginLeft: "auto" }}>{lead.status}</span>
         {CONVERTIBLE.has(lead.status) && <button className="btn btn-sm" onClick={() => convert(lead)} disabled={convertMutation.isPending && convertMutation.variables === lead.id}>{convertMutation.isPending && convertMutation.variables === lead.id ? "Converting..." : "Convert"}</button>}
         {CONVERTIBLE.has(lead.status) && <button className="btn btn-sm" onClick={() => disqualify(lead)} disabled={disqualifyMutation.isPending}>{disqualifyMutation.isPending && disqualifyMutation.variables?.id === lead.id ? "Disqualifying..." : "Disqualify"}</button>}
-        {canManageMasters(user?.role) && <button className="link-btn danger-link" disabled={deleteMutation.isPending} onClick={() => { if (window.confirm(`Delete ${lead.name}? Converted or in-use records will be protected.`)) deleteMutation.mutate(lead.id); }}>Delete</button>}
+        {canManageMasters(user?.role) && <button className="link-btn danger-link" disabled={deleteMutation.isPending} onClick={async () => {
+          const confirmed = await dialog.confirm({ title: "Delete Lead", message: `Delete ${lead.name}? Converted or in-use records will be protected.`, confirmLabel: "Delete Lead", tone: "danger" });
+          if (confirmed) deleteMutation.mutate(lead.id);
+        }}>Delete</button>}
       </div></Fragment>; })}
       {leadsQ.isSuccess && <footer className="page-controls" aria-label="Lead pagination">
         <span>Showing {leads.length} of {total} records - 100 rows per page</span>

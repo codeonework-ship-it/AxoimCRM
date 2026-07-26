@@ -4,6 +4,7 @@ import { api, ApiError, type SavedView, type SavedViewDefinition } from "../api/
 import { InfoTag } from "./InfoTag";
 import { InlineLoader } from "./Loaders";
 import { useToasts } from "./Toasts";
+import { useAppDialog } from "./AppDialog";
 
 /**
  * The saved-view control for a grid: apply, save, share, delete.
@@ -34,6 +35,7 @@ interface SavedViewBarProps {
 
 export function SavedViewBar({ gridKey, currentState, onApply }: SavedViewBarProps) {
   const toasts = useToasts();
+  const dialog = useAppDialog();
   const queryClient = useQueryClient();
   const [selectedId, setSelectedId] = useState("");
   const [saving, setSaving] = useState(false);
@@ -178,11 +180,14 @@ export function SavedViewBar({ gridKey, currentState, onApply }: SavedViewBarPro
             {selected && selected.editable && (
               <button type="button" className="btn btn-sm danger-link"
                 disabled={deleteMutation.isPending}
-                onClick={() => {
-                  if (window.confirm(`Delete the saved view "${selected.name}"? `
-                    + "Your current grid arrangement is not affected.")) {
-                    deleteMutation.mutate(selected);
-                  }
+                onClick={async () => {
+                  const confirmed = await dialog.confirm({
+                    title: "Delete Saved View",
+                    message: `Delete the saved view "${selected.name}"? Your current grid arrangement is not affected.`,
+                    confirmLabel: "Delete View",
+                    tone: "danger",
+                  });
+                  if (confirmed) deleteMutation.mutate(selected);
                 }}>
                 Delete
               </button>

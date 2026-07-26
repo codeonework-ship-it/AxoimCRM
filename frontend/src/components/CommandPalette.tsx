@@ -24,7 +24,7 @@ const COMMANDS = [
   { label: "Lead operations", hint: "Qualify and convert demand", to: "/leads", icon: LeadsIcon },
   { label: "Activities", hint: "Tasks, calls, meetings, notes and manual email logs", to: "/activities", icon: BellIcon },
   { label: "Reference data", hint: "Governed value sets and codes", to: "/reference-data", icon: ReferenceIcon },
-  { label: "Reports", hint: "Jasper PDF, Excel and Word downloads", to: "/reports", icon: SparkIcon },
+  { label: "Reports", hint: "PDF, Excel and Word downloads", to: "/reports", icon: SparkIcon },
   { label: "Administration", hint: "Users, RBAC, trials, billing and alerts", to: "/admin", icon: ReferenceIcon },
 ];
 

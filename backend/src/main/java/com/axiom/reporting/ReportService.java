@@ -1,6 +1,7 @@
 package com.axiom.reporting;
 
 import com.axiom.auth.CrmRole;
+import com.axiom.api.PageResult;
 import com.axiom.common.NotFoundException;
 import com.axiom.tenancy.TenantContext;
 import net.sf.jasperreports.engine.JRException;
@@ -52,10 +53,13 @@ public class ReportService {
     public record FilePayload(byte[] bytes, String contentType, String filename) {}
     public record ReportPreviewColumns(String dimension, String value, String detail, String signal) {}
     public record ReportPreviewRow(String metric, String value, String detail, String signal) {}
+    public record ReportFilters(String search, String metric, String value, String detail, String signal) {
+        public static final ReportFilters EMPTY = new ReportFilters(null, null, null, null, null);
+    }
     public record ReportPreview(String code, String label, String description, String category,
                                 String businessQuestion, List<String> audience, String tenantName,
                                 OffsetDateTime generatedAt, ReportPreviewColumns columns,
-                                List<ReportPreviewRow> rows) {}
+                                PageResult<ReportPreviewRow> rows) {}
     record ReportSpec(String dimensionLabel, String valueLabel, String detailLabel) {}
 
     private static final Map<String, ReportSpec> REPORT_SPECS = Map.ofEntries(
@@ -142,11 +146,16 @@ public class ReportService {
 
     @Transactional
     public FilePayload export(String code, ReportFormat format) {
+        return export(code, format, ReportFilters.EMPTY);
+    }
+
+    @Transactional
+    public FilePayload export(String code, ReportFormat format, ReportFilters filters) {
         CrmRole.requireExport(TenantContext.get().role());
         Map<String, Object> definition = findDefinition(code, format);
         ReportSpec spec = REPORT_SPECS.get(code);
         if (spec == null) throw new NotFoundException("Report query is not implemented");
-        List<ReportRow> rows = rowsFor(code);
+        List<ReportRow> rows = filterRows(rowsFor(code), filters);
         byte[] bytes = render(definition, spec, format, rows);
         jdbc.update("""
                 insert into reporting.report_run(tenant_id, report_definition_id, format, status, row_count, generated_by)
@@ -154,6 +163,30 @@ public class ReportService {
                 """, TenantContext.get().tenantId(), definition.get("id"), format.name(), rows.size(), TenantContext.get().userId());
         String fileCode = code.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-");
         return new FilePayload(bytes, format.contentType, fileCode + "." + format.extension);
+    }
+
+    /**
+     * Render the selected report as an inline PDF for the authenticated viewer.
+     *
+     * <p>This is deliberately a read use case, separate from {@link #export}:
+     * opening a preview must not create export evidence or require an export
+     * entitlement. Tenant isolation and the report definition's active/format
+     * contract still apply because this path resolves the same definition and
+     * executes the same tenant-scoped query supplied to Jasper.
+     */
+    @Transactional(readOnly = true)
+    public FilePayload documentPreview(String code) {
+        return documentPreview(code, ReportFilters.EMPTY);
+    }
+
+    @Transactional(readOnly = true)
+    public FilePayload documentPreview(String code, ReportFilters filters) {
+        Map<String, Object> definition = findDefinition(code, ReportFormat.PDF);
+        ReportSpec spec = REPORT_SPECS.get(code);
+        if (spec == null) throw new NotFoundException("Report query is not implemented");
+        byte[] bytes = render(definition, spec, ReportFormat.PDF, filterRows(rowsFor(code), filters));
+        String fileCode = code.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-");
+        return new FilePayload(bytes, ReportFormat.PDF.contentType, fileCode + "-preview.pdf");
     }
 
     /**
@@ -165,13 +198,18 @@ public class ReportService {
      * {@link #export(String, ReportFormat)}.
      */
     @Transactional(readOnly = true)
-    public ReportPreview preview(String code) {
+    public ReportPreview preview(String code, int requestedPage, int requestedSize, ReportFilters filters) {
         Map<String, Object> definition = findDefinition(code, ReportFormat.PDF);
         ReportSpec spec = REPORT_SPECS.get(code);
         if (spec == null) throw new NotFoundException("Report query is not implemented");
-        List<ReportPreviewRow> rows = rowsFor(code).stream()
+        int page = Math.max(0, requestedPage);
+        int size = Math.max(1, Math.min(100, requestedSize));
+        List<ReportPreviewRow> matchedRows = filterRows(rowsFor(code), filters).stream()
                 .map(row -> new ReportPreviewRow(row.getMetric(), row.getValue(), row.getDetail(), row.getSignal()))
                 .toList();
+        int from = (int) Math.min((long) page * size, matchedRows.size());
+        int to = Math.min(from + size, matchedRows.size());
+        PageResult<ReportPreviewRow> rows = PageResult.of(matchedRows.subList(from, to), page, size, matchedRows.size());
         String tenantName = jdbc.queryForObject(
                 "select name from platform.tenant where id = ?", String.class, TenantContext.get().tenantId());
         return new ReportPreview(
@@ -186,6 +224,37 @@ public class ReportService {
                 new ReportPreviewColumns(spec.dimensionLabel(), spec.valueLabel(), spec.detailLabel(), "Signal"),
                 rows
         );
+    }
+
+    /**
+     * Apply the report-grid query contract on the server. Global search is an
+     * OR across all visible columns; column filters are ANDed and use the same
+     * case-insensitive "contains" rule as the rest of Axiom's text grids.
+     * Exports and PDF preview call this method too, so a filtered screen cannot
+     * silently produce an unrelated document.
+     */
+    static List<ReportRow> filterRows(List<ReportRow> rows, ReportFilters requested) {
+        ReportFilters filters = requested == null ? ReportFilters.EMPTY : requested;
+        return rows.stream().filter(row -> {
+            boolean globalMatch = blank(filters.search())
+                    || contains(row.getMetric(), filters.search())
+                    || contains(row.getValue(), filters.search())
+                    || contains(row.getDetail(), filters.search())
+                    || contains(row.getSignal(), filters.search());
+            return globalMatch
+                    && (blank(filters.metric()) || contains(row.getMetric(), filters.metric()))
+                    && (blank(filters.value()) || contains(row.getValue(), filters.value()))
+                    && (blank(filters.detail()) || contains(row.getDetail(), filters.detail()))
+                    && (blank(filters.signal()) || contains(row.getSignal(), filters.signal()));
+        }).toList();
+    }
+
+    private static boolean blank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    private static boolean contains(String value, String filter) {
+        return value != null && value.toLowerCase(Locale.ROOT).contains(filter.trim().toLowerCase(Locale.ROOT));
     }
 
     private Map<String, Object> findDefinition(String code, ReportFormat format) {

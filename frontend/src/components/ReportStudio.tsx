@@ -85,7 +85,9 @@ function Builder() {
     related: related ? { related, mode: relatedMode, withinDays: 90 } : null,
     calculatedMeasures: formulas,
     conditionalRules: rules,
-    limit: 500,
+    // One report-grid page is 100 rows across Axiom. Larger analytical reads
+    // belong behind an explicit paged query rather than a browser-side dump.
+    limit: 100,
   }), [datasetName, format, columns, groups, pivot, summaries, filterField, filterOperator, filterValue, related, relatedMode, formulas, rules]);
 
   const run = useMutation({

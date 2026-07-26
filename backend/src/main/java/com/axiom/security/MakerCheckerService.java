@@ -220,11 +220,14 @@ public class MakerCheckerService {
     @Transactional(readOnly = true)
     public List<Delegation> delegations() {
         return jdbc.query("""
-                select d.id, d.delegator_id, du.email as delegator_email,
-                       d.delegate_id, eu.email as delegate_email, d.starts_at, d.expires_at, d.active
+                select d.id, d.delegator_id, coalesce(du.email, dpu.email) as delegator_email,
+                       d.delegate_id, coalesce(eu.email, epu.email) as delegate_email,
+                       d.starts_at, d.expires_at, d.active
                 from security.approval_delegation d
-                join identity.app_user du on du.tenant_id = d.tenant_id and du.id = d.delegator_id
-                join identity.app_user eu on eu.tenant_id = d.tenant_id and eu.id = d.delegate_id
+                left join identity.app_user du on du.tenant_id = d.tenant_id and du.id = d.delegator_id
+                left join platform.platform_user dpu on dpu.id = d.delegator_id
+                left join identity.app_user eu on eu.tenant_id = d.tenant_id and eu.id = d.delegate_id
+                left join platform.platform_user epu on epu.id = d.delegate_id
                 where d.tenant_id = ?
                 order by d.created_at desc
                 """, (rs, i) -> new Delegation(rs.getObject("id", UUID.class),
@@ -242,6 +245,18 @@ public class MakerCheckerService {
         TenantContext.Principal p = TenantContext.get();
         if (p.userId().equals(delegateId)) {
             throw new ConflictException("You cannot delegate approval authority to yourself.");
+        }
+        Boolean delegateExists = jdbc.queryForObject("""
+                select exists (
+                    select 1 from identity.app_user
+                     where tenant_id = ? and id = ? and active = true
+                    union all
+                    select 1 from platform.platform_user
+                     where id = ? and active = true
+                )
+                """, Boolean.class, p.tenantId(), delegateId, delegateId);
+        if (!Boolean.TRUE.equals(delegateExists)) {
+            throw new NotFoundException("The approval delegate is not an active user in this workspace.");
         }
         UUID id = UUID.randomUUID();
         jdbc.update("""
@@ -289,11 +304,15 @@ public class MakerCheckerService {
         }
         return jdbc.query("""
                 select r.id, r.action_code, r.entity_type, r.entity_id, r.summary, r.payload::text,
-                       r.initiated_by, iu.email as initiator_email, r.initiated_at, r.status,
-                       r.decided_by, du.email as decider_email, r.decided_at, r.decision_note
+                       r.initiated_by, coalesce(iu.email, ipu.email) as initiator_email,
+                       r.initiated_at, r.status,
+                       r.decided_by, coalesce(du.email, dpu.email) as decider_email,
+                       r.decided_at, r.decision_note
                 from security.approval_request r
-                join identity.app_user iu on iu.tenant_id = r.tenant_id and iu.id = r.initiated_by
+                left join identity.app_user iu on iu.tenant_id = r.tenant_id and iu.id = r.initiated_by
+                left join platform.platform_user ipu on ipu.id = r.initiated_by
                 left join identity.app_user du on du.tenant_id = r.tenant_id and du.id = r.decided_by
+                left join platform.platform_user dpu on dpu.id = r.decided_by
                 where r.tenant_id = ?""" + filter + """
 
                 order by r.initiated_at desc
@@ -304,11 +323,15 @@ public class MakerCheckerService {
     public ApprovalRequest find(UUID id) {
         List<ApprovalRequest> rows = jdbc.query("""
                 select r.id, r.action_code, r.entity_type, r.entity_id, r.summary, r.payload::text,
-                       r.initiated_by, iu.email as initiator_email, r.initiated_at, r.status,
-                       r.decided_by, du.email as decider_email, r.decided_at, r.decision_note
+                       r.initiated_by, coalesce(iu.email, ipu.email) as initiator_email,
+                       r.initiated_at, r.status,
+                       r.decided_by, coalesce(du.email, dpu.email) as decider_email,
+                       r.decided_at, r.decision_note
                 from security.approval_request r
-                join identity.app_user iu on iu.tenant_id = r.tenant_id and iu.id = r.initiated_by
+                left join identity.app_user iu on iu.tenant_id = r.tenant_id and iu.id = r.initiated_by
+                left join platform.platform_user ipu on ipu.id = r.initiated_by
                 left join identity.app_user du on du.tenant_id = r.tenant_id and du.id = r.decided_by
+                left join platform.platform_user dpu on dpu.id = r.decided_by
                 where r.tenant_id = ? and r.id = ?
                 """, (rs, i) -> map(rs), TenantContext.get().tenantId(), id);
         if (rows.isEmpty()) throw new NotFoundException("No approval request with that id");

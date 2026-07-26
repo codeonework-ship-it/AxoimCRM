@@ -11,6 +11,8 @@ import {
   type AccessCause,
   type AccessReviewCampaign,
   type AccessReviewItem,
+  type ApprovalDelegation,
+  type ApprovalRequest,
   type AssignmentRow,
   type FieldPermissionRow,
   type FloorFinding,
@@ -18,6 +20,7 @@ import {
   type ObjectPermissionRow,
   type OrgWideDefaultRow,
   type PermissionSetRow,
+  type PermissionSetGroupRow,
   type ProfileRow,
   type RecomputeJob,
   type RoleNode,
@@ -59,6 +62,7 @@ const TABS = [
   { id: "sharing", label: "Sharing rules" },
   { id: "sod", label: "Segregation of duties" },
   { id: "reviews", label: "Access reviews" },
+  { id: "approvals", label: "Maker-checker approvals" },
   { id: "explainer", label: "Access explainer" },
   { id: "floor", label: "Admin & auditor floor" },
 ] as const;
@@ -82,6 +86,49 @@ function messageOf(error: unknown): string {
   if (error instanceof RbacApiError) return error.message;
   if (error instanceof Error) return error.message;
   return "The request failed.";
+}
+
+function DecisionNoteDialog({
+  title,
+  description,
+  note,
+  noteLabel,
+  confirmLabel,
+  destructive = false,
+  busy,
+  required = false,
+  onNoteChange,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  description: string;
+  note: string;
+  noteLabel: string;
+  confirmLabel: string;
+  destructive?: boolean;
+  busy: boolean;
+  required?: boolean;
+  onNoteChange: (note: string) => void;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return <div className="modal-scrim" role="presentation" onMouseDown={(event) => {
+    if (event.target === event.currentTarget && !busy) onCancel();
+  }}>
+    <section className="modal-card decision-note-dialog" role="dialog" aria-modal="true" aria-labelledby="decision-note-title">
+      <header className="modal-head">
+        <div><span className="eyebrow">Governed Decision</span><h2 id="decision-note-title">{title}</h2><p>{description}</p></div>
+        <button type="button" className="icon-btn" aria-label="Close Decision Dialog" disabled={busy} onClick={onCancel}>×</button>
+      </header>
+      <label className="decision-note-field"><span>{noteLabel}</span><textarea autoFocus required={required} rows={5} value={note}
+        onChange={(event) => onNoteChange(event.target.value)} /></label>
+      <p className="form-note">This note becomes part of the immutable approval evidence.</p>
+      <footer className="modal-actions"><button type="button" className="btn" disabled={busy} onClick={onCancel}>Cancel</button>
+        <button type="button" className={`btn ${destructive ? "danger" : "primary"}`} disabled={busy || (required && !note.trim())}
+          onClick={onConfirm}>{busy ? "Recording Decision..." : confirmLabel}</button></footer>
+    </section>
+  </div>;
 }
 
 export function RbacAdminPage() {
@@ -160,6 +207,9 @@ export function RbacAdminPage() {
           {tab === "sharing" && <SharingTab canWrite={canWrite} onChanged={() => invalidate("sharing")} />}
           {tab === "sod" && <SodTab canWrite={canWrite} onChanged={() => invalidate("sod")} />}
           {tab === "reviews" && <AccessReviewsTab canWrite={canWrite} onChanged={() => invalidate("reviews")} />}
+          {tab === "approvals" && <ApprovalsTab canWrite={canWrite} users={overviewQ.data.users}
+            profiles={overviewQ.data.profiles} permissionSets={overviewQ.data.permissionSets}
+            onChanged={() => invalidate("approvals", "assignments", "profiles", "permission-sets")} />}
           {tab === "explainer" && <ExplainerTab users={overviewQ.data.users} objects={overviewQ.data.objects} />}
           {tab === "floor" && (
             <FloorTab canWrite={canWrite} users={overviewQ.data.users} onChanged={() => invalidate("floor", "users")} />
@@ -171,12 +221,209 @@ export function RbacAdminPage() {
 }
 
 // ---------------------------------------------------------------------------
+// Maker-checker approvals and effective permission evidence
+// ---------------------------------------------------------------------------
+
+function ApprovalsTab({ canWrite, users, profiles, permissionSets, onChanged }: {
+  canWrite: boolean;
+  users: TenantUser[];
+  profiles: ProfileRow[];
+  permissionSets: PermissionSetRow[];
+  onChanged: () => void;
+}) {
+  const toasts = useToasts();
+  const [status, setStatus] = useState("PENDING");
+  const [selectedUser, setSelectedUser] = useState(users[0]?.id ?? "");
+  const [draft, setDraft] = useState({ userId: users[0]?.id ?? "", kind: "PROFILE", grantId: "", expiresAt: "" });
+  const [delegateId, setDelegateId] = useState("");
+  const [delegateExpiry, setDelegateExpiry] = useState("");
+  const [approvalDecision, setApprovalDecision] = useState<{
+    request: ApprovalRequest;
+    decision: "APPROVE" | "REJECT";
+    note: string;
+  } | null>(null);
+
+  const approvalsQ = useQuery({ queryKey: ["rbac", "approvals", status], queryFn: () => rbac.approvals(status || undefined), retry: 1 });
+  const groupsQ = useQuery({ queryKey: ["rbac", "permission-set-groups"], queryFn: rbac.permissionSetGroups, retry: 1 });
+  const delegationsQ = useQuery({ queryKey: ["rbac", "approval-delegations"], queryFn: rbac.approvalDelegations, retry: 1 });
+  const effectiveQ = useQuery({
+    queryKey: ["rbac", "effective-permissions", selectedUser],
+    queryFn: () => rbac.effectivePermissions(selectedUser),
+    enabled: !!selectedUser,
+    retry: 1,
+  });
+
+  const grantOptions = draft.kind === "PROFILE"
+    ? profiles.map((row) => ({ id: row.id, label: `${row.code} — ${row.name}` }))
+    : draft.kind === "SET"
+      ? permissionSets.map((row) => ({ id: row.id, label: `${row.code} — ${row.name}` }))
+      : (groupsQ.data ?? []).map((row: PermissionSetGroupRow) => ({ id: row.id, label: `${row.code} — ${row.name}` }));
+
+  const submit = useMutation({
+    mutationFn: async () => {
+      if (!draft.userId || !draft.grantId) throw new Error("Choose a user and the access to request.");
+      const expiresAt = draft.expiresAt ? new Date(`${draft.expiresAt}T23:59:59`).toISOString() : null;
+      if (draft.kind === "PROFILE") {
+        return rbac.assignProfile({ userId: draft.userId, profileId: draft.grantId, reason: "Submitted from maker-checker workspace" });
+      }
+      return rbac.assign({
+        userId: draft.userId,
+        permissionSetId: draft.kind === "SET" ? draft.grantId : null,
+        permissionSetGroupId: draft.kind === "GROUP" ? draft.grantId : null,
+        expiresAt,
+        reason: "Submitted from maker-checker workspace",
+      });
+    },
+    onSuccess: (request) => {
+      toasts.push("info", "Approval Request Submitted", `${request.summary}. A different authorized administrator must approve it.`);
+      void approvalsQ.refetch();
+      onChanged();
+    },
+    onError: (error) => toasts.push("error", "Request Not Submitted", messageOf(error)),
+  });
+
+  const decide = useMutation({
+    mutationFn: async ({ request, decision, note }: { request: ApprovalRequest; decision: "APPROVE" | "REJECT"; note: string }) => {
+      if (!note.trim()) throw new Error("A decision note is required.");
+      return decision === "APPROVE" ? rbac.approve(request.id, note.trim()) : rbac.reject(request.id, note.trim());
+    },
+    onSuccess: (request) => {
+      setApprovalDecision(null);
+      toasts.push("info", `Request ${request.status === "APPROVED" ? "Approved" : "Rejected"}`,
+        request.status === "APPROVED" ? "The RBAC grant is now effective and audited." : "No access was changed.");
+      void approvalsQ.refetch();
+      if (selectedUser) void effectiveQ.refetch();
+      onChanged();
+    },
+    onError: (error) => toasts.push("error", "Decision Refused", messageOf(error)),
+  });
+
+  const delegate = useMutation({
+    mutationFn: () => rbac.delegateApproval(delegateId,
+      delegateExpiry ? new Date(`${delegateExpiry}T23:59:59`).toISOString() : null),
+    onSuccess: () => {
+      toasts.push("info", "Approval Authority Delegated", "The delegation is active, but cannot be used to bypass maker-checker separation.");
+      setDelegateId(""); setDelegateExpiry(""); void delegationsQ.refetch();
+    },
+    onError: (error) => toasts.push("error", "Delegation Not Created", messageOf(error)),
+  });
+  const revokeDelegation = useMutation({
+    mutationFn: rbac.revokeApprovalDelegation,
+    onSuccess: () => { toasts.push("info", "Delegation Revoked", "Approval authority returned to the delegator."); void delegationsQ.refetch(); },
+    onError: (error) => toasts.push("error", "Delegation Not Revoked", messageOf(error)),
+  });
+
+  const approvalColumns: Column<ApprovalRequest>[] = [
+    { key: "status", header: "Status", value: (r) => r.status, filter: "enum", render: (r) => <span className={`chip chip-${r.status.toLowerCase()}`}>{r.status}</span> },
+    { key: "summary", header: "Requested Change", value: (r) => r.summary },
+    { key: "initiator", header: "Requested By", value: (r) => r.initiatedByEmail, filter: "enum" },
+    { key: "initiatedAt", header: "Requested At", value: (r) => new Date(r.initiatedAt).toLocaleString() },
+    { key: "decider", header: "Decided By", value: (r) => r.decidedByEmail ?? "", blank: "Pending", filter: "enum" },
+    { key: "note", header: "Decision Note", value: (r) => r.decisionNote ?? "", blank: "Pending" },
+  ];
+  const delegationColumns: Column<ApprovalDelegation>[] = [
+    { key: "delegator", header: "Delegator", value: (r) => r.delegatorEmail, filter: "enum" },
+    { key: "delegate", header: "Delegate", value: (r) => r.delegateEmail, filter: "enum" },
+    { key: "starts", header: "Starts", value: (r) => new Date(r.startsAt).toLocaleString() },
+    { key: "expires", header: "Expires", value: (r) => r.expiresAt ? new Date(r.expiresAt).toLocaleString() : "", blank: "Never" },
+    { key: "active", header: "Active", value: (r) => r.active, filter: "boolean", render: (r) => <BoolChip value={r.active} /> },
+  ];
+
+  type EffectiveObjectRow = { object: string; create: boolean; read: boolean; edit: boolean; delete: boolean; export: boolean; modifyAll: boolean };
+  const effectiveObjects: EffectiveObjectRow[] = effectiveQ.data
+    ? Object.entries(effectiveQ.data.objectAccess).map(([object, access]) => ({
+        object,
+        create: !!access.canCreate,
+        read: !!access.canRead,
+        edit: !!access.canEdit,
+        delete: !!access.canDelete,
+        export: !!access.canExport,
+        modifyAll: !!access.modifyAll,
+      }))
+    : [];
+  const effectiveColumns: Column<EffectiveObjectRow>[] = [
+    { key: "object", header: "Object", value: (r) => r.object, filter: "enum" },
+    ...(["create", "read", "edit", "delete", "export", "modifyAll"] as const).map((key): Column<EffectiveObjectRow> => ({
+      key, header: key === "modifyAll" ? "Modify All" : key[0].toUpperCase() + key.slice(1), value: (r) => r[key],
+      filter: "boolean", render: (r) => <BoolChip value={r[key]} />,
+    })),
+  ];
+
+  return <>
+    <div className="page-head compact-head"><div><span className="eyebrow">Four-Eyes Governance</span>
+      <h2>Maker-Checker Approval Queue</h2><p>Submitting a grant never changes access. A different authorized administrator must approve it, and delegation cannot bypass that separation.</p></div></div>
+
+    {canWrite && <section className="list-controls" aria-label="Submit permission grant for approval">
+      <label><span>User</span><select value={draft.userId} onChange={(e) => setDraft((v) => ({ ...v, userId: e.target.value }))}>
+        <option value="">Select User</option>{users.filter((u) => u.active).map((u) => <option key={u.id} value={u.id}>{u.displayName} — {u.email}</option>)}
+      </select></label>
+      <label><span>Grant Type</span><select value={draft.kind} onChange={(e) => setDraft((v) => ({ ...v, kind: e.target.value, grantId: "" }))}>
+        <option value="PROFILE">Profile</option><option value="SET">Permission Set</option><option value="GROUP">Permission Set Group</option>
+      </select></label>
+      <label><span>Requested Access</span><select value={draft.grantId} onChange={(e) => setDraft((v) => ({ ...v, grantId: e.target.value }))}>
+        <option value="">Select Access</option>{grantOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+      </select></label>
+      <label><span>Expires (Optional)</span><input type="date" value={draft.expiresAt} onChange={(e) => setDraft((v) => ({ ...v, expiresAt: e.target.value }))} /></label>
+      <button type="button" className="btn btn-primary btn-sm" disabled={submit.isPending || !draft.userId || !draft.grantId}
+        onClick={() => submit.mutate()}>{submit.isPending ? "Submitting..." : "Submit For Approval"}</button>
+    </section>}
+
+    <div className="page-controls"><label><span>Status</span><select value={status} onChange={(e) => setStatus(e.target.value)}>
+      <option value="PENDING">Pending</option><option value="APPROVED">Approved</option><option value="REJECTED">Rejected</option><option value="">All</option>
+    </select></label></div>
+    {approvalsQ.isLoading && <GridLoader label="Reading approval requests" rows={5} columns={6} />}
+    {approvalsQ.isError && <p className="form-error">{messageOf(approvalsQ.error)}</p>}
+    {approvalsQ.isSuccess && <DataTable name="Controlled approvals" columns={approvalColumns} rows={approvalsQ.data} rowKey={(r) => r.id}
+      actions={canWrite ? (request) => request.status !== "PENDING" ? null : <span className="inline-actions">
+        <button className="link-btn" disabled={decide.isPending} onClick={() => setApprovalDecision({ request, decision: "APPROVE", note: "Reviewed against the user's current duties" })}>Approve & Apply</button>
+        <button className="link-btn danger-link" disabled={decide.isPending} onClick={() => setApprovalDecision({ request, decision: "REJECT", note: "Access is not required" })}>Reject</button>
+      </span> : undefined}
+      note="Approval and RBAC application commit together. If the grant fails policy, the request stays pending." />}
+
+    <h2 className="eyebrow" style={{ marginTop: 20 }}>Effective Permissions By User</h2>
+    <div className="page-controls"><label><span>User</span><select value={selectedUser} onChange={(e) => setSelectedUser(e.target.value)}>
+      <option value="">Select User</option>{users.map((u) => <option key={u.id} value={u.id}>{u.displayName} — {u.email}</option>)}
+    </select></label>{effectiveQ.data && <span className="count">Profile {effectiveQ.data.profileCode ?? "None"} · Role {effectiveQ.data.roleCode ?? "None"} · {effectiveQ.data.permissionCodes.length} permission codes</span>}</div>
+    {effectiveQ.isLoading && <GridLoader label="Calculating effective permissions" rows={6} columns={7} />}
+    {effectiveQ.isError && <p className="form-error">{messageOf(effectiveQ.error)}</p>}
+    {effectiveQ.isSuccess && <DataTable name="Effective object permissions" columns={effectiveColumns} rows={effectiveObjects} rowKey={(r) => r.object}
+      note={`Effective access is profile plus ${effectiveQ.data.permissionSets.length} assigned set(s), minus explicit mutes. Export ceiling: ${effectiveQ.data.exportRowLimit ?? "unlimited"}.`} />}
+
+    <h2 className="eyebrow" style={{ marginTop: 20 }}>Approval Delegations</h2>
+    {canWrite && <section className="list-controls" aria-label="Delegate approval authority"><label><span>Delegate To</span><select value={delegateId} onChange={(e) => setDelegateId(e.target.value)}>
+      <option value="">Select User</option>{users.filter((u) => u.active).map((u) => <option key={u.id} value={u.id}>{u.displayName} — {u.email}</option>)}
+    </select></label><label><span>Expires (Optional)</span><input type="date" value={delegateExpiry} onChange={(e) => setDelegateExpiry(e.target.value)} /></label>
+      <button className="btn btn-sm" disabled={!delegateId || delegate.isPending} onClick={() => delegate.mutate()}>Delegate Authority</button></section>}
+    {delegationsQ.isLoading && <GridLoader label="Reading approval delegations" rows={3} columns={5} />}
+    {delegationsQ.isSuccess && <DataTable name="Approval delegations" columns={delegationColumns} rows={delegationsQ.data} rowKey={(r) => r.id}
+      actions={canWrite ? (row) => row.active ? <button className="link-btn danger-link" disabled={revokeDelegation.isPending} onClick={() => revokeDelegation.mutate(row.id)}>Revoke</button> : null : undefined} />}
+    {approvalDecision && <DecisionNoteDialog
+      title={approvalDecision.decision === "APPROVE" ? "Approve And Apply Access" : "Reject Access Request"}
+      description={approvalDecision.request.summary}
+      note={approvalDecision.note}
+      noteLabel={approvalDecision.decision === "APPROVE" ? "Approval Evidence" : "Rejection Reason"}
+      confirmLabel={approvalDecision.decision === "APPROVE" ? "Approve And Apply" : "Reject Request"}
+      destructive={approvalDecision.decision === "REJECT"}
+      busy={decide.isPending}
+      required
+      onNoteChange={(note) => setApprovalDecision((current) => current ? { ...current, note } : current)}
+      onCancel={() => setApprovalDecision(null)}
+      onConfirm={() => decide.mutate(approvalDecision)} />}
+  </>;
+}
+
+// ---------------------------------------------------------------------------
 // Access recertification
 // ---------------------------------------------------------------------------
 
 function AccessReviewsTab({ canWrite, onChanged }: { canWrite: boolean; onChanged: () => void }) {
   const toasts = useToasts();
   const [selected, setSelected] = useState<string | null>(null);
+  const [reviewDecision, setReviewDecision] = useState<{
+    item: AccessReviewItem;
+    decision: "CONFIRMED" | "REVOKED";
+    note: string;
+  } | null>(null);
   const [draft, setDraft] = useState(() => ({
     code: `ACCESS_${new Date().getFullYear()}`,
     name: "Quarterly access review",
@@ -206,15 +453,11 @@ function AccessReviewsTab({ canWrite, onChanged }: { canWrite: boolean; onChange
     onError: (error) => toasts.push("error", "Review not created", messageOf(error)),
   });
   const decide = useMutation({
-    mutationFn: ({ item, decision }: { item: AccessReviewItem; decision: "CONFIRMED" | "REVOKED" }) => {
-      const note = window.prompt(
-        decision === "REVOKED" ? "Why should this access be removed?" : "Review note (optional)",
-        decision === "REVOKED" ? "No longer required" : "Still required for current duties",
-      );
-      if (note === null) return Promise.reject(new Error("Decision cancelled."));
+    mutationFn: ({ item, decision, note }: { item: AccessReviewItem; decision: "CONFIRMED" | "REVOKED"; note: string }) => {
       return rbac.decideAccessReviewItem(item.id, decision, note);
     },
     onSuccess: () => {
+      setReviewDecision(null);
       toasts.push("info", "Access decision recorded", "The decision is immutable and any revocation is already effective.");
       void itemsQ.refetch();
       void campaignsQ.refetch();
@@ -252,9 +495,9 @@ function AccessReviewsTab({ canWrite, onChanged }: { canWrite: boolean; onChange
       value: (r) => r.decision,
       render: (r) => r.decision !== "PENDING" || !canWrite ? <span>{r.decision}</span> : <span className="inline-actions">
         <button type="button" className="link-btn" disabled={decide.isPending}
-          onClick={() => decide.mutate({ item: r, decision: "CONFIRMED" })}>Confirm</button>
+          onClick={() => setReviewDecision({ item: r, decision: "CONFIRMED", note: "Still required for current duties" })}>Confirm</button>
         <button type="button" className="link-btn danger-link" disabled={decide.isPending}
-          onClick={() => decide.mutate({ item: r, decision: "REVOKED" })}>Revoke</button>
+          onClick={() => setReviewDecision({ item: r, decision: "REVOKED", note: "No longer required" })}>Revoke</button>
       </span>,
     },
   ];
@@ -284,6 +527,18 @@ function AccessReviewsTab({ canWrite, onChanged }: { canWrite: boolean; onChange
         rows={itemsQ.data} rowKey={(r) => r.id}
         note="A revoked decision updates the authoritative grant in the same database transaction." />}
     </>}
+    {reviewDecision && <DecisionNoteDialog
+      title={reviewDecision.decision === "REVOKED" ? "Revoke Reviewed Access" : "Confirm Reviewed Access"}
+      description={reviewDecision.item.description}
+      note={reviewDecision.note}
+      noteLabel={reviewDecision.decision === "REVOKED" ? "Revocation Reason" : "Review Note"}
+      confirmLabel={reviewDecision.decision === "REVOKED" ? "Revoke Access" : "Confirm Access"}
+      destructive={reviewDecision.decision === "REVOKED"}
+      busy={decide.isPending}
+      required={reviewDecision.decision === "REVOKED"}
+      onNoteChange={(note) => setReviewDecision((current) => current ? { ...current, note } : current)}
+      onCancel={() => setReviewDecision(null)}
+      onConfirm={() => decide.mutate(reviewDecision)} />}
   </>;
 }
 

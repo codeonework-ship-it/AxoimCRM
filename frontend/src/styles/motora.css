@@ -1611,6 +1611,31 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   :root body .user-id strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
+/* Responsive shell contract. This file loads after app.css, so repeat the
+   identity width only where the cinematic skin previously overrode the shared
+   rail-aware header sizing. */
+@media (max-width: 1600px) {
+  :root body .user-trigger {
+    inline-size: 176px;
+    min-inline-size: 176px;
+    max-inline-size: 176px;
+  }
+}
+
+@media (max-width: 1360px) {
+  :root body .user-trigger {
+    inline-size: var(--control-icon-size);
+    min-inline-size: var(--control-icon-size);
+    max-inline-size: var(--control-icon-size);
+    padding: 0;
+    justify-content: center;
+  }
+  :root body .user-trigger .user-id,
+  :root body .user-trigger > svg {
+    display: none;
+  }
+}
+
 /* The earlier -1px optical nudge overshot: measured delta went 0 → -1. The
    select and the title already share a left edge, so no nudge is needed. */
 .workspace-switch select { margin-left: 0; }
@@ -1932,3 +1957,591 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   :root[data-theme="ironman"] .app-ground::before { display: none; }
   :root[data-theme="ironman"] .kpi { background: var(--panel); }
 }
+
+
+/* ============================================================================
+   THE GRID — the complete game-UI suite.
+
+   Everything above is The Grid's surface treatment. This is the layer that makes
+   it read as a game interface rather than as a dark theme with cyan edges, and it
+   is built entirely from FLAT means, because two product rules constrain it
+   absolutely:
+
+     1. NO 3D CONTROLS. No bevel, emboss, extrusion, gloss or press. So the
+        depth cues a game UI normally leans on are unavailable, and the character
+        has to come from FRAMING, TYPOGRAPHY, LIGHT and MOTION instead.
+     2. BUTTONS DO NOT RESTYLE ON HOVER. There is not one `.btn:hover` rule in
+        this block, and there must never be. The game feel lives in the chrome
+        around the controls, never in the controls themselves.
+
+   The one place perspective appears is the FLOOR — and it is a background, not a
+   control. That is the trick of this pass: perspective belongs to the world, and
+   the instruments standing on it stay resolutely flat. It is also what keeps the
+   result professional. A game UI that decorates its buttons is a toy; one that
+   builds a convincing environment and then puts a plain, legible, high-contrast
+   control panel inside it is a cockpit.
+
+   Gold remains AI provenance only. Every accent here is lightcycle cyan, with
+   antagonist orange reserved for danger.
+   ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+   1. THE FLOOR — a perspective grid receding to a lit horizon.
+
+   The most recognisable image in the reference, and the reason the flat lattice
+   above is not enough on its own: a flat grid reads as graph paper, while a grid
+   in perspective reads as GROUND, and ground is what makes the panels feel like
+   objects standing on something.
+
+   Mechanics worth knowing before editing. The pseudo-element is fixed, so the
+   floor does not scroll away — the horizon is at infinity and must not move. And
+   z-index -1 puts it behind the workspace content; a negative z-index child
+   normally paints behind its parent's BACKGROUND too, which would make it
+   invisible against --bg, so `isolation: isolate` makes .app-ground a stacking
+   context. The floor then lands above that background and below the content,
+   which is the single layer we want.
+   --------------------------------------------------------------------------- */
+:root[data-theme="tron"] .app-ground {
+  position: relative;
+  isolation: isolate;
+}
+:root[data-theme="tron"] .app-ground::before {
+  content: "";
+  position: fixed;
+  left: -25%;
+  right: -25%;
+  bottom: 0;
+  height: 42vh;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    /* Tracks running toward the vanishing point. */
+    repeating-linear-gradient(90deg,
+      rgba(111, 249, 255, 0.5) 0 1px, transparent 1px 78px),
+    /* Rungs, spaced wider than the tracks so the foreground reads as nearer. */
+    repeating-linear-gradient(0deg,
+      rgba(111, 249, 255, 0.34) 0 1px, transparent 1px 54px);
+  transform: perspective(300px) rotateX(74deg);
+  transform-origin: 50% 100%;
+  /* Dissolves toward the horizon instead of stopping at a hard line. */
+  -webkit-mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.55) 42%, transparent 88%);
+  mask-image: linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.55) 42%, transparent 88%);
+  opacity: 0.5;
+}
+
+/* The horizon: one thin lit band where the floor meets the void. */
+:root[data-theme="tron"] .app-ground::after {
+  content: "";
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 41vh;
+  height: 1px;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(90deg,
+    transparent, rgba(111, 249, 255, 0.55) 20%, rgba(111, 249, 255, 0.55) 80%, transparent);
+  box-shadow: 0 0 26px 6px rgba(111, 249, 255, 0.18);
+}
+
+/* ---------------------------------------------------------------------------
+   2. HUD FRAMING — the workspace sits inside a bracketed frame.
+
+   Corner ticks rather than a full border: a closed rectangle reads as a dialog,
+   while four corner marks read as a targeting frame, which is the game-UI idiom.
+   Drawn with border segments on two pseudo-elements, so it costs no markup.
+   --------------------------------------------------------------------------- */
+:root[data-theme="tron"] .data-view-frame {
+  position: relative;
+}
+:root[data-theme="tron"] .data-view-frame::before,
+:root[data-theme="tron"] .data-view-frame::after {
+  content: "";
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  pointer-events: none;
+  z-index: 2;
+  filter: drop-shadow(0 0 6px rgba(111, 249, 255, 0.8));
+}
+:root[data-theme="tron"] .data-view-frame::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--cyan);
+  border-left: 2px solid var(--cyan);
+}
+:root[data-theme="tron"] .data-view-frame::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--cyan);
+  border-right: 2px solid var(--cyan);
+}
+
+/* The workspace header is a HUD title bar: an energised rule beneath it, and a
+   light bar leading the title. */
+:root[data-theme="tron"] .data-view-head {
+  border-bottom: 1px solid var(--cyan);
+  box-shadow: 0 1px 18px -6px rgba(111, 249, 255, 0.6);
+}
+:root[data-theme="tron"] .data-view-title > span {
+  position: relative;
+  padding-left: 14px;
+}
+:root[data-theme="tron"] .data-view-title > span::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 4px;
+  height: 1.05em;
+  transform: translateY(-50%);
+  background: var(--cyan);
+  box-shadow: 0 0 10px var(--cyan);
+}
+
+/* Eyebrows are system labels: mono, tracked out, faintly lit. */
+:root[data-theme="tron"] .eyebrow {
+  font-family: var(--font-mono);
+  letter-spacing: 0.22em;
+  color: var(--cyan);
+}
+
+/* A bracket marks the start of a module. */
+:root[data-theme="tron"] .page-head {
+  position: relative;
+  padding-left: 14px;
+  border-bottom: 1px solid var(--line-m);
+}
+:root[data-theme="tron"] .page-head::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 2px;
+  bottom: 12px;
+  width: 2px;
+  background: linear-gradient(180deg, var(--cyan), transparent);
+  box-shadow: 0 0 12px rgba(111, 249, 255, 0.7);
+}
+
+/* ---------------------------------------------------------------------------
+   3. INSTRUMENTS — KPI tiles as readouts.
+
+   Mono numerals, because a proportional figure reads as prose and a monospaced
+   one reads as telemetry. Plus a segmented strip on the bottom edge: the
+   universal "this is a gauge" signal, and flat by construction.
+   --------------------------------------------------------------------------- */
+:root[data-theme="tron"] .kpi {
+  position: relative;
+  background: linear-gradient(180deg, rgba(111, 249, 255, 0.05), transparent 62%), var(--panel);
+  border: 1px solid var(--line-bright);
+  overflow: hidden;
+}
+:root[data-theme="tron"] .kpi-value {
+  font-family: var(--font-mono);
+  color: #eafdff;
+  text-shadow: 0 0 16px rgba(111, 249, 255, 0.45);
+  letter-spacing: -0.01em;
+}
+/* The meter. A repeating gradient, so the segment count adapts to the tile width
+   instead of being a fixed number of elements. */
+:root[data-theme="tron"] .kpi::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background-image: repeating-linear-gradient(90deg,
+    var(--cyan) 0 6px, transparent 6px 10px);
+  opacity: 0.55;
+  box-shadow: 0 0 12px rgba(111, 249, 255, 0.5);
+}
+
+/* ---------------------------------------------------------------------------
+   4. THE DATA STREAM — the grid.
+
+   A CRM is mostly table, so this is where the theme is actually lived in and
+   where restraint matters most. The header band gets a lit underline and mono
+   labels; rows keep the cyan hover spine from the surface layer. Numeric cells
+   go mono so columns of figures align on the digit — a legibility win first and
+   a telemetry cue second.
+   --------------------------------------------------------------------------- */
+:root[data-theme="tron"] thead th {
+  font-family: var(--font-mono);
+  letter-spacing: 0.14em;
+  color: var(--cyan);
+  background: linear-gradient(180deg, rgba(111, 249, 255, 0.08), var(--panel-2));
+  border-bottom: 1px solid var(--cyan);
+  box-shadow: inset 0 -1px 12px -4px rgba(111, 249, 255, 0.6);
+}
+:root[data-theme="tron"] .grid-filter-row > th {
+  background: rgba(111, 249, 255, 0.03);
+  border-bottom: 1px solid var(--line-m);
+  box-shadow: none;
+}
+:root[data-theme="tron"] td.num,
+:root[data-theme="tron"] td.mono {
+  font-family: var(--font-mono);
+}
+:root[data-theme="tron"] tbody tr.is-selected > td {
+  background: rgba(111, 249, 255, 0.12);
+}
+:root[data-theme="tron"] tbody tr.is-selected > td:first-child {
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+/* Group headers read as stream partitions. */
+:root[data-theme="tron"] tr.group-row > th {
+  background: linear-gradient(90deg, rgba(111, 249, 255, 0.16), transparent 74%);
+  border-block-start: 1px solid var(--cyan);
+  color: var(--cyan);
+  font-family: var(--font-mono);
+  box-shadow: none;
+}
+
+/* Tool rows are console strips. */
+:root[data-theme="tron"] .grid-tool-row {
+  background: linear-gradient(180deg, rgba(111, 249, 255, 0.04), transparent);
+  border-color: var(--line-bright);
+}
+:root[data-theme="tron"] .grid-tool-label {
+  font-family: var(--font-mono);
+  letter-spacing: 0.16em;
+  color: var(--cyan);
+}
+
+/* ---------------------------------------------------------------------------
+   5. STATUS — chips as light strips.
+
+   A leading 3px bar carries the state colour and the chip body stays dark. Flat,
+   and it means the status is legible from the bar alone when scanning fifty rows,
+   with the label there to confirm it. Hue is never the only carrier.
+   --------------------------------------------------------------------------- */
+:root[data-theme="tron"] .chip {
+  position: relative;
+  padding-left: 12px;
+  background: rgba(111, 249, 255, 0.05);
+  border: 1px solid var(--line-bright);
+  color: var(--ink-soft);
+  font-family: var(--font-mono);
+  letter-spacing: 0.06em;
+}
+:root[data-theme="tron"] .chip::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  bottom: 3px;
+  width: 3px;
+  background: var(--line-bright);
+}
+:root[data-theme="tron"] :is(.chip-open, .chip-active, .chip-applied) {
+  border-color: var(--cyan);
+  color: var(--cyan);
+}
+:root[data-theme="tron"] :is(.chip-open, .chip-active, .chip-applied)::before {
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+}
+:root[data-theme="tron"] :is(.chip-won, .chip-success, .chip-paid) {
+  border-color: var(--green);
+  color: var(--green);
+}
+:root[data-theme="tron"] :is(.chip-won, .chip-success, .chip-paid)::before {
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+}
+:root[data-theme="tron"] :is(.chip-lost, .chip-failed, .chip-overdue) {
+  border-color: var(--red);
+  color: var(--red);
+}
+:root[data-theme="tron"] :is(.chip-lost, .chip-failed, .chip-overdue)::before {
+  background: var(--red);
+  box-shadow: 0 0 8px var(--red);
+}
+
+/* Module tabs as HUD selectors. */
+:root[data-theme="tron"] .master-tab {
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+}
+
+/* ---------------------------------------------------------------------------
+   6. MOTION — what makes it feel alive, and the part most likely to become an
+   accessibility problem.
+
+   Everything animated sits inside `prefers-reduced-motion: no-preference`, so a
+   user who has asked their OS for less motion gets the whole suite above with
+   nothing moving at all — not a reduced version, none of it. That is the right
+   default for vestibular triggers, and it is also why the static layer had to
+   carry the character on its own: the animation is a bonus, never the substance.
+
+   Two effects only, both slow and both peripheral. A game UI feels atmospheric
+   because things drift, not because things flash.
+   --------------------------------------------------------------------------- */
+@media (prefers-reduced-motion: no-preference) {
+  /* The horizon breathes on a 9-second cycle: slow enough to read as ambience
+     rather than as a status change somewhere. */
+  :root[data-theme="tron"] .app-ground::after {
+    animation: tron-horizon 9s ease-in-out infinite;
+  }
+
+  /* The active nav item runs a light down its spine — the lightcycle trail, and
+     the one place the eye is meant to be pulled. */
+  :root[data-theme="tron"] .rail-btn.active::before {
+    animation: tron-spine 2.6s ease-in-out infinite;
+  }
+}
+
+@keyframes tron-horizon {
+  0%, 100% { opacity: 0.55; }
+  50%      { opacity: 1; }
+}
+
+@keyframes tron-spine {
+  0%, 100% { box-shadow: 0 0 8px var(--cyan); }
+  50%      { box-shadow: 0 0 20px var(--cyan), 0 0 34px rgba(111, 249, 255, 0.5); }
+}
+
+/* Low-transparency users lose the floor and the washes and keep the frame, the
+   brackets and the typography — the parts that carry meaning. */
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-theme="tron"] .app-ground::before,
+  :root[data-theme="tron"] .app-ground::after { display: none; }
+  :root[data-theme="tron"] .kpi { background: var(--panel); }
+}
+
+
+/* ============================================================================
+   FLAT HUD FRAMING — Command Deck and Mark VII.
+
+   The Grid gets the full game-UI suite: a perspective floor, a lit horizon, and
+   two slow animations. These two themes deliberately get LESS, and the reason is
+   product rather than effort.
+
+   Command Deck is the default theme — the one every new user opens and the one
+   most people will work in all day. Mark VII is a character skin, but it is still
+   a working skin. A perspective floor and a breathing horizon are atmosphere, and
+   atmosphere behind eight hours of pipeline review stops being atmosphere and
+   becomes something to squint past. The Grid can afford it because choosing The
+   Grid is choosing exactly that.
+
+   So these two get the parts of the suite that cost the reader nothing:
+
+     - HUD corner brackets on the workspace frame        (structure)
+     - a lit rule and a leading bar on section headers   (hierarchy)
+     - mono, tracked-out system labels                   (register)
+     - mono numerals in KPI tiles and numeric cells      (legibility)
+     - segmented gauge strips on KPI tiles               (instrument idiom)
+     - status chips as light strips                      (scannability)
+
+   and none of the parts that move or fill the background. Every one of those is
+   a legibility improvement that happens to also read as an instrument panel,
+   which is the honest version of "professional gaming UI".
+
+   Same two hard rules as everywhere: no 3D controls, and not one button hover
+   rule. Each theme keeps its own accent — cyan telemetry for Command Deck, the
+   arc reactor for Mark VII — and gold stays AI provenance only in both.
+   ============================================================================ */
+
+/* ---------------------------------------------------------------------------
+   COMMAND DECK
+   --------------------------------------------------------------------------- */
+
+/* HUD corner brackets on the workspace frame. Two pseudo-elements, no markup. */
+:root[data-theme="dark"] .data-view-frame {
+  position: relative;
+}
+:root[data-theme="dark"] .data-view-frame::before,
+:root[data-theme="dark"] .data-view-frame::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  z-index: 2;
+}
+:root[data-theme="dark"] .data-view-frame::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--cyan);
+  border-left: 2px solid var(--cyan);
+}
+:root[data-theme="dark"] .data-view-frame::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--cyan);
+  border-right: 2px solid var(--cyan);
+}
+
+/* Section headers: a lit rule beneath, and a bar leading the title. */
+:root[data-theme="dark"] .data-view-title > span {
+  position: relative;
+  padding-left: 13px;
+}
+:root[data-theme="dark"] .data-view-title > span::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 1.05em;
+  transform: translateY(-50%);
+  background: var(--cyan);
+}
+
+/* System labels in mono: the register shift that does most of the work. */
+:root[data-theme="dark"] .eyebrow,
+:root[data-theme="dark"] .grid-tool-label {
+  font-family: var(--font-mono);
+  letter-spacing: 0.2em;
+}
+
+/* Column headers as readout labels. */
+:root[data-theme="dark"] thead th {
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+}
+
+/* Numerals in mono so a column of figures aligns on the digit. */
+:root[data-theme="dark"] .kpi-value,
+:root[data-theme="dark"] td.num,
+:root[data-theme="dark"] td.mono {
+  font-family: var(--font-mono);
+}
+
+/* KPI tiles read as gauges: a segmented strip on the bottom edge. The gradient
+   adapts its segment count to the tile width, so no fixed element count. */
+:root[data-theme="dark"] .kpi {
+  position: relative;
+  overflow: hidden;
+}
+:root[data-theme="dark"] .kpi::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background-image: repeating-linear-gradient(90deg,
+    var(--cyan) 0 6px, transparent 6px 10px);
+  opacity: 0.42;
+}
+
+/* Status chips as light strips: the bar carries the state, the label confirms it,
+   so hue is never the only carrier. */
+:root[data-theme="dark"] .chip {
+  position: relative;
+  padding-left: 12px;
+}
+:root[data-theme="dark"] .chip::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  bottom: 3px;
+  width: 3px;
+  background: var(--line-bright);
+}
+:root[data-theme="dark"] :is(.chip-open, .chip-active, .chip-applied)::before { background: var(--cyan); }
+:root[data-theme="dark"] :is(.chip-won, .chip-success, .chip-paid)::before { background: var(--green); }
+:root[data-theme="dark"] :is(.chip-lost, .chip-failed, .chip-overdue)::before { background: var(--red); }
+
+/* ---------------------------------------------------------------------------
+   MARK VII
+
+   Same framing, but the brackets and bars are ARC REACTOR cyan, not gold and not
+   armour red. Gold is AI provenance; red is armour and danger. The interactive
+   blue-white is the only colour that can mark structure here without colliding
+   with either — which is the same argument that made it the accent in the first
+   place.
+   --------------------------------------------------------------------------- */
+
+:root[data-theme="ironman"] .data-view-frame {
+  position: relative;
+}
+:root[data-theme="ironman"] .data-view-frame::before,
+:root[data-theme="ironman"] .data-view-frame::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  z-index: 2;
+}
+:root[data-theme="ironman"] .data-view-frame::before {
+  top: -1px;
+  left: -1px;
+  border-top: 2px solid var(--cyan);
+  border-left: 2px solid var(--cyan);
+}
+:root[data-theme="ironman"] .data-view-frame::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 2px solid var(--cyan);
+  border-right: 2px solid var(--cyan);
+}
+
+:root[data-theme="ironman"] .data-view-title > span {
+  position: relative;
+  padding-left: 13px;
+}
+:root[data-theme="ironman"] .data-view-title > span::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 1.05em;
+  transform: translateY(-50%);
+  background: var(--cyan);
+}
+
+:root[data-theme="ironman"] .eyebrow,
+:root[data-theme="ironman"] .grid-tool-label {
+  font-family: var(--font-mono);
+  letter-spacing: 0.2em;
+}
+
+:root[data-theme="ironman"] thead th {
+  font-family: var(--font-mono);
+  letter-spacing: 0.12em;
+}
+
+:root[data-theme="ironman"] .kpi-value,
+:root[data-theme="ironman"] td.num,
+:root[data-theme="ironman"] td.mono {
+  font-family: var(--font-mono);
+}
+
+:root[data-theme="ironman"] .kpi {
+  position: relative;
+  overflow: hidden;
+}
+:root[data-theme="ironman"] .kpi::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background-image: repeating-linear-gradient(90deg,
+    var(--cyan) 0 6px, transparent 6px 10px);
+  opacity: 0.42;
+}
+
+:root[data-theme="ironman"] .chip {
+  position: relative;
+  padding-left: 12px;
+}
+:root[data-theme="ironman"] .chip::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  bottom: 3px;
+  width: 3px;
+  background: var(--armour-line, var(--line-bright));
+}
+:root[data-theme="ironman"] :is(.chip-open, .chip-active, .chip-applied)::before { background: var(--cyan); }
+:root[data-theme="ironman"] :is(.chip-won, .chip-success, .chip-paid)::before { background: var(--green); }
+:root[data-theme="ironman"] :is(.chip-lost, .chip-failed, .chip-overdue)::before { background: var(--red); }

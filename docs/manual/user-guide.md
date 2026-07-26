@@ -205,6 +205,42 @@ You control how loud all this is — see [Notifications and staying in control](
 
 ---
 
+## Editing records without overwriting someone else
+
+When you choose **Edit** on a governed record, Axiom reserves that record for
+you while the form is open. You can work normally; the reservation renews in
+the background and is released when you close the form.
+
+If another person is already editing, the form remains readable but its fields
+and **Save changes** button are disabled. The banner names the editor and tells
+you when their reservation expires. Choose **Retry Lock** after they finish. A
+tenant or super administrator can use **Force Unlock** for an urgent handover;
+that action is deliberately visible and should not replace asking the current
+editor to finish. Even with a reservation, Axiom checks the record version again
+when saving, so a stale form cannot overwrite a newer committed change.
+
+## Approving access changes
+
+Open **Authorization → Maker-Checker Approvals**. Granting a role, profile,
+permission set or permission-set group creates a pending request; it does not
+change the user's access immediately.
+
+- Use **Status** to review pending, approved, rejected or all requests.
+- A different administrator reviews the requested change and enters a decision
+  note before choosing **Approve & Apply** or **Reject**.
+- The requester cannot approve their own request. Delegating approval authority
+  between the two people does not bypass this rule.
+- **Effective Permissions By User** shows the resolved profile, role, permission
+  codes and object rights after all grants and mutes have been combined.
+- **Approval Delegations** is for temporary coverage. Choose an expiry whenever
+  the cover has a known end date, and revoke it when the cover ends early.
+
+If policy rejects the underlying grant, the approval stays pending rather than
+claiming that access was applied. Ask an administrator outside the requester's
+delegation chain to resolve it.
+
+---
+
 ## Working leads
 
 ### Where leads come from
@@ -402,17 +438,17 @@ The parts always add up exactly to the total change — no mystery residue. Clic
 
 Open **Reports** and choose one of two workspaces:
 
-- **Reports Studio** is the governed Jasper grid. Filter or search any column, sort or group the portfolio, choose a report, read its business question and audience, then review the complete browser-safe report inside Axiom before downloading PDF, Excel or Word.
+- **Reports Studio** is the governed Jasper report library and viewer. Choose a report from the searchable left-side panel, read its business question and audience, then use either the complete browser-safe grid or the authenticated PDF viewer before downloading PDF, Excel or Word.
 - **Custom Reports** is the no-code authoring workspace for report building, dashboards, calculated measures, conditional formatting, sharing and delivery policies.
 
 The separation is intentional: choosing and reading an approved operating report is a different job from designing a new analytical definition. The two workspaces share the same tenant security, export rights and audit trail.
 
 ### Use a standard CRM report
 
-The catalogue is arranged into Executive, Sales, Growth, Customer, Commercial and Governance collections. Each grid row tells you the plain-language decision the report supports, who normally uses it, available formats and Jasper readiness. The twenty-one-report portfolio includes revenue summary, pipeline, forecast, quota, stage velocity, ARR movement, whitespace, Customer 360, discount governance, demand, activity, health, service, quote, campaign and data-quality analysis.
+The left-side report library is arranged into Executive, Sales, Growth, Customer, Commercial and Governance collections. Each item tells you the plain-language decision the report supports, while the selected report shows its recommended audience, available formats and Jasper readiness in the viewer. The twenty-one-report portfolio includes revenue summary, pipeline, forecast, quota, stage velocity, ARR movement, whitespace, Customer 360, discount governance, demand, activity, health, service, quote, campaign and data-quality analysis.
 
-1. Open **Reports Studio** and use the column filters, sorting or **Group** choices to find a report by collection, title, business question, recommended role, format or status.
-2. Choose **View Report** in the grid. Axiom renders every row from the same governed query supplied to Jasper in a browser-safe document viewer; choose **Full View** when you need the largest reading area.
+1. Open **Reports Studio** and use the search box or collection buttons in the left-side library to find a report by title, business question or recommended role.
+2. Choose the report in the library. Use **Report Grid** to search all report columns, filter an individual column and move through server-provided pages of 100 rows. Use **Document Preview** to inspect the actual Jasper PDF in Axiom's PDF.js viewer. Use Previous/Next Page, zoom in/out and **Open PDF** from the viewer toolbar. The PDF/Excel/Word downloads and document preview use the complete filtered result, not only the current grid page; choose **Full View** when you need the largest reading area.
 3. Review **Decision Supported** to confirm it answers the question you have.
 4. Choose **Download PDF** for a presentation-ready document, **Download Excel** for further analysis or **Download Word** for a document you can annotate.
 5. Choose **Schedule Report** only when the same governed report is needed repeatedly. A schedule does not give the recipient more access than they already have.

@@ -6,9 +6,19 @@ import { preloadRoute } from "../routes/preload";
 import { NotificationsProvider } from "./notifications";
 import { CommandPalette } from "./CommandPalette";
 import { HelpDrawer } from "./HelpDrawer";
+import { useScreenViewTracking } from "../activity/uiActivity";
 
 export function AppShell() {
   const navigate = useNavigate();
+
+  /*
+   * Screen views are reported from here, not from each page. A per-page call
+   * would be a promise that every future page remembers to make one, and the
+   * pages that forgot would be invisible in the audit trail with nothing to
+   * indicate they were missing. The shell wraps every authenticated route, so
+   * coverage is structural.
+   */
+  useScreenViewTracking();
   const [commandOpen, setCommandOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false);

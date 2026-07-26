@@ -47,8 +47,13 @@ public class ReportController {
 
     @GetMapping("/{code}/download")
     public ResponseEntity<byte[]> download(@PathVariable String code,
-                                           @RequestParam ReportService.ReportFormat format) {
-        ReportService.FilePayload file = reports.export(code, format);
+                                           @RequestParam ReportService.ReportFormat format,
+                                           @RequestParam(required = false) String search,
+                                           @RequestParam(required = false) String metric,
+                                           @RequestParam(required = false) String value,
+                                           @RequestParam(required = false) String detail,
+                                           @RequestParam(required = false) String signal) {
+        ReportService.FilePayload file = reports.export(code, format, filters(search, metric, value, detail, signal));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.filename() + "\"")
                 .contentType(MediaType.parseMediaType(file.contentType()))
@@ -56,7 +61,34 @@ public class ReportController {
     }
 
     @GetMapping("/{code}/preview")
-    public ReportService.ReportPreview preview(@PathVariable String code) {
-        return reports.preview(code);
+    public ReportService.ReportPreview preview(@PathVariable String code,
+                                               @RequestParam(defaultValue = "0") int page,
+                                               @RequestParam(defaultValue = "100") int size,
+                                               @RequestParam(required = false) String search,
+                                               @RequestParam(required = false) String metric,
+                                               @RequestParam(required = false) String value,
+                                               @RequestParam(required = false) String detail,
+                                               @RequestParam(required = false) String signal) {
+        return reports.preview(code, page, size, filters(search, metric, value, detail, signal));
+    }
+
+    @GetMapping("/{code}/document-preview")
+    public ResponseEntity<byte[]> documentPreview(@PathVariable String code,
+                                                  @RequestParam(required = false) String search,
+                                                  @RequestParam(required = false) String metric,
+                                                  @RequestParam(required = false) String value,
+                                                  @RequestParam(required = false) String detail,
+                                                  @RequestParam(required = false) String signal) {
+        ReportService.FilePayload file = reports.documentPreview(code, filters(search, metric, value, detail, signal));
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + file.filename() + "\"")
+                .header("X-Content-Type-Options", "nosniff")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(file.bytes());
+    }
+
+    private static ReportService.ReportFilters filters(String search, String metric, String value,
+                                                       String detail, String signal) {
+        return new ReportService.ReportFilters(search, metric, value, detail, signal);
     }
 }

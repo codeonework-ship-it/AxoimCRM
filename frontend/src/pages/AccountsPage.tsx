@@ -11,6 +11,7 @@ import { useToasts } from "../components/Toasts";
 import { GridLoader } from "../components/Loaders";
 import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
+import { useAppDialog } from "../components/AppDialog";
 
 const ACCOUNT_GROUP_COLUMNS: GroupColumn<Account>[] = [
   { key: "name", label: "Name", value: (row) => row.name },
@@ -27,6 +28,7 @@ export function AccountsPage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const toasts = useToasts();
+  const dialog = useAppDialog();
 
   const accountsQ = useQuery({
     queryKey: ["accounts", page, search, industryFilter],
@@ -86,8 +88,14 @@ export function AccountsPage() {
   const totalPages = accountsQ.data?.totalPages ?? 0;
   let previousGroup = "";
 
-  function remove(account: Account) {
-    if (window.confirm(`Delete ${account.name}? This is a reversible soft delete. Records in use will be protected.`)) deleteMutation.mutate(account.id);
+  async function remove(account: Account) {
+    const confirmed = await dialog.confirm({
+      title: "Delete Account",
+      message: `Delete ${account.name}? This is a reversible soft delete. Records in use will be protected.`,
+      confirmLabel: "Delete Account",
+      tone: "danger",
+    });
+    if (confirmed) deleteMutation.mutate(account.id);
   }
 
   function updateSearch(value: string) { setSearch(value); setPage(0); }

@@ -10,6 +10,7 @@ import org.springframework.core.io.ResourceLoader;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.UUID;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -47,5 +48,19 @@ class ReportServiceTest {
     @Test void crmInsightJasperTemplateCompiles() throws Exception {
         var resource = new ClassPathResource("reports/crm-insight-report.jrxml");
         assertNotNull(net.sf.jasperreports.engine.JasperCompileManager.compileReport(resource.getInputStream()));
+    }
+
+    @Test void reportFiltersSearchEveryColumnAndCombineColumnCriteria() {
+        List<ReportService.ReportRow> rows = List.of(
+                new ReportService.ReportRow("North", "120", "Enterprise renewals", "AT RISK"),
+                new ReportService.ReportRow("South", "95", "New business", "CURRENT"),
+                new ReportService.ReportRow("West", "120", "Enterprise expansion", "CURRENT")
+        );
+
+        assertEquals(2, ReportService.filterRows(rows,
+                new ReportService.ReportFilters("enterprise", null, null, null, null)).size());
+        assertEquals(List.of("North"), ReportService.filterRows(rows,
+                        new ReportService.ReportFilters(null, null, "120", "renewals", "risk"))
+                .stream().map(ReportService.ReportRow::getMetric).toList());
     }
 }

@@ -65,17 +65,34 @@ axiom:
     batch-size: 100
   cors:
     allowed-origins: ${AXIOM_CORS_ORIGINS:http://localhost:5173,http://localhost:4280}
+  observability:
+    prometheus:
+      enabled: ${AXIOM_PROMETHEUS_ENABLED:true}
+      scrape-token: ${AXIOM_PROMETHEUS_SCRAPE_TOKEN:axiom-prometheus-dev-token-change-before-use}
 
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics,prometheus
+        include: health,prometheus
   endpoint:
     health:
       probes:
         enabled: true
       show-details: when-authorized
+  prometheus:
+    metrics:
+      export:
+        enabled: ${AXIOM_PROMETHEUS_ENABLED:true}
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      environment: ${axiom.environment.name}
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 100ms,250ms,500ms,1s,2s,5s
 
 logging:
   level:

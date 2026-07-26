@@ -11,6 +11,7 @@ import { formatDate } from "../lib/format";
 import { GridLoader } from "../components/Loaders";
 import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, type GroupColumn } from "../lib/gridGrouping";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
+import { useAppDialog } from "../components/AppDialog";
 
 const TYPES = ["TASK", "EVENT", "CALL", "EMAIL_LOG", "NOTE"];
 const STATUSES = ["OPEN", "COMPLETED", "CANCELLED"];
@@ -30,6 +31,7 @@ function localDateTime(value: string): string | null {
 
 export function ActivitiesPage() {
   const toasts = useToasts();
+  const dialog = useAppDialog();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
@@ -180,12 +182,12 @@ export function ActivitiesPage() {
             <small>{template.folder} · {template.sharingScope} · owner {template.ownerName}</small>
             <p>{template.subject}</p>
             <code>{template.mergeFields.length ? template.mergeFields.join(", ") : "No merge fields"}</code>
-            {template.canEdit && <button className="btn btn-sm" disabled={reviseTemplate.isPending} onClick={() => {
-              const subject = window.prompt("Subject for the new immutable version", template.subject);
+            {template.canEdit && <button className="btn btn-sm" disabled={reviseTemplate.isPending} onClick={async () => {
+              const subject = await dialog.prompt({ title: "Revise Email Template", message: `Enter the subject for the new immutable version of ${template.name}.`, label: "Email Subject", defaultValue: template.subject, required: true, confirmLabel: "Next" });
               if (subject == null) return;
-              const body = window.prompt("Body for the new immutable version", template.body);
+              const body = await dialog.prompt({ title: "Revise Email Body", message: "Update the content for the new version. The previous version remains unchanged.", label: "Email Body", defaultValue: template.body, required: true, multiline: true, confirmLabel: "Next" });
               if (body == null) return;
-              const changeNote = window.prompt("What changed and why?", "Updated after content review.");
+              const changeNote = await dialog.prompt({ title: "Explain The Revision", message: "Record what changed and why for the audit trail.", label: "Change Note", defaultValue: "Updated after content review.", required: true, multiline: true, confirmLabel: "Create Version" });
               if (changeNote?.trim()) reviseTemplate.mutate({ template, subject, body, changeNote });
             }}>Create new version</button>}
           </article>)}
@@ -281,8 +283,8 @@ export function ActivitiesPage() {
             <p>{activity.body || activity.outcome || "No notes captured."}</p>
             <small>{activity.activityType} · {activity.priority} · owner {activity.ownerName} · {activity.dueAt ? `due ${formatDate(activity.dueAt)}` : `occurred ${formatDate(activity.occurredAt)}`}</small>
           </div>
-          {activity.status !== "COMPLETED" && <button className="btn btn-sm" disabled={completeMutation.isPending} onClick={() => {
-            const outcome = window.prompt("Outcome", "Completed");
+          {activity.status !== "COMPLETED" && <button className="btn btn-sm" disabled={completeMutation.isPending} onClick={async () => {
+            const outcome = await dialog.prompt({ title: "Complete Activity", message: `Record the outcome of ${activity.subject}.`, label: "Outcome", defaultValue: "Completed", required: true, multiline: true, confirmLabel: "Complete Activity" });
             if (outcome != null) completeMutation.mutate({ id: activity.id, outcome });
           }}>Complete</button>}
         </article>)}
@@ -294,8 +296,8 @@ export function ActivitiesPage() {
           <p>{activity.body || activity.outcome || "No notes captured."}</p>
           <small>{activity.activityType} · {activity.priority} · {activity.relatedLabel ?? activity.relatedEntityType} · owner {activity.ownerName} · {activity.dueAt ? `due ${formatDate(activity.dueAt)}` : `occurred ${formatDate(activity.occurredAt)}`}</small>
         </div>
-        {activity.status !== "COMPLETED" && <button className="btn btn-sm" disabled={completeMutation.isPending} onClick={() => {
-          const outcome = window.prompt("Outcome", "Completed");
+        {activity.status !== "COMPLETED" && <button className="btn btn-sm" disabled={completeMutation.isPending} onClick={async () => {
+          const outcome = await dialog.prompt({ title: "Complete Activity", message: `Record the outcome of ${activity.subject}.`, label: "Outcome", defaultValue: "Completed", required: true, multiline: true, confirmLabel: "Complete Activity" });
           if (outcome != null) completeMutation.mutate({ id: activity.id, outcome });
         }}>Complete</button>}
       </article>)}

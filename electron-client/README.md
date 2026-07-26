@@ -37,7 +37,18 @@ $env:AXIOM_WEB_URL = "http://localhost:4280"; npm start
 # Local desktop package / publish artifact
 cd ../frontend && npm run build
 cd ../electron-client && npm run package
+
+# Responsive wrapping and raster-quality acceptance audit (requires the local
+# web app on :4280 and API on :8080)
+npm run audit:visual
 ```
+
+The visual audit signs in with the documented demo operator (override with
+`AXIOM_AUDIT_TENANT`, `AXIOM_AUDIT_EMAIL`, and `AXIOM_AUDIT_PASSWORD`), checks
+Home, Contacts, Authorization, and Reports at 1024x700 through 1920x1080, and
+writes screenshots plus `visual-audit.json` to `audit-output/`. Page overflow,
+clipped/off-screen controls, or raster images enlarged beyond their native
+resolution fail the command.
 
 The packaged output is written to `electron-client/release/`:
 
@@ -46,7 +57,7 @@ The packaged output is written to `electron-client/release/`:
 
 ## Notes
 
-- Window: 1440x900, minimum 1024x700, dark ground (#0A0D14).
+- Window: 1440x900 content area, minimum 1024x700, dark ground (#0A0D14).
 - The preload script (`preload.cjs`) is the only bridge between the page and
   Electron; context isolation and sandboxing are on, node integration is off.
 - Notifications: the web app calls `window.axiomDesktop.notify(...)` for

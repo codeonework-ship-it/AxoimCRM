@@ -61,12 +61,13 @@ public class RbacAdminController {
     private final TenantRoleFloorService floor;
     private final SensitiveFieldService sensitiveFields;
     private final AccessReviewService accessReviews;
+    private final RbacChangeApprovalService rbacChanges;
 
     public RbacAdminController(RoleHierarchyService roles, PermissionAdminService permissions,
                                SharingRuleService sharing, SodService sod,
                                DelegatedAdminService delegatedAdmin, AccessExplainerService explainer,
                                TenantRoleFloorService floor, SensitiveFieldService sensitiveFields,
-                               AccessReviewService accessReviews) {
+                               AccessReviewService accessReviews, RbacChangeApprovalService rbacChanges) {
         this.roles = roles;
         this.permissions = permissions;
         this.sharing = sharing;
@@ -76,6 +77,7 @@ public class RbacAdminController {
         this.floor = floor;
         this.sensitiveFields = sensitiveFields;
         this.accessReviews = accessReviews;
+        this.rbacChanges = rbacChanges;
     }
 
     // ---------------------------------------------------------------- requests
@@ -154,8 +156,9 @@ public class RbacAdminController {
     }
 
     @PostMapping("/roles/assignments")
-    public void assignRole(@RequestBody @Valid RoleAssignmentRequest request) {
-        roles.assignUser(request.userId(), request.roleNodeId(), request.expiresAt());
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public MakerCheckerService.ApprovalRequest assignRole(@RequestBody @Valid RoleAssignmentRequest request) {
+        return rbacChanges.submitRole(request.userId(), request.roleNodeId(), request.expiresAt());
     }
 
     // -------------------------------------------------- profiles and permissions
@@ -173,8 +176,9 @@ public class RbacAdminController {
     }
 
     @PostMapping("/profiles/assignments")
-    public void assignProfile(@RequestBody @Valid ProfileAssignmentRequest request) {
-        permissions.assignProfile(request.userId(), request.profileId(), request.reason());
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public MakerCheckerService.ApprovalRequest assignProfile(@RequestBody @Valid ProfileAssignmentRequest request) {
+        return rbacChanges.submitProfile(request.userId(), request.profileId(), request.reason());
     }
 
     @GetMapping("/permission-sets")
@@ -260,10 +264,10 @@ public class RbacAdminController {
 
     /** Assign a permission set or a group to a user, optionally with an expiry (FR-SEC-012). */
     @PostMapping("/assignments")
-    @ResponseStatus(HttpStatus.CREATED)
-    public PermissionAdminService.AssignmentRow assign(
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public MakerCheckerService.ApprovalRequest assign(
             @RequestBody @Valid PermissionAdminService.AssignRequest request) {
-        return permissions.assign(request);
+        return rbacChanges.submitPermissionAssignment(request);
     }
 
     @PostMapping("/assignments/{id}/revoke")

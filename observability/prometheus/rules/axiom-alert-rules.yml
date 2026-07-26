@@ -1,0 +1,103 @@
+groups:
+  - name: axiom_availability
+    rules:
+      - alert: AxiomApiDown
+        expr: up{job="axiom-api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: axiom-api
+        annotations:
+          summary: Axiom API cannot be scraped
+          description: Prometheus has failed to scrape the Axiom API for more than one minute.
+          runbook_url: docs/operations/prometheus.md#axiomaptdown
+
+      - alert: AxiomApiHighErrorRatio
+        expr: job:axiom_http_5xx_ratio:rate5m > 0.05 and job:axiom_http_requests:rate5m > 0.1
+        for: 10m
+        labels:
+          severity: critical
+          service: axiom-api
+        annotations:
+          summary: Axiom API 5xx ratio exceeds 5%
+          description: The five-minute server-error ratio has remained above 5% for ten minutes.
+          runbook_url: docs/operations/prometheus.md#axiomapihigherrorratio
+
+      - alert: AxiomApiHighLatency
+        expr: job:axiom_http_duration_seconds:p95_5m > 2
+        for: 10m
+        labels:
+          severity: warning
+          service: axiom-api
+        annotations:
+          summary: Axiom API p95 latency exceeds two seconds
+          description: The user-visible API latency objective has been missed for ten minutes.
+          runbook_url: docs/operations/prometheus.md#axiomapihighlatency
+
+      - alert: AxiomDatabasePoolSaturated
+        expr: hikaricp_connections_pending{job="axiom-api",pool="axiom-app-pool"} > 0
+        for: 5m
+        labels:
+          severity: warning
+          service: postgresql
+        annotations:
+          summary: CRM requests are waiting for database connections
+          description: The application connection pool has had pending borrowers for five minutes.
+          runbook_url: docs/operations/prometheus.md#axiomdatabasepoolsaturated
+
+  - name: axiom_eventing_and_workflows
+    rules:
+      - alert: AxiomOutboxBacklogGrowing
+        expr: axiom_outbox_backlog_events{job="axiom-api"} > 100
+        for: 10m
+        labels:
+          severity: critical
+          service: event-backbone
+        annotations:
+          summary: Axiom transactional outbox backlog exceeds 100 events
+          description: CRM changes are durable in PostgreSQL but downstream Kafka consumers are falling behind.
+          runbook_url: docs/operations/prometheus.md#axiomoutboxbackloggrowing
+
+      - alert: AxiomOutboxOldestEventStale
+        expr: axiom_outbox_oldest_event_age_seconds{job="axiom-api"} > 300
+        for: 5m
+        labels:
+          severity: critical
+          service: event-backbone
+        annotations:
+          summary: Oldest undispatched CRM event is more than five minutes old
+          description: Reporting projections, automation and search may be stale even if API writes still succeed.
+          runbook_url: docs/operations/prometheus.md#axiomoutboxoldesteventstale
+
+      - alert: AxiomAutomationFailures
+        expr: axiom:automation_failures:increase15m > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: automation
+        annotations:
+          summary: Multiple automation runs are failing or halted
+          description: More than five governed automation executions failed in the last fifteen minutes.
+          runbook_url: docs/operations/prometheus.md#axiomautomationfailures
+
+      - alert: AxiomMakerCheckerDenials
+        expr: axiom:approval_denials:increase15m > 3
+        for: 1m
+        labels:
+          severity: warning
+          service: security-governance
+        annotations:
+          summary: Repeated maker-checker decisions are being denied
+          description: Investigate segregation-of-duty refusals; this can indicate a delegation mistake or bypass attempt.
+          runbook_url: docs/operations/prometheus.md#axiommakercheckerdenials
+
+      - alert: AxiomOutboxMetricRefreshFailing
+        expr: increase(axiom_outbox_metrics_refresh_failures_total{job="axiom-api"}[10m]) > 2
+        for: 1m
+        labels:
+          severity: warning
+          service: observability
+        annotations:
+          summary: Axiom cannot refresh outbox gauges
+          description: The least-privilege relay datasource or PostgreSQL may be unavailable.
+          runbook_url: docs/operations/prometheus.md#axiomoutboxmetricrefreshfailing

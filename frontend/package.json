@@ -12,15 +12,16 @@
   "dependencies": {
     "@tanstack/react-query": "^5.51.0",
     "bootstrap": "^5.3.8",
+    "pdfjs-dist": "^5.7.284",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^6.26.0"
+    "react-router-dom": "7.18.1"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
-    "@vitejs/plugin-react": "^4.3.1",
+    "@vitejs/plugin-react": "^6.0.4",
     "typescript": "^5.5.4",
-    "vite": "^5.4.0"
+    "vite": "^8.1.5"
   }
 }

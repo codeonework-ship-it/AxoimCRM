@@ -87,6 +87,7 @@ The backend is a Spring Boot (Java 21) modular monolith implementing the walking
 docker compose up -d --build
 # Web preview: http://localhost:4280
 # API: http://localhost:8080 — health at /actuator/health
+# Prometheus: http://localhost:9090 — Alertmanager: http://localhost:9096
 ```
 
 Environment-specific database files live in `deploy/env/`. The shared CRM database login requested for each environment is:

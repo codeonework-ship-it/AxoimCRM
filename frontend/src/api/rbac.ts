@@ -172,6 +172,47 @@ export interface AssignmentRow {
   revokedAt: string | null;
 }
 
+export interface ApprovalRequest {
+  id: string;
+  actionCode: string;
+  entityType: string;
+  entityId: string | null;
+  summary: string;
+  payload: string;
+  initiatedBy: string;
+  initiatedByEmail: string;
+  initiatedAt: string;
+  status: "PENDING" | "APPROVED" | "REJECTED" | "WITHDRAWN";
+  decidedBy: string | null;
+  decidedByEmail: string | null;
+  decidedAt: string | null;
+  decisionNote: string | null;
+}
+
+export interface ApprovalDelegation {
+  id: string;
+  delegatorId: string;
+  delegatorEmail: string;
+  delegateId: string;
+  delegateEmail: string;
+  startsAt: string;
+  expiresAt: string | null;
+  active: boolean;
+}
+
+export interface EffectivePermissionView {
+  userId: string;
+  userEmail: string;
+  profileCode: string | null;
+  permissionSets: string[];
+  roleCode: string | null;
+  rolePath: string | null;
+  permissionCodes: string[];
+  objectAccess: Record<string, Record<string, boolean>>;
+  unreadableFields: Record<string, string[]>;
+  exportRowLimit: number | null;
+}
+
 export interface OrgWideDefaultRow {
   objectType: string;
   defaultAccess: "private" | "read_only" | "read_write";
@@ -449,6 +490,7 @@ export interface ActivityFilter {
 // ---------------------------------------------------------------------------
 
 const RBAC = "/security/rbac";
+const APPROVALS = "/security/approvals";
 
 export const rbac = {
   overview: () => request<RbacOverview>("GET", `${RBAC}/overview`),
@@ -463,13 +505,13 @@ export const rbac = {
   deactivateRole: (id: string) =>
     request<void>("POST", `${RBAC}/roles/${encodeURIComponent(id)}/deactivate`),
   assignRole: (body: { userId: string; roleNodeId: string; expiresAt?: string | null }) =>
-    request<void>("POST", `${RBAC}/roles/assignments`, body),
+    request<ApprovalRequest>("POST", `${RBAC}/roles/assignments`, body),
 
   // Profiles, permission sets and groups
   permissions: () => request<PermissionDescriptor[]>("GET", `${RBAC}/permissions`),
   profiles: () => request<ProfileRow[]>("GET", `${RBAC}/profiles`),
   assignProfile: (body: { userId: string; profileId: string; reason?: string }) =>
-    request<void>("POST", `${RBAC}/profiles/assignments`, body),
+    request<ApprovalRequest>("POST", `${RBAC}/profiles/assignments`, body),
   permissionSets: () => request<PermissionSetRow[]>("GET", `${RBAC}/permission-sets`),
   createPermissionSet: (body: { code: string; name: string; description?: string }) =>
     request<PermissionSetRow>("POST", `${RBAC}/permission-sets`, body),
@@ -509,9 +551,23 @@ export const rbac = {
     permissionSetGroupId?: string | null;
     expiresAt?: string | null;
     reason?: string;
-  }) => request<AssignmentRow>("POST", `${RBAC}/assignments`, body),
+  }) => request<ApprovalRequest>("POST", `${RBAC}/assignments`, body),
   revokeAssignment: (id: string, reason?: string) =>
     request<void>("POST", `${RBAC}/assignments/${encodeURIComponent(id)}/revoke`, { reason }),
+  effectivePermissions: (userId: string) =>
+    request<EffectivePermissionView>("GET", `${RBAC}/users/${encodeURIComponent(userId)}/effective-permissions`),
+
+  // Maker-checker. Approval applies the grant in the same transaction.
+  approvals: (status?: string) => request<ApprovalRequest[]>("GET", `${APPROVALS}${qs({ status })}`),
+  approve: (id: string, note: string) =>
+    request<ApprovalRequest>("POST", `${APPROVALS}/${encodeURIComponent(id)}/approve`, { note }),
+  reject: (id: string, note: string) =>
+    request<ApprovalRequest>("POST", `${APPROVALS}/${encodeURIComponent(id)}/reject`, { note }),
+  approvalDelegations: () => request<ApprovalDelegation[]>("GET", `${APPROVALS}/delegations`),
+  delegateApproval: (delegateId: string, expiresAt?: string | null) =>
+    request<ApprovalDelegation>("POST", `${APPROVALS}/delegations`, { delegateId, expiresAt }),
+  revokeApprovalDelegation: (id: string) =>
+    request<void>("DELETE", `${APPROVALS}/delegations/${encodeURIComponent(id)}`),
 
   // Org-wide defaults
   orgWideDefaults: () => request<OrgWideDefaultRow[]>("GET", `${RBAC}/org-wide-defaults`),

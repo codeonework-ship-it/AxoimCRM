@@ -1,15 +1,19 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api, isUnreachable, type ReportDefinition, type ReportPreview } from "../api/client";
+import { GlobalWorkerOptions, getDocument, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist";
+import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
+import { api, isUnreachable, type ReportDefinition, type ReportGridParams, type ReportPreview } from "../api/client";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { saveDownloadedFile } from "../components/DataGridToolbar";
-import { DataTable, type Column } from "../components/DataTable";
+import { GridFilterRow } from "../components/GridFilterRow";
 import { ReportStudio } from "../components/ReportStudio";
+import { MenuIcon } from "../components/icons";
 import { useToasts } from "../components/Toasts";
 
 type ReportWorkspace = "REPORTS_STUDIO" | "CUSTOM_REPORTS";
 type ReportFormat = "PDF" | "XLSX" | "DOCX";
+type ReportViewerTab = "GRID" | "DOCUMENT";
 type ReportRow = Awaited<ReturnType<typeof api.reports>>[number];
 
 interface ScheduleDraft {
@@ -18,77 +22,36 @@ interface ScheduleDraft {
   frequency: "DAILY" | "WEEKLY" | "MONTHLY";
 }
 
+type ReportGridFilters = Pick<ReportGridParams, "search" | "metric" | "value" | "detail" | "signal">;
+
 const EMPTY_SCHEDULE: ScheduleDraft = { recipient: "", format: "PDF", frequency: "WEEKLY" };
+const EMPTY_REPORT_FILTERS: ReportGridFilters = { search: "", metric: "", value: "", detail: "", signal: "" };
+const REPORT_PAGE_SIZE = 100;
 const COLLECTION_ORDER = ["EXECUTIVE", "SALES", "GROWTH", "CUSTOMER", "COMMERCIAL", "GOVERNANCE", "GENERAL"];
 
-const REPORT_GRID_COLUMNS: Column<ReportRow>[] = [
-  {
-    key: "report",
-    header: "Report Name",
-    value: (report) => report.label,
-    filter: "text",
-    groupable: false,
-    sortable: true,
-    render: (report) => <div className="jasper-grid-report-name"><strong>{report.label}</strong><code>{report.code}</code></div>,
-  },
-  {
-    key: "collection",
-    header: "Collection",
-    value: (report) => categoryLabel(report.category),
-    filter: "enum",
-    groupable: true,
-    sortable: true,
-    render: (report) => <span className="report-signal signal-neutral">{categoryLabel(report.category)}</span>,
-  },
-  {
-    key: "businessQuestion",
-    header: "Business Question",
-    value: (report) => report.businessQuestion,
-    filter: "text",
-    groupable: false,
-    sortable: true,
-    cellClass: "jasper-grid-question",
-  },
-  {
-    key: "audience",
-    header: "Recommended For",
-    value: (report) => (report.audience ?? []).map(roleLabel).join(", "),
-    filter: "text",
-    groupable: true,
-    sortable: true,
-  },
-  {
-    key: "formats",
-    header: "Download Formats",
-    value: (report) => report.allowedFormats.map(formatLabel).join(", "),
-    filter: "enum",
-    groupable: true,
-    sortable: false,
-    cellClass: "mono",
-  },
-  {
-    key: "status",
-    header: "Status",
-    value: (report) => report.active ? "Ready" : "Inactive",
-    filter: "enum",
-    groupable: true,
-    sortable: true,
-    render: (report) => <span className={`report-signal ${report.active ? "signal-positive" : "signal-risk"}`}>
-      {report.active ? "Jasper Ready" : "Inactive"}
-    </span>,
-  },
-];
+GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 export function ReportsPage() {
   const toasts = useToasts();
   const queryClient = useQueryClient();
   const [workspace, setWorkspace] = useState<ReportWorkspace>("REPORTS_STUDIO");
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
+  const [search, setSearch] = useState("");
+  const [collection, setCollection] = useState("ALL");
+  /* The library starts expanded: a first-time visitor should see what is on
+     offer, not a column of two-letter marks they have no key for. */
+  const [libraryOpen, setLibraryOpen] = useState(true);
   const [previewRevision, setPreviewRevision] = useState(0);
   const [preview, setPreview] = useState<ReportPreview | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState<string | null>(null);
+  const [documentPreviewUrl, setDocumentPreviewUrl] = useState<string | null>(null);
+  const [documentPreviewLoading, setDocumentPreviewLoading] = useState(false);
+  const [documentPreviewError, setDocumentPreviewError] = useState<string | null>(null);
   const [fullPreview, setFullPreview] = useState(false);
+  const [viewerTab, setViewerTab] = useState<ReportViewerTab>("GRID");
+  const [reportPage, setReportPage] = useState(0);
+  const [reportFilters, setReportFilters] = useState<ReportGridFilters>(EMPTY_REPORT_FILTERS);
   const [scheduleReport, setScheduleReport] = useState<ReportRow | null>(null);
   const [scheduleDraft, setScheduleDraft] = useState<ScheduleDraft>(EMPTY_SCHEDULE);
 
@@ -100,6 +63,17 @@ export function ReportsPage() {
     () => [...new Set(reports.map((report) => report.category ?? "GENERAL"))].sort(compareCollections),
     [reports],
   );
+  // Search and collection filters narrow the report library without changing
+  // the selected report's complete preview dataset.
+  const visibleReports = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return reports.filter((report) => {
+      if (collection !== "ALL" && report.category !== collection) return false;
+      if (!term) return true;
+      return [report.label, report.description, report.businessQuestion, report.code, ...(report.audience ?? [])]
+        .some((value) => String(value ?? "").toLowerCase().includes(term));
+    });
+  }, [collection, reports, search]);
   const selectedReport = reports.find((report) => report.code === selectedCode) ?? reports[0] ?? null;
 
   useEffect(() => {
@@ -108,12 +82,17 @@ export function ReportsPage() {
   }, [reports, selectedCode]);
 
   useEffect(() => {
+    setReportPage(0);
+    setReportFilters(EMPTY_REPORT_FILTERS);
+  }, [selectedReport?.code]);
+
+  useEffect(() => {
     if (workspace !== "REPORTS_STUDIO" || !selectedReport) return;
     let disposed = false;
     setPreviewLoading(true);
     setPreviewError(null);
     setPreview(null);
-    void api.reportPreview(selectedReport.code)
+    void api.reportPreview(selectedReport.code, { page: reportPage, size: REPORT_PAGE_SIZE, ...reportFilters })
       .then((value) => {
         if (!disposed) setPreview(value);
       })
@@ -126,7 +105,37 @@ export function ReportsPage() {
     return () => {
       disposed = true;
     };
-  }, [previewRevision, selectedReport?.code, workspace]);
+  }, [previewRevision, reportFilters, reportPage, selectedReport?.code, workspace]);
+
+  useEffect(() => {
+    if (workspace !== "REPORTS_STUDIO" || viewerTab !== "DOCUMENT" || !selectedReport) {
+      setDocumentPreviewUrl(null);
+      setDocumentPreviewError(null);
+      setDocumentPreviewLoading(false);
+      return;
+    }
+    let disposed = false;
+    let objectUrl: string | null = null;
+    setDocumentPreviewLoading(true);
+    setDocumentPreviewError(null);
+    setDocumentPreviewUrl(null);
+    void api.reportDocumentPreview(selectedReport.code, reportFilters)
+      .then((file) => {
+        if (disposed) return;
+        objectUrl = URL.createObjectURL(file.blob);
+        setDocumentPreviewUrl(objectUrl);
+      })
+      .catch((error: unknown) => {
+        if (!disposed) setDocumentPreviewError(error instanceof Error ? error.message : "The PDF preview could not be generated.");
+      })
+      .finally(() => {
+        if (!disposed) setDocumentPreviewLoading(false);
+      });
+    return () => {
+      disposed = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [previewRevision, reportFilters, selectedReport?.code, viewerTab, workspace]);
 
   const createSubscription = useMutation({
     mutationFn: ({ report, draft }: { report: ReportRow; draft: ScheduleDraft }) => api.createReportSubscription({
@@ -158,8 +167,8 @@ export function ReportsPage() {
 
   async function download(report: ReportRow, format: ReportFormat) {
     try {
-      saveDownloadedFile(await api.downloadReport(report.code, format));
-      toasts.push("info", "Report Download Ready", `${formatLabel(format)} report generated through Jasper Reports.`);
+      saveDownloadedFile(await api.downloadReport(report.code, format, reportFilters));
+      toasts.push("info", "Report Download Ready", `${formatLabel(format)} report generated.`);
     } catch (error) {
       toasts.push("error", "Report Download Failed", error instanceof Error ? error.message : "Download failed.");
     }
@@ -179,7 +188,7 @@ export function ReportsPage() {
   return <>
     <div className="page-head reports-page-head">
       <div>
-        <span className="eyebrow">Jasper Reporting</span>
+        <span className="eyebrow">Reporting</span>
         <h1>CRM Reports</h1>
         <p>View governed operational reports or build custom analytics from one controlled reporting workspace.</p>
       </div>
@@ -204,30 +213,102 @@ export function ReportsPage() {
     </nav>
 
     {workspace === "REPORTS_STUDIO" ? <>
-      <section className="jasper-report-grid panel" aria-label="Jasper Report Grid">
-        <header className="jasper-report-grid-head">
-          <div><span className="eyebrow">Jasper Report Grid</span><h2>Governed Report Catalogue</h2>
-            <p>Filter, sort or group the complete portfolio, then open any report in the document viewer.</p></div>
-          <div className="jasper-engine-status"><span aria-hidden="true" /><strong>Jasper Engine Ready</strong><small>PDF · Excel · Word</small></div>
-        </header>
-        {reportsQ.isLoading && <p className="loading-note">Loading Jasper Reports...</p>}
-        {reportsQ.isError && <p className="empty-note">Reports Could Not Be Loaded.</p>}
-        {reportsQ.isSuccess && <DataTable name="Jasper Reports" columns={REPORT_GRID_COLUMNS} rows={reports}
-          rowKey={(report) => report.id} empty="No Jasper reports match the current filters."
-          actionsHeader="Preview"
-          actions={(report) => <button className={`btn btn-sm${selectedReport?.code === report.code ? " primary" : ""}`}
-            aria-pressed={selectedReport?.code === report.code} onClick={() => setSelectedCode(report.code)}>
-            {selectedReport?.code === report.code ? "Viewing" : "View Report"}
-          </button>}
-          note="Every preview and download uses the same tenant-scoped report query and is recorded through the reporting audit trail." />}
+      <section className="reports-studio-shell" aria-label="Reports Studio">
+        {/* The library collapses to an icon rail.
+            The hamburger is the only control that stays visible in both states,
+            so there is always a way back out — a collapse control that collapses
+            with the thing it controls is a trap. Collapsed items keep their
+            `title` and `aria-label`, so the report name is still reachable by
+            hover and by screen reader when the visible glyph is just its mark. */}
+        <aside
+          className={`report-library${libraryOpen ? "" : " is-collapsed"}`}
+          aria-label="Report library"
+        >
+          <header className="report-library-head">
+            <button
+              type="button"
+              className="icon-btn report-library-toggle"
+              aria-expanded={libraryOpen}
+              aria-controls="report-library-list"
+              aria-label={libraryOpen ? "Collapse the report list" : "Expand the report list"}
+              title={libraryOpen ? "Collapse the report list" : "Expand the report list"}
+              onClick={() => setLibraryOpen((open) => !open)}
+            >
+              <MenuIcon />
+            </button>
+            {libraryOpen && (
+              <div>
+                <span className="eyebrow">Report Library</span>
+                <h2>Choose A Report</h2>
+                <p>Select a governed CRM report to display its complete grid and document preview.</p>
+              </div>
+            )}
+          </header>
+
+          {libraryOpen && <>
+            <label className="report-library-search">
+              <span>Search Reports</span>
+              <input type="search" value={search} onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search title, question or role" />
+            </label>
+            <div className="report-collection-filter" role="group" aria-label="Filter By Collection">
+              <button className={collection === "ALL" ? "active" : ""} onClick={() => setCollection("ALL")}>All</button>
+              {collections.map((value) => <button key={value} className={collection === value ? "active" : ""}
+                onClick={() => setCollection(value)}>{categoryLabel(value)}</button>)}
+            </div>
+          </>}
+
+          <div className="report-library-list" id="report-library-list" role="listbox" aria-label="Available Reports">
+            {reportsQ.isLoading && libraryOpen && <p className="loading-note">Loading Reports...</p>}
+            {reportsQ.isError && libraryOpen && <p className="empty-note">Reports Could Not Be Loaded.</p>}
+            {visibleReports.map((report) => (
+              <button key={report.id} role="option" aria-selected={selectedReport?.code === report.code}
+                className={`report-library-item${selectedReport?.code === report.code ? " active" : ""}`}
+                title={`${report.label} — ${categoryLabel(report.category)}`}
+                aria-label={report.label}
+                onClick={() => setSelectedCode(report.code)}>
+                {/* The mark. Two letters from the collection, so every report in
+                    a collection shares a glyph and the rail reads as grouped
+                    even with no labels. Shown in both states: expanded it is the
+                    row's leading badge, collapsed it is the whole row. */}
+                <span className="report-library-mark" aria-hidden="true">
+                  {collectionMark(report.category)}
+                </span>
+                {libraryOpen && <span className="report-library-text">
+                  <span className="report-library-collection">{categoryLabel(report.category)}</span>
+                  <strong>{report.label}</strong>
+                  <small>{report.businessQuestion}</small>
+                </span>}
+              </button>
+            ))}
+            {reportsQ.isSuccess && visibleReports.length === 0 && libraryOpen
+              && <p className="empty-note">No Reports Match This Search.</p>}
+          </div>
+
+          {libraryOpen && (
+            <footer className="report-library-status">
+              <span aria-hidden="true" />
+              <div>
+                <strong>Reporting Engine Ready</strong>
+                <small>{reports.length} reports · PDF · Excel · Word</small>
+              </div>
+            </footer>
+          )}
+        </aside>
+
+        {!fullPreview && <ReportDocumentWorkspace report={selectedReport} preview={preview} previewLoading={previewLoading}
+          previewError={previewError} documentPreviewUrl={documentPreviewUrl} documentPreviewLoading={documentPreviewLoading}
+          documentPreviewError={documentPreviewError} full={false} activeTab={viewerTab} onTabChange={setViewerTab}
+          onDownload={download} onSchedule={openSchedule}
+          reportFilters={reportFilters} reportPage={reportPage} onReportFiltersChange={(next) => { setReportFilters(next); setReportPage(0); }} onReportPageChange={setReportPage}
+          onRefresh={() => setPreviewRevision((value) => value + 1)} onToggleFull={() => setFullPreview(true)} />}
       </section>
 
-      {!fullPreview && <ReportDocumentWorkspace report={selectedReport} preview={preview} previewLoading={previewLoading}
-        previewError={previewError} full={false} onDownload={download} onSchedule={openSchedule}
-        onRefresh={() => setPreviewRevision((value) => value + 1)} onToggleFull={() => setFullPreview(true)} />}
-
       {fullPreview && createPortal(<ReportDocumentWorkspace report={selectedReport} preview={preview} previewLoading={previewLoading}
-        previewError={previewError} full onDownload={download} onSchedule={openSchedule}
+        previewError={previewError} documentPreviewUrl={documentPreviewUrl} documentPreviewLoading={documentPreviewLoading}
+        documentPreviewError={documentPreviewError} full activeTab={viewerTab} onTabChange={setViewerTab}
+        onDownload={download} onSchedule={openSchedule}
+        reportFilters={reportFilters} reportPage={reportPage} onReportFiltersChange={(next) => { setReportFilters(next); setReportPage(0); }} onReportPageChange={setReportPage}
         onRefresh={() => setPreviewRevision((value) => value + 1)} onToggleFull={() => setFullPreview(false)} />, document.body)}
 
       <section className="panel report-subscriptions" aria-label="Report Subscriptions">
@@ -285,9 +366,18 @@ function ReportDocumentWorkspace({
   preview,
   previewLoading,
   previewError,
+  documentPreviewUrl,
+  documentPreviewLoading,
+  documentPreviewError,
   full,
+  activeTab,
+  onTabChange,
   onDownload,
   onSchedule,
+  reportFilters,
+  reportPage,
+  onReportFiltersChange,
+  onReportPageChange,
   onRefresh,
   onToggleFull,
 }: {
@@ -295,9 +385,18 @@ function ReportDocumentWorkspace({
   preview: ReportPreview | null;
   previewLoading: boolean;
   previewError: string | null;
+  documentPreviewUrl: string | null;
+  documentPreviewLoading: boolean;
+  documentPreviewError: string | null;
   full: boolean;
+  activeTab: ReportViewerTab;
+  onTabChange: (tab: ReportViewerTab) => void;
   onDownload: (report: ReportRow, format: ReportFormat) => Promise<void>;
   onSchedule: (report: ReportRow) => void;
+  reportFilters: ReportGridFilters;
+  reportPage: number;
+  onReportFiltersChange: (filters: ReportGridFilters) => void;
+  onReportPageChange: (page: number) => void;
   onRefresh: () => void;
   onToggleFull: () => void;
 }) {
@@ -321,8 +420,20 @@ function ReportDocumentWorkspace({
         <div><span>Recommended For</span><p>{(report.audience ?? []).map(roleLabel).join(" · ")}</p></div>
         <div><span>Available Formats</span><p>{report.allowedFormats.map(formatLabel).join(" · ")}</p></div>
       </div>
+      <div className="report-view-tabs" role="tablist" aria-label="Report View">
+        <button id="report-grid-tab" type="button" role="tab" aria-selected={activeTab === "GRID"}
+          aria-controls="report-grid-panel" className={activeTab === "GRID" ? "active" : ""}
+          onClick={() => onTabChange("GRID")}>
+          <strong>Report Grid</strong><span>Work with the current report rows.</span>
+        </button>
+        <button id="report-document-tab" type="button" role="tab" aria-selected={activeTab === "DOCUMENT"}
+          aria-controls="report-document-panel" className={activeTab === "DOCUMENT" ? "active" : ""}
+          onClick={() => onTabChange("DOCUMENT")}>
+          <strong>Document Preview</strong><span>Review the formatted document.</span>
+        </button>
+      </div>
       <div className="report-preview-toolbar">
-        <div><span className="eyebrow">Full Report Preview</span><small>Same Governed Data As Jasper Downloads</small></div>
+        <div><span className="eyebrow">{activeTab === "GRID" ? "Current Report Grid" : "Document Preview"}</span><small>Same Governed Data As The Downloads</small></div>
         <div>
           <button className="btn btn-sm" disabled={previewLoading} onClick={onRefresh}>
             {previewLoading ? "Generating Preview..." : "Refresh Preview"}
@@ -330,26 +441,172 @@ function ReportDocumentWorkspace({
           <button className="btn btn-sm" onClick={onToggleFull}>{full ? "Restore View" : "Full View"}</button>
         </div>
       </div>
-      <div className="report-preview-frame">
-        {previewLoading && <div className="report-preview-state"><span className="spinner" /><strong>Generating Complete Report Preview...</strong><p>The same governed report query used by Jasper is being prepared.</p></div>}
-        {previewError && <div className="report-preview-state is-error"><strong>Preview Could Not Be Generated</strong><p>{previewError}</p><button className="btn btn-sm" onClick={onRefresh}>Retry Preview</button></div>}
-        {preview && !previewLoading && <div className="report-rendered-document" aria-label={`${report.label} Complete Report Preview`}>
-          <header>
-            <div><span className="eyebrow">{categoryLabel(preview.category)} Report</span><h3>{preview.label}</h3><p>{preview.description}</p></div>
-            <dl><div><dt>Company</dt><dd>{preview.tenantName}</dd></div><div><dt>Generated</dt><dd>{new Date(preview.generatedAt).toLocaleString()}</dd></div></dl>
-          </header>
-          <div className="report-rendered-question"><span>Business Question</span><strong>{preview.businessQuestion}</strong></div>
-          <div className="table-wrap"><table className="data-table report-rendered-table">
-            <thead><tr><th>{preview.columns.dimension}</th><th>{preview.columns.value}</th><th>{preview.columns.detail}</th><th>{preview.columns.signal}</th></tr></thead>
-            <tbody>{preview.rows.map((row, index) => <tr key={`${row.metric}-${index}`}>
-              <td><strong>{row.metric}</strong></td><td className="mono num">{row.value}</td><td>{row.detail}</td><td><span className={`report-signal signal-${signalClass(row.signal)}`}>{titleCase(row.signal)}</span></td>
-            </tr>)}{preview.rows.length === 0 && <tr><td colSpan={4} className="empty-note">No Matching Report Data.</td></tr>}</tbody>
-          </table></div>
-          <footer><span>Generated By Axiom Jasper Reporting</span><span>{preview.rows.length} Report Rows</span></footer>
-        </div>}
+      <div id={activeTab === "GRID" ? "report-grid-panel" : "report-document-panel"} className="report-preview-frame"
+        role="tabpanel" aria-labelledby={activeTab === "GRID" ? "report-grid-tab" : "report-document-tab"}>
+        {activeTab === "GRID" && previewLoading && <div className="report-preview-state"><span className="spinner" /><strong>Generating Current Report Grid...</strong><p>The governed report query is being prepared.</p></div>}
+        {activeTab === "GRID" && previewError && <div className="report-preview-state is-error"><strong>Grid Could Not Be Generated</strong><p>{previewError}</p><button className="btn btn-sm" onClick={onRefresh}>Retry Grid</button></div>}
+        {preview && !previewLoading && activeTab === "GRID" && <ReportGridView report={report} preview={preview}
+          filters={reportFilters} page={reportPage} onFiltersChange={onReportFiltersChange} onPageChange={onReportPageChange} />}
+        {activeTab === "DOCUMENT" && documentPreviewLoading && <div className="report-preview-state"><span className="spinner" /><strong>Rendering PDF...</strong><p>Axiom is creating an authenticated, tenant-scoped document preview.</p></div>}
+        {activeTab === "DOCUMENT" && documentPreviewError && <div className="report-preview-state is-error"><strong>PDF Preview Could Not Be Generated</strong><p>{documentPreviewError}</p><button className="btn btn-sm" onClick={onRefresh}>Retry PDF Preview</button></div>}
+        {activeTab === "DOCUMENT" && documentPreviewUrl && !documentPreviewLoading && <PdfDocumentViewer
+          url={documentPreviewUrl} title={`${report.label} PDF Preview`} />}
       </div>
     </> : <div className="report-preview-state"><strong>Choose A Report</strong><p>Select a report from the library to view its complete document.</p></div>}
   </section>;
+}
+
+function ReportGridView({ report, preview, filters, page, onFiltersChange, onPageChange }: {
+  report: ReportRow;
+  preview: ReportPreview;
+  filters: ReportGridFilters;
+  page: number;
+  onFiltersChange: (filters: ReportGridFilters) => void;
+  onPageChange: (page: number) => void;
+}) {
+  const rows = preview.rows.items;
+  const activeFilters = Object.values(filters).filter((value) => value?.trim()).length;
+
+  function updateFilters(next: Record<string, string>) {
+    onFiltersChange({
+      search: next.search ?? filters.search ?? "",
+      metric: next.metric ?? "",
+      value: next.value ?? "",
+      detail: next.detail ?? "",
+      signal: next.signal ?? "",
+    });
+  }
+
+  return <div className="report-grid-view" aria-label={`${report.label} Current Report Grid`}>
+    <header>
+      <div><span className="eyebrow">Current Governed Dataset</span><h3>{report.label}</h3>
+        <p>Search and column filters run on the server. Downloads use the same complete filtered result.</p></div>
+      <div className="report-grid-count"><strong>{preview.rows.total}</strong><span>Matching Rows</span></div>
+    </header>
+    <div className="report-grid-query" role="search" aria-label={`${report.label} report search`}>
+      <label><span>Search All Columns</span><input type="search" value={filters.search ?? ""}
+        placeholder="Search the complete report"
+        onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })} /></label>
+      <div>
+        <span>{activeFilters} Active Filter{activeFilters === 1 ? "" : "s"}</span>
+        <button type="button" className="btn btn-sm" disabled={activeFilters === 0}
+          onClick={() => onFiltersChange(EMPTY_REPORT_FILTERS)}>Reset Filters</button>
+      </div>
+    </div>
+    <div className="table-wrap"><table className="data-table report-current-grid">
+      <thead><tr><th>{preview.columns.dimension}</th><th>{preview.columns.value}</th><th>{preview.columns.detail}</th><th>{preview.columns.signal}</th></tr>
+        <GridFilterRow columns={[
+          { key: "metric", label: preview.columns.dimension },
+          { key: "value", label: preview.columns.value },
+          { key: "detail", label: preview.columns.detail },
+          { key: "signal", label: preview.columns.signal },
+        ]} filters={filters as Record<string, string>} onChange={updateFilters} />
+      </thead>
+      <tbody>{rows.map((row, index) => <tr key={`${row.metric}-${page}-${index}`}>
+        <td><strong>{row.metric}</strong></td><td className="mono num">{row.value}</td><td>{row.detail}</td>
+        <td><span className={`report-signal signal-${signalClass(row.signal)}`}>{titleCase(row.signal)}</span></td>
+      </tr>)}{rows.length === 0 && <tr><td colSpan={4} className="empty-note">No Report Rows Match This Search And Filter.</td></tr>}</tbody>
+    </table></div>
+    <footer className="report-grid-footer">
+      <div><span>{preview.tenantName}</span><span>Generated {new Date(preview.generatedAt).toLocaleString()}</span></div>
+      <div className="page-controls" aria-label="Report pagination">
+        <span>Showing {rows.length} of {preview.rows.total} records - {preview.rows.size} rows per page</span>
+        <div>
+          <button className="btn btn-sm" disabled={page === 0} onClick={() => onPageChange(Math.max(0, page - 1))}>Previous</button>
+          <strong>Page {preview.rows.totalPages === 0 ? 0 : page + 1} of {preview.rows.totalPages}</strong>
+          <button className="btn btn-sm" disabled={page + 1 >= preview.rows.totalPages} onClick={() => onPageChange(page + 1)}>Next</button>
+        </div>
+      </div>
+    </footer>
+  </div>;
+}
+
+function PdfDocumentViewer({ url, title }: { url: string; title: string }) {
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [document, setDocument] = useState<PDFDocumentProxy | null>(null);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [zoom, setZoom] = useState(1.15);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const renderTaskRef = useRef<RenderTask | null>(null);
+
+  useEffect(() => {
+    const loadingTask = getDocument({ url });
+    let disposed = false;
+    setLoading(true);
+    setError(null);
+    setDocument(null);
+    setPageNumber(1);
+    void loadingTask.promise
+      .then((pdf) => {
+        if (!disposed) setDocument(pdf);
+      })
+      .catch((reason: unknown) => {
+        if (!disposed) setError(reason instanceof Error ? reason.message : "The PDF could not be opened.");
+      })
+      .finally(() => {
+        if (!disposed) setLoading(false);
+      });
+    return () => {
+      disposed = true;
+      renderTaskRef.current?.cancel();
+      void loadingTask.destroy();
+    };
+  }, [url]);
+
+  useEffect(() => {
+    if (!document || !canvasRef.current) return;
+    let disposed = false;
+    renderTaskRef.current?.cancel();
+    void document.getPage(pageNumber).then((page) => {
+      if (disposed || !canvasRef.current) return;
+      const canvas = canvasRef.current;
+      const viewport = page.getViewport({ scale: zoom });
+      const outputScale = Math.max(1, window.devicePixelRatio || 1);
+      const context = canvas.getContext("2d", { alpha: false });
+      if (!context) throw new Error("Canvas rendering is unavailable in this browser.");
+      canvas.width = Math.floor(viewport.width * outputScale);
+      canvas.height = Math.floor(viewport.height * outputScale);
+      canvas.style.width = `${Math.floor(viewport.width)}px`;
+      canvas.style.height = `${Math.floor(viewport.height)}px`;
+      const renderTask = page.render({
+        canvas,
+        canvasContext: context,
+        viewport,
+        transform: outputScale === 1 ? undefined : [outputScale, 0, 0, outputScale, 0, 0],
+      });
+      renderTaskRef.current = renderTask;
+      return renderTask.promise;
+    }).catch((reason: unknown) => {
+      if (!disposed && reason instanceof Error && reason.name !== "RenderingCancelledException") setError(reason.message);
+    });
+    return () => {
+      disposed = true;
+      renderTaskRef.current?.cancel();
+    };
+  }, [document, pageNumber, zoom]);
+
+  const pageCount = document?.numPages ?? 0;
+  return <div className="report-pdf-viewer" aria-label={title}>
+    <div className="report-pdf-toolbar" aria-label="PDF Viewer Controls">
+      <div>
+        <button className="btn btn-sm" disabled={pageNumber <= 1} onClick={() => setPageNumber((value) => Math.max(1, value - 1))}>Previous Page</button>
+        <span aria-live="polite">Page {pageNumber} Of {pageCount || "—"}</span>
+        <button className="btn btn-sm" disabled={!pageCount || pageNumber >= pageCount} onClick={() => setPageNumber((value) => Math.min(pageCount, value + 1))}>Next Page</button>
+      </div>
+      <div>
+        <button className="btn btn-sm" disabled={zoom <= .65} aria-label="Zoom Out" onClick={() => setZoom((value) => Math.max(.65, value - .15))}>−</button>
+        <span aria-live="polite">{Math.round(zoom * 100)}%</span>
+        <button className="btn btn-sm" disabled={zoom >= 2} aria-label="Zoom In" onClick={() => setZoom((value) => Math.min(2, value + .15))}>+</button>
+        <a className="btn btn-sm" href={url} target="_blank" rel="noreferrer">Open PDF</a>
+      </div>
+    </div>
+    <div className="report-pdf-canvas-stage">
+      {loading && <div className="report-preview-state"><span className="spinner" /><strong>Opening PDF Document...</strong></div>}
+      {error && <div className="report-preview-state is-error"><strong>PDF Could Not Be Displayed</strong><p>{error}</p><a className="btn btn-sm" href={url} target="_blank" rel="noreferrer">Open PDF</a></div>}
+      <canvas ref={canvasRef} hidden={loading || !!error} aria-label={`PDF page ${pageNumber} of ${pageCount}`} />
+    </div>
+  </div>;
 }
 
 function compareReports(left: ReportRow, right: ReportRow): number {
@@ -390,4 +647,23 @@ function signalClass(value: string): string {
   if (/risk|overdue|missing|stale|critical|fail|late/.test(normalized)) return "risk";
   if (/active|healthy|won|complete|converted|forecast/.test(normalized)) return "positive";
   return "neutral";
+}
+
+/**
+ * A two-letter mark for a report collection.
+ *
+ * <p>Reports have no icon of their own — they are rows in a catalogue, not
+ * features — so the collapsed rail needs a glyph derived from data that exists.
+ * The collection initials do the job: every report in a collection shares a mark,
+ * which means the collapsed rail still reads as GROUPED rather than as twenty-one
+ * identical squares. The report name stays reachable through the title attribute
+ * and aria-label, so nothing is only communicated by the mark.
+ */
+function collectionMark(value: ReportDefinition["category"] | string | null | undefined): string {
+  const key = String(value ?? "GENERAL").toUpperCase();
+  const marks: Record<string, string> = {
+    EXECUTIVE: "EX", SALES: "SL", GROWTH: "GR", CUSTOMER: "CU",
+    COMMERCIAL: "CM", GOVERNANCE: "GV", GENERAL: "GN",
+  };
+  return marks[key] ?? key.slice(0, 2);
 }

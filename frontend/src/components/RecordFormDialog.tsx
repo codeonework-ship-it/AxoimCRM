@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ApiError } from "../api/client";
 import { InlineLoader } from "./Loaders";
 import { CloseIcon } from "./icons";
+import { useAppDialog } from "./AppDialog";
 
 /**
  * The create / edit / clone dialog every object authors through.
@@ -71,11 +72,22 @@ interface RecordFormDialogProps<T extends object> {
   onSubmit: (values: Partial<T>, extra: { acknowledgeDuplicates: boolean; duplicateReason: string | null }) => Promise<void>;
   /** Rendered under the fields — related-record pickers, say. */
   children?: ReactNode;
+  editLock?: {
+    checking: boolean;
+    blocked: boolean;
+    message: string | null;
+    holderName?: string | null;
+    expiresAt?: string | null;
+    canForceRelease?: boolean;
+    onRetry: () => void;
+    onForceRelease?: () => Promise<void>;
+  };
 }
 
 export function RecordFormDialog<T extends object>({
-  open, mode, objectLabel, fields, initial, busy = false, onClose, onSubmit, children,
+  open, mode, objectLabel, fields, initial, busy = false, onClose, onSubmit, children, editLock,
 }: RecordFormDialogProps<T>) {
+  const dialog = useAppDialog();
   const [values, setValues] = useState<Partial<T>>(initial);
   const [dirty, setDirty] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -103,7 +115,7 @@ export function RecordFormDialog<T extends object>({
   useEffect(() => {
     if (!open) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") attemptClose();
+      if (event.key === "Escape") void attemptClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -112,10 +124,18 @@ export function RecordFormDialog<T extends object>({
 
   if (!open) return null;
 
-  function attemptClose() {
-    if (!dirty || window.confirm(`Discard this ${objectLabel}? Your changes have not been saved.`)) {
+  async function attemptClose() {
+    if (!dirty) {
       onClose();
+      return;
     }
+    const discard = await dialog.confirm({
+      title: `Discard ${objectLabel}`,
+      message: `Discard this ${objectLabel}? Your changes have not been saved.`,
+      confirmLabel: "Discard Changes",
+      tone: "danger",
+    });
+    if (discard) onClose();
   }
 
   function setValue(key: string, value: unknown) {
@@ -166,10 +186,11 @@ export function RecordFormDialog<T extends object>({
   const title = mode === "create" ? `New ${objectLabel}`
     : mode === "clone" ? `Clone ${objectLabel}`
       : `Edit ${objectLabel}`;
+  const authoringBlocked = mode === "edit" && !!editLock?.blocked;
 
   return (
     <div className="record-scrim" role="presentation"
-      onMouseDown={(event) => { if (event.target === event.currentTarget) attemptClose(); }}>
+      onMouseDown={(event) => { if (event.target === event.currentTarget) void attemptClose(); }}>
       <div className="panel record-dialog" role="dialog" aria-modal="true" aria-labelledby="record-dialog-title">
         <header className="record-dialog-head">
           <div>
@@ -186,6 +207,27 @@ export function RecordFormDialog<T extends object>({
             Everything except the identifying fields is copied. Fill those in before saving —
             a clone is a new record, not a second copy of the original.
           </p>
+        )}
+
+        {mode === "edit" && editLock?.checking && (
+          <div className="record-lock-banner is-checking" role="status">
+            <strong>Checking edit availability...</strong>
+            <p>Axiom is reserving this record before the form becomes editable.</p>
+          </div>
+        )}
+
+        {mode === "edit" && editLock && !editLock.checking && editLock.blocked && (
+          <div className="record-lock-banner is-blocked" role="alert">
+            <strong>{editLock.holderName ? `${editLock.holderName} is editing this record.` : "This record cannot be edited right now."}</strong>
+            <p>{editLock.message ?? "The edit lease could not be acquired. Your record remains safe to view."}</p>
+            {editLock.expiresAt && <p className="sub">Lease expires {new Date(editLock.expiresAt).toLocaleString()} unless the editor renews it.</p>}
+            <div className="inline-actions">
+              <button type="button" className="btn btn-sm" onClick={editLock.onRetry}>Retry Lock</button>
+              {editLock.canForceRelease && editLock.onForceRelease && (
+                <button type="button" className="btn btn-sm danger-link" onClick={() => void editLock.onForceRelease?.()}>Force Unlock</button>
+              )}
+            </div>
+          </div>
         )}
 
         {conflict && (
@@ -234,7 +276,7 @@ export function RecordFormDialog<T extends object>({
                   {field.kind === "select" ? (
                     <select
                       ref={index === 0 ? (firstFieldRef as React.Ref<HTMLSelectElement>) : undefined}
-                      value={String(value)} required={field.required}
+                      value={String(value)} required={field.required} disabled={authoringBlocked}
                       onChange={(event) => setValue(field.key, event.target.value || null)}>
                       <option value="">Select…</option>
                       {(field.options ?? []).map((option) => (
@@ -244,14 +286,14 @@ export function RecordFormDialog<T extends object>({
                   ) : field.kind === "textarea" ? (
                     <textarea
                       ref={index === 0 ? (firstFieldRef as React.Ref<HTMLTextAreaElement>) : undefined}
-                      rows={3} value={String(value)} required={field.required}
+                      rows={3} value={String(value)} required={field.required} disabled={authoringBlocked}
                       placeholder={field.placeholder}
                       onChange={(event) => setValue(field.key, event.target.value)} />
                   ) : (
                     <input
                       ref={index === 0 ? (firstFieldRef as React.Ref<HTMLInputElement>) : undefined}
                       type={field.kind === "number" ? "number" : field.kind ?? "text"}
-                      value={String(value)} required={field.required}
+                      value={String(value)} required={field.required} disabled={authoringBlocked}
                       placeholder={field.placeholder}
                       onChange={(event) => setValue(field.key, event.target.value)} />
                   )}
@@ -265,7 +307,7 @@ export function RecordFormDialog<T extends object>({
 
           <footer className="record-form-actions">
             <button className="btn" type="button" onClick={attemptClose}>Cancel</button>
-            <button className="btn btn-primary" type="submit" disabled={saving || busy}>
+            <button className="btn btn-primary" type="submit" disabled={saving || busy || authoringBlocked}>
               {saving ? <InlineLoader label="Saving" />
                 : candidates.length > 0 ? "Save anyway"
                   : mode === "edit" ? "Save changes" : `Create ${objectLabel}`}

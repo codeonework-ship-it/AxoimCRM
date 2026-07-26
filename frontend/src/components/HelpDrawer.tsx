@@ -111,7 +111,7 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
             <span className="eyebrow">Admin modules</span>
             <ol className="guide-steps">
               <li><span>05</span><div><strong>RBAC first</strong><p>Review role policies before changing users, trials, company status, billing or alerts.</p></div></li>
-              <li><span>06</span><div><strong>Reports</strong><p>Use Reports for Jasper-generated PDF, Excel and Word downloads for the selected workspace.</p></div></li>
+              <li><span>06</span><div><strong>Reports</strong><p>Use Reports for governed PDF, Excel and Word downloads for the selected workspace.</p></div></li>
               <li><span>07</span><div><strong>Alert queues</strong><p>Email and report alerts are validated and queued internally until third-party delivery is connected.</p></div></li>
             </ol>
           </section>

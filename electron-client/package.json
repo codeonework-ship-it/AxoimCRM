@@ -6,6 +6,7 @@
   "main": "main.js",
   "scripts": {
     "start": "electron .",
+    "audit:visual": "electron scripts/visual-audit.cjs",
     "package": "node scripts/package-desktop.cjs",
     "publish:local": "npm run package"
   },

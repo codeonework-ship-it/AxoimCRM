@@ -185,6 +185,23 @@ export interface ContactDetail {
   version: number;
 }
 
+export interface RecordLock {
+  objectType: string;
+  recordId: string;
+  holderId: string;
+  holderEmail: string;
+  holderName: string | null;
+  acquiredAt: string;
+  expiresAt: string;
+  heldByMe: boolean;
+  heartbeatSeconds: number;
+}
+
+export interface RecordLockStatus {
+  locked: boolean;
+  lock: RecordLock | null;
+}
+
 export interface ContactRequest {
   firstName: string;
   lastName: string;
@@ -249,6 +266,20 @@ export interface SavedViewDefinition {
   sort?: { key: string; direction: 1 | -1 } | null;
   columnOrder?: string[];
   hiddenColumns?: string[];
+}
+
+/**
+ * One client-observed event. `ageMs` is how long ago the client saw it — the
+ * server timestamps on receipt and keeps this only as evidence, so a wrong client
+ * clock cannot reorder the audit trail. `action` must be in the server's closed
+ * vocabulary; anything else is skipped rather than failing the batch.
+ */
+export interface UiEventReport {
+  action: string;
+  screen: string;
+  objectType?: string | null;
+  objectId?: string | null;
+  ageMs?: number;
 }
 
 /**
@@ -662,7 +693,17 @@ export interface ReportPreview {
   tenantName: string;
   generatedAt: string;
   columns: { dimension: string; value: string; detail: string; signal: string };
-  rows: Array<{ metric: string; value: string; detail: string; signal: string }>;
+  rows: PageResult<{ metric: string; value: string; detail: string; signal: string }>;
+}
+
+export interface ReportGridParams {
+  page?: number;
+  size?: number;
+  search?: string;
+  metric?: string;
+  value?: string;
+  detail?: string;
+  signal?: string;
 }
 
 export interface EmailAlert {
@@ -1177,6 +1218,26 @@ export const api = {
     return request<ContactDetail[]>("GET", `/contacts/full${queryString(params)}`);
   },
 
+  recordLockStatus(objectType: string, recordId: string): Promise<RecordLockStatus> {
+    return request<RecordLockStatus>("GET", `/record-locks/${encodeURIComponent(objectType)}/${encodeURIComponent(recordId)}`);
+  },
+
+  acquireRecordLock(objectType: string, recordId: string): Promise<RecordLock> {
+    return request<RecordLock>("POST", `/record-locks/${encodeURIComponent(objectType)}/${encodeURIComponent(recordId)}`);
+  },
+
+  heartbeatRecordLock(objectType: string, recordId: string): Promise<RecordLock> {
+    return request<RecordLock>("PUT", `/record-locks/${encodeURIComponent(objectType)}/${encodeURIComponent(recordId)}/heartbeat`);
+  },
+
+  releaseRecordLock(objectType: string, recordId: string): Promise<void> {
+    return request<void>("DELETE", `/record-locks/${encodeURIComponent(objectType)}/${encodeURIComponent(recordId)}`);
+  },
+
+  forceReleaseRecordLock(objectType: string, recordId: string): Promise<{ message: string }> {
+    return request<{ message: string }>("POST", `/record-locks/${encodeURIComponent(objectType)}/${encodeURIComponent(recordId)}/force-release`);
+  },
+
   contact(id: string): Promise<ContactDetail> {
     return request<ContactDetail>("GET", `/contacts/${encodeURIComponent(id)}`);
   },
@@ -1204,6 +1265,16 @@ export const api = {
 
   deleteContact(id: string, reason?: string): Promise<void> {
     return request<void>("DELETE", `/contacts/${encodeURIComponent(id)}${queryString({ reason })}`);
+  },
+
+  /* ----------------------------------------------------- ui activity log ----
+     Append-only. The client reports WHAT happened; the server supplies the actor
+     from the verified token and the timestamp from the database, so neither can
+     be forged from here. */
+
+  reportUiEvents(events: UiEventReport[]): Promise<{ received: number; accepted: number }> {
+    return request<{ received: number; accepted: number }>(
+      "POST", "/activity/ui-events", { events });
   },
 
   /* ----------------------------------------------------------------- ui ----
@@ -1464,12 +1535,37 @@ export const api = {
     return request<ReportDefinition[]>("GET", "/reports");
   },
 
-  reportPreview(code: string): Promise<ReportPreview> {
-    return request<ReportPreview>("GET", `/reports/${encodeURIComponent(code)}/preview`);
+  reportPreview(code: string, params?: ReportGridParams): Promise<ReportPreview> {
+    return request<ReportPreview>("GET", `/reports/${encodeURIComponent(code)}/preview${queryString({
+      page: params?.page ?? 0,
+      size: params?.size ?? 100,
+      search: params?.search,
+      metric: params?.metric,
+      value: params?.value,
+      detail: params?.detail,
+      signal: params?.signal,
+    })}`);
   },
 
-  downloadReport(code: string, format: "PDF" | "XLSX" | "DOCX"): Promise<DownloadedFile> {
-    return fileRequest(`/reports/${encodeURIComponent(code)}/download${queryString({ format })}`);
+  reportDocumentPreview(code: string, params?: ReportGridParams): Promise<DownloadedFile> {
+    return fileRequest(`/reports/${encodeURIComponent(code)}/document-preview${queryString({
+      search: params?.search,
+      metric: params?.metric,
+      value: params?.value,
+      detail: params?.detail,
+      signal: params?.signal,
+    })}`);
+  },
+
+  downloadReport(code: string, format: "PDF" | "XLSX" | "DOCX", params?: ReportGridParams): Promise<DownloadedFile> {
+    return fileRequest(`/reports/${encodeURIComponent(code)}/download${queryString({
+      format,
+      search: params?.search,
+      metric: params?.metric,
+      value: params?.value,
+      detail: params?.detail,
+      signal: params?.signal,
+    })}`);
   },
 
   reportSubscriptions(): Promise<ReportSubscription[]> {

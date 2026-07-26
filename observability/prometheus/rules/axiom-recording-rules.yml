@@ -1,0 +1,31 @@
+groups:
+  - name: axiom_api_sli_recording
+    interval: 30s
+    rules:
+      - record: job:axiom_http_requests:rate5m
+        expr: sum by (job) (rate(http_server_requests_seconds_count{job="axiom-api"}[5m]))
+
+      - record: job:axiom_http_5xx_ratio:rate5m
+        expr: |
+          sum by (job) (rate(http_server_requests_seconds_count{job="axiom-api",status=~"5.."}[5m]))
+          /
+          clamp_min(sum by (job) (rate(http_server_requests_seconds_count{job="axiom-api"}[5m])), 0.001)
+
+      - record: job:axiom_http_duration_seconds:p95_5m
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (job, le) (rate(http_server_requests_seconds_bucket{job="axiom-api"}[5m]))
+          )
+
+      - record: axiom:automation_failures:increase15m
+        expr: |
+          sum(increase(axiom_crm_operations_total{
+            job="axiom-api",module="automation",outcome=~"failed|halted"
+          }[15m])) or vector(0)
+
+      - record: axiom:approval_denials:increase15m
+        expr: |
+          sum(increase(axiom_crm_operations_total{
+            job="axiom-api",module="approval",outcome="denied"
+          }[15m])) or vector(0)

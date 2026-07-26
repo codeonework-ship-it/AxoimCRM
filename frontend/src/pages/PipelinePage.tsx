@@ -12,6 +12,7 @@ import { useToasts } from "../components/Toasts";
 import { formatDate, formatMoney, initials } from "../lib/format";
 import { LockIcon } from "../components/icons";
 import { BoardLoader } from "../components/Loaders";
+import { useAppDialog } from "../components/AppDialog";
 
 /** Move one opportunity between stages, immutably. Returns null if no-op. */
 function moveCard(
@@ -39,6 +40,7 @@ function moveCard(
 export function PipelinePage() {
   const queryClient = useQueryClient();
   const toasts = useToasts();
+  const dialog = useAppDialog();
 
   const boardQ = useQuery({
     queryKey: ["pipeline", "board"],
@@ -96,10 +98,14 @@ export function PipelinePage() {
       }
       let reason: string | undefined;
       if (gate.reasonRequired) {
-        const answer = window.prompt(
-          `${gate.transitionKind === "BACKWARD" ? "Moving backward" : "Skipping stages"} requires a reason.`,
-          "Customer process changed; reviewed by the opportunity owner.",
-        );
+        const answer = await dialog.prompt({
+          title: gate.transitionKind === "BACKWARD" ? "Reason For Moving Backward" : "Reason For Skipping Stages",
+          message: `${gate.transitionKind === "BACKWARD" ? "Moving backward" : "Skipping stages"} requires a reason so the opportunity history stays complete.`,
+          label: "Reason",
+          defaultValue: "Customer process changed; reviewed by the opportunity owner.",
+          required: true,
+          confirmLabel: "Continue Move",
+        });
         if (!answer?.trim()) return;
         reason = answer.trim();
       }

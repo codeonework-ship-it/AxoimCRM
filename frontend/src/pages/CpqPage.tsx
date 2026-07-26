@@ -12,6 +12,7 @@ import { useToasts } from "../components/Toasts";
 import { formatDate, formatMoney } from "../lib/format";
 import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
+import { useAppDialog } from "../components/AppDialog";
 
 type CpqSection = "products" | "price-books" | "quotes";
 
@@ -84,6 +85,7 @@ const QUOTE_FILTER_COLUMNS: GridFilterColumn[] = [
 
 export function CpqPage({ section }: CpqPageProps) {
   const toasts = useToasts();
+  const dialog = useAppDialog();
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
@@ -202,8 +204,16 @@ export function CpqPage({ section }: CpqPageProps) {
       {activeQ.isError && <p className="empty-note">CPQ records failed to load{activeQ.error instanceof Error ? `: ${activeQ.error.message}` : "."}</p>}
       {activeQ.isSuccess && section === "products" && <ProductTable rows={sortByGroups(productRows, selectedProductGroups, (row) => row.name)} groupColumns={selectedProductGroups} filters={columnFilters} onFiltersChange={setColumnFilters} />}
       {activeQ.isSuccess && section === "price-books" && <PriceBookTable rows={sortByGroups(priceBookRows, selectedPriceBookGroups, (row) => row.name)} groupColumns={selectedPriceBookGroups} filters={columnFilters} onFiltersChange={setColumnFilters} />}
-      {activeQ.isSuccess && section === "quotes" && <QuoteTable rows={sortByGroups(quoteRows, selectedQuoteGroups, (row) => row.quoteNumber)} groupColumns={selectedQuoteGroups} filters={columnFilters} onFiltersChange={setColumnFilters} onDownload={downloadQuote} revisingId={revisionMutation.variables?.quote.id} onRevise={(quote) => {
-        const reason = window.prompt(`Create a new immutable revision of ${quote.quoteNumber}. What changed?`, "Commercial terms updated after customer review.");
+      {activeQ.isSuccess && section === "quotes" && <QuoteTable rows={sortByGroups(quoteRows, selectedQuoteGroups, (row) => row.quoteNumber)} groupColumns={selectedQuoteGroups} filters={columnFilters} onFiltersChange={setColumnFilters} onDownload={downloadQuote} revisingId={revisionMutation.variables?.quote.id} onRevise={async (quote) => {
+        const reason = await dialog.prompt({
+          title: "Create Quote Revision",
+          message: `Create a new immutable revision of ${quote.quoteNumber}. Describe what changed for the audit history.`,
+          label: "Revision Note",
+          defaultValue: "Commercial terms updated after customer review.",
+          required: true,
+          multiline: true,
+          confirmLabel: "Create Revision",
+        });
         if (reason?.trim()) revisionMutation.mutate({ quote, reason: reason.trim() });
       }} />}
       {activeQ.isSuccess && <footer className="page-controls" aria-label="CPQ pagination">

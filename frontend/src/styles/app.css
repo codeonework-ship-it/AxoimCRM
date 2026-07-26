@@ -1389,9 +1389,164 @@ button {
   backdrop-filter:blur(7px) saturate(1.12);
 }
 
+/* ---- Application decision dialogs -----------------------------------------
+   Browser-owned alert/confirm/prompt windows cannot inherit an Axiom theme.
+   Every workflow decision therefore renders through AppDialogProvider and uses
+   only design tokens. The portal is attached to body, but theme tokens live on
+   :root, so Command Deck, Arctic Frost, Meridian, Mark VII and The Grid all
+   update the open dialog immediately. */
+.app-dialog-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
+  padding: 24px;
+  background: color-mix(in srgb, var(--steel-900) 72%, transparent);
+  backdrop-filter: blur(7px) saturate(1.08);
+}
+
+.app-dialog {
+  position: relative;
+  width: min(560px, calc(100vw - 48px));
+  max-height: calc(100dvh - 48px);
+  overflow: auto;
+  border: 1px solid var(--line-strong);
+  border-top: 2px solid var(--ion-600);
+  background: var(--paper-raised);
+  color: var(--ink);
+  box-shadow: 0 28px 96px color-mix(in srgb, var(--steel-900) 54%, transparent);
+  clip-path: var(--chamfer);
+}
+
+.app-dialog-danger { border-top-color: var(--crit); }
+
+.app-dialog-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid var(--line);
+  background: color-mix(in srgb, var(--paper-raised) 94%, var(--ion-100));
+}
+
+.app-dialog-head h2 {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: clamp(19px, 2vw, 23px);
+  line-height: 1.2;
+}
+
+.app-dialog-close {
+  flex: 0 0 38px;
+  width: 38px;
+  min-width: 38px;
+  height: 38px;
+}
+
+.app-dialog-body { padding: 20px 22px 22px; }
+
+.app-dialog-body > p {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.app-dialog-field {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.app-dialog-field > span {
+  color: var(--slate);
+  font: 800 10px/1.25 var(--font-mono);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.app-dialog-field em {
+  color: var(--crit);
+  font-style: normal;
+  letter-spacing: .05em;
+}
+
+.app-dialog-field input,
+.app-dialog-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  outline: none;
+  background: var(--paper);
+  color: var(--ink);
+  caret-color: var(--ion-600);
+  font: 13px/1.45 var(--font-ui);
+}
+
+.app-dialog-field textarea {
+  min-height: 108px;
+  resize: vertical;
+}
+
+.app-dialog-field input:focus,
+.app-dialog-field textarea:focus {
+  border-color: var(--ion-600);
+  box-shadow: 0 0 0 2px var(--ion-100);
+}
+
+.app-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 22px 20px;
+  border-top: 1px solid var(--line);
+  background: var(--paper-sunk);
+}
+
+.app-dialog-actions .btn {
+  min-width: 126px;
+  min-height: 40px;
+}
+
+.app-dialog-actions .btn-danger {
+  border-color: var(--crit);
+  background: var(--crit);
+  color: var(--paper-raised);
+}
+
+@media (max-width: 600px) {
+  .app-dialog-scrim { align-items: end; padding: 12px; }
+  .app-dialog { width: 100%; max-height: calc(100dvh - 24px); }
+  .app-dialog-head,
+  .app-dialog-body { padding-right: 18px; padding-left: 18px; }
+  .app-dialog-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    padding-right: 18px;
+    padding-left: 18px;
+  }
+  .app-dialog-actions .btn { width: 100%; min-width: 0; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .app-dialog { animation: app-dialog-enter 160ms var(--ease); }
+  @keyframes app-dialog-enter {
+    from { opacity: 0; transform: translateY(10px) scale(.985); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+}
+
 .trial-dialog {
   width:min(820px, calc(100vw - 48px));
-  max-height:calc(100dvh - 48px);
+  max-height:calc(100vh - 48px); max-height:calc(100dvh - 48px);
   overflow:auto;
   padding:0;
   border:1px solid var(--line-strong);
@@ -1639,7 +1794,7 @@ button {
   }
   .trial-dialog {
     width:100%;
-    max-height:calc(100dvh - 24px);
+    max-height:calc(100vh - 24px); max-height:calc(100dvh - 24px);
   }
   .trial-head,
   .trial-form,
@@ -1854,7 +2009,7 @@ button {
 
 /* Axiom 1.0 workspace foundation */
 .eyebrow { display:block; color:var(--slate); font-size:10px; font-weight:700; letter-spacing:.18em; line-height:1.3; text-transform:uppercase; }
-.shell { height:100dvh; }
+.shell { height:100vh; height:100dvh; }
 .shell-content { --shell-content-top-pad:30px; padding:30px 34px 48px; }
 
 /* Labelled command rail */
@@ -1887,7 +2042,7 @@ button {
 .bell-dot { display:none; }
 
 /* Signal center */
-.notif-pop { width:404px; max-height:min(620px,calc(100dvh - 82px)); overflow:hidden; border-top:2px solid var(--ion-600); }
+.notif-pop { width:404px; max-height:min(620px,calc(100vh - 82px)); max-height:min(620px,calc(100dvh - 82px)); overflow:hidden; border-top:2px solid var(--ion-600); }
 .notif-head { align-items:flex-end; padding:16px; }
 .notif-head>span { display:flex; flex-direction:column; gap:3px; }
 .notif-head strong { font-size:16px; }
@@ -1973,7 +2128,7 @@ button {
 
 /* Command palette and operator guide */
 .modal-scrim,.drawer-scrim { position:fixed; inset:0; z-index:100; display:flex; justify-content:center; align-items:flex-start; padding:clamp(24px,8vh,82px) 16px 16px; background:rgba(2,5,10,.72); backdrop-filter:blur(5px); }
-.command-palette { width:min(720px,100%); max-height:calc(100dvh - 48px); align-self:flex-start; overflow:auto; border:1px solid var(--line-strong); border-top:2px solid var(--ion-600); background:var(--paper-raised); box-shadow:0 24px 80px rgba(0,0,0,.48); }
+.command-palette { width:min(720px,100%); max-height:calc(100vh - 48px); max-height:calc(100dvh - 48px); align-self:flex-start; overflow:auto; border:1px solid var(--line-strong); border-top:2px solid var(--ion-600); background:var(--paper-raised); box-shadow:0 24px 80px rgba(0,0,0,.48); }
 .command-search { display:flex; align-items:center; gap:12px; padding:15px 16px; border-bottom:1px solid var(--line); color:var(--slate); }
 .command-search input { min-width:0; flex:1; padding:0; border:0; outline:0; background:transparent; color:var(--ink); font:15px var(--font-ui); }
 kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--radius); background:var(--paper-sunk); color:var(--slate); font:10px var(--font-mono); }
@@ -2045,8 +2200,8 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   .page-head { align-items:flex-start; flex-direction:column; gap:9px; }
   .lead-row { align-items:flex-start; flex-wrap:wrap; }
   .lead-row .chip { margin-left:0 !important; }
-  .notif-pop { position:fixed; top:58px; right:0; width:100vw; max-height:calc(100dvh - 58px); }
-  .notif-list { max-height:calc(100dvh - 224px); }
+  .notif-pop { position:fixed; top:58px; right:0; width:100vw; max-height:calc(100vh - 58px); max-height:calc(100dvh - 58px); }
+  .notif-list { max-height:calc(100vh - 224px); max-height:calc(100dvh - 224px); }
   .modal-scrim { padding:7vh 10px 10px; }
   .command-footer>span { display:none; }
   .command-footer { justify-content:flex-end; }
@@ -3060,6 +3215,8 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   background:var(--paper-raised);
 }
 .report-library {
+  display:flex;
+  flex-direction:column;
   min-width:0;
   padding:18px;
   border-right:1px solid var(--line);
@@ -3099,7 +3256,9 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
 .report-collection-filter button.active { border-color:var(--ion-600); background:var(--ion-100); color:var(--ion-600); }
 .report-library-list {
   display:grid;
+  flex:1 1 auto;
   gap:6px;
+  min-height:0;
   max-height:590px;
   padding-right:4px;
   overflow:auto;
@@ -3120,9 +3279,22 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
 }
 .report-library-item:hover,
 .report-library-item.active { border-color:var(--ion-600); border-left-color:var(--ion-600); background:var(--ion-100); }
-.report-library-item>span { color:var(--ion-600); font:700 8px/1.2 var(--font-mono); letter-spacing:.12em; text-transform:uppercase; }
-.report-library-item>strong { overflow:hidden; font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
+/* superseded by .report-library-text — see the icon-rail block at the end. */
+/* superseded by .report-library-text — see the icon-rail block at the end. */
 .report-library-item>small { display:-webkit-box; overflow:hidden; color:var(--slate); font-size:10px; line-height:1.4; -webkit-box-orient:vertical; -webkit-line-clamp:2; }
+.report-library-status {
+  display:flex;
+  align-items:center;
+  gap:9px;
+  margin-top:12px;
+  padding:10px 11px;
+  border:1px solid var(--line);
+  background:var(--paper-raised);
+}
+.report-library-status>span { width:8px; height:8px; flex:0 0 auto; border-radius:50%; background:var(--ion-600); box-shadow:0 0 10px var(--ion-600); }
+.report-library-status>div { display:grid; min-width:0; gap:2px; }
+.report-library-status strong { color:var(--ink); font-size:10px; }
+.report-library-status small { overflow:hidden; color:var(--slate); font:700 8px/1.2 var(--font-mono); letter-spacing:.06em; text-overflow:ellipsis; text-transform:uppercase; white-space:nowrap; }
 
 .report-document-workspace { display:flex; min-width:0; flex-direction:column; border:1px solid var(--line); background:var(--paper); }
 .report-document-head { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; padding:20px 22px 16px; border-bottom:1px solid var(--line); }
@@ -3142,6 +3314,30 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
 .report-decision-strip span { display:block; margin-bottom:5px; color:var(--ion-600); font:750 8.5px/1.2 var(--font-mono); letter-spacing:.12em; text-transform:uppercase; }
 .report-decision-strip strong,
 .report-decision-strip p { margin:0; color:var(--ink-soft); font-size:11px; line-height:1.4; }
+.report-view-tabs {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:1px;
+  border-bottom:1px solid var(--line);
+  background:var(--line);
+}
+.report-view-tabs button {
+  display:grid;
+  min-width:0;
+  min-height:58px;
+  align-content:center;
+  gap:3px;
+  padding:10px 16px;
+  border:0;
+  border-bottom:2px solid transparent;
+  background:var(--paper-raised);
+  color:var(--slate);
+  text-align:left;
+}
+.report-view-tabs button:hover { background:var(--paper-sunk); color:var(--ink); }
+.report-view-tabs button.active { border-bottom-color:var(--ion-600); background:var(--ion-100); color:var(--ink); }
+.report-view-tabs strong { font-size:11px; }
+.report-view-tabs span { overflow:hidden; font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
 .report-preview-toolbar { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:10px 14px; border-bottom:1px solid var(--line); background:var(--paper-sunk); }
 .report-preview-toolbar>div { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
 .report-preview-toolbar small { color:var(--slate); font-size:9px; }
@@ -3149,6 +3345,34 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
 .report-preview-state { min-height:480px; display:grid; align-content:center; justify-items:center; gap:8px; padding:32px; color:var(--ink-soft); text-align:center; }
 .report-preview-state p { max-width:540px; margin:0; color:var(--slate); }
 .report-preview-state.is-error strong { color:var(--red,#ff5d5d); }
+.report-grid-view { min-height:100%; border:1px solid var(--line-strong); background:var(--paper-raised); }
+.report-grid-view>header { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; padding:18px 20px; border-top:3px solid var(--ion-600); border-bottom:1px solid var(--line); }
+.report-grid-view>header h3 { margin:5px 0 4px; font-size:19px; }
+.report-grid-view>header p { margin:0; color:var(--slate); font-size:10px; }
+.report-grid-count { display:grid; min-width:92px; justify-items:end; gap:2px; }
+.report-grid-count strong { color:var(--ion-600); font:750 24px/1 var(--font-mono); }
+.report-grid-count span { color:var(--slate); font:700 8px/1.2 var(--font-mono); letter-spacing:.1em; text-transform:uppercase; }
+.report-grid-query { display:flex; align-items:end; justify-content:space-between; gap:16px; padding:12px 16px; border-bottom:1px solid var(--line); background:var(--paper-sunk); }
+.report-grid-query label { display:grid; width:min(520px,100%); gap:5px; }
+.report-grid-query label>span { color:var(--slate); font:700 8px/1.2 var(--font-mono); letter-spacing:.1em; text-transform:uppercase; }
+.report-grid-query input { width:100%; }
+.report-grid-query>div { display:flex; align-items:center; gap:10px; color:var(--slate); font-size:10px; white-space:nowrap; }
+.report-current-grid th { position:sticky; z-index:1; }
+.report-current-grid thead tr:first-child th { top:0; }
+.report-current-grid .grid-filter-row th { top:35px; }
+.report-current-grid td { vertical-align:top; }
+.report-current-grid td:nth-child(2) { font-weight:750; }
+.report-grid-view>footer { display:flex; justify-content:space-between; gap:16px; padding:11px 14px; border-top:1px solid var(--line); color:var(--slate); font:700 8px/1.2 var(--font-mono); letter-spacing:.08em; text-transform:uppercase; }
+.report-grid-footer { align-items:center; flex-wrap:wrap; }
+.report-grid-footer>div:first-child { display:grid; gap:4px; }
+.report-grid-footer .page-controls { min-width:min(620px,100%); flex:1 1 auto; margin:0; padding:0; border:0; font-family:var(--font-sans); letter-spacing:normal; text-transform:none; }
+.report-pdf-viewer { display:flex; min-height:680px; flex-direction:column; border:1px solid var(--line-strong); background:#40454c; }
+.report-pdf-toolbar { position:sticky; top:0; z-index:2; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:8px 10px; border-bottom:1px solid var(--line-strong); background:var(--paper-raised); }
+.report-pdf-toolbar>div { display:flex; align-items:center; gap:7px; }
+.report-pdf-toolbar span { min-width:74px; color:var(--ink-soft); font:700 9px/1.2 var(--font-mono); text-align:center; text-transform:uppercase; }
+.report-pdf-toolbar .btn { min-width:42px; }
+.report-pdf-canvas-stage { min-height:630px; flex:1 1 auto; padding:22px; overflow:auto; text-align:center; }
+.report-pdf-canvas-stage canvas { display:block; max-width:none; margin:0 auto; background:#fff; box-shadow:0 16px 48px rgba(0,0,0,.38); }
 .report-rendered-document { min-height:100%; border:1px solid var(--line-strong); background:var(--paper-raised); box-shadow:0 18px 54px rgba(0,0,0,.28); }
 .report-rendered-document>header { display:flex; align-items:flex-start; justify-content:space-between; gap:24px; padding:24px 26px 18px; border-top:3px solid var(--ion-600); border-bottom:1px solid var(--line); }
 .report-rendered-document>header h3 { margin:6px 0 4px; font-size:22px; }
@@ -3185,7 +3409,7 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
 
 .report-schedule-dialog {
   width:min(680px,100%);
-  max-height:calc(100dvh - 48px);
+  max-height:calc(100vh - 48px); max-height:calc(100dvh - 48px);
   overflow:auto;
   border:1px solid var(--line-strong);
   border-top:2px solid var(--ion-600);
@@ -3203,6 +3427,24 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
 .report-schedule-dialog .span-2 { grid-column:1 / -1; }
 .report-schedule-dialog .form-note { margin:0 22px; padding:11px 13px; border-left:2px solid var(--ion-600); background:var(--paper-sunk); color:var(--slate); font-size:11px; }
 .report-schedule-dialog .modal-actions { display:flex; justify-content:flex-end; gap:8px; padding:18px 22px 20px; }
+
+.decision-note-dialog {
+  width:min(620px,100%);
+  max-height:calc(100vh - 48px); max-height:calc(100dvh - 48px);
+  overflow:auto;
+  border:1px solid var(--line-strong);
+  border-top:2px solid var(--ion-600);
+  background:var(--paper-raised);
+  box-shadow:0 24px 80px rgba(0,0,0,.52);
+}
+.decision-note-dialog .modal-head { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; padding:20px 22px; border-bottom:1px solid var(--line); }
+.decision-note-dialog .modal-head h2 { margin:4px 0; }
+.decision-note-dialog .modal-head p { margin:0; color:var(--slate); }
+.decision-note-field { display:grid; gap:8px; padding:20px 22px 14px; }
+.decision-note-field>span { color:var(--slate); font-size:9px; font-weight:750; letter-spacing:.12em; text-transform:uppercase; }
+.decision-note-field textarea { width:100%; min-height:118px; resize:vertical; padding:11px 12px; border:1px solid var(--line); background:var(--paper); color:var(--ink); font:12px/1.55 var(--font-ui); }
+.decision-note-dialog .form-note { margin:0 22px; padding:11px 13px; border-left:2px solid var(--ion-600); background:var(--paper-sunk); color:var(--slate); font-size:11px; }
+.decision-note-dialog .modal-actions { display:flex; justify-content:flex-end; gap:8px; padding:18px 22px 20px; }
 
 /* Title Case is a visual contract for page titles, grid names and column
    headings. CSS capitalisation preserves authored acronyms such as CRM, API,
@@ -3235,7 +3477,12 @@ kbd { padding:2px 6px; border:1px solid var(--line-strong); border-radius:var(--
   .report-preview-toolbar { align-items:flex-start; flex-direction:column; }
   .report-preview-toolbar>div:last-child { width:100%; }
   .report-preview-toolbar .btn { flex:1; }
+  .report-view-tabs span { white-space:normal; }
   .report-preview-frame { min-height:430px; padding:8px; }
+  .report-pdf-viewer { min-height:520px; }
+  .report-pdf-toolbar { align-items:stretch; flex-direction:column; }
+  .report-pdf-toolbar>div { justify-content:center; }
+  .report-pdf-canvas-stage { min-height:430px; padding:10px; }
   .report-rendered-document>header { flex-direction:column; padding:18px; }
   .report-rendered-document dl { width:100%; min-width:0; }
   .report-subscription-head { align-items:flex-start; flex-direction:column; }
@@ -4673,6 +4920,66 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--ion-600); }
   }
 }
 
+/* The desktop shell's viewport includes the 230px command rail. Compress the
+   header before its controls reach that rail-adjusted content width; waiting
+   for phone breakpoints caused Language, Theme and User to be clipped at
+   ordinary 1280–1440 desktop sizes. */
+@media (max-width: 1600px) {
+  :root body .topbar {
+    gap: 10px;
+    padding-inline: 14px;
+  }
+  :root body .topbar-context {
+    min-inline-size: 190px;
+    max-inline-size: 220px;
+  }
+  :root body .search-box {
+    inline-size: auto;
+    min-inline-size: 210px;
+    flex: 1 1 260px;
+  }
+  :root body .manual-button {
+    inline-size: 112px;
+    min-inline-size: 112px;
+  }
+  :root body .topbar .locale-trigger {
+    min-inline-size: 72px;
+  }
+  :root body .user-trigger {
+    inline-size: 176px;
+    min-inline-size: 176px;
+    max-inline-size: 176px;
+  }
+}
+
+@media (max-width: 1360px) {
+  :root body .topbar-context {
+    min-inline-size: 145px;
+    max-inline-size: 170px;
+  }
+  :root body .search-box {
+    min-inline-size: 44px;
+  }
+  :root body .search-box > span:not(.search-kbd),
+  :root body .search-kbd,
+  :root body .locale-code,
+  :root body .user-trigger .user-id,
+  :root body .user-trigger > svg {
+    display: none;
+  }
+  :root body .topbar .locale-trigger,
+  :root body .user-trigger {
+    inline-size: var(--control-icon-size);
+    min-inline-size: var(--control-icon-size);
+    max-inline-size: var(--control-icon-size);
+    padding: 0;
+  }
+  :root body .manual-button {
+    inline-size: 98px;
+    min-inline-size: 98px;
+  }
+}
+
 @media (max-width: 760px) {
   :root body .topbar {
     gap: 8px;
@@ -5057,6 +5364,13 @@ button.btn-sm:not(.btn-block) {
   border-top: 1px solid var(--line);
 }
 
+.record-lock-banner { display:grid; gap:7px; margin:0 20px 14px; padding:12px 14px; border:1px solid var(--line-strong); background:var(--paper-sunk); color:var(--ink-soft); }
+.record-lock-banner strong { font-size:12px; }
+.record-lock-banner p { margin:0; color:var(--slate); font-size:11px; line-height:1.45; }
+.record-lock-banner.is-checking { border-left:3px solid var(--ion-600); }
+.record-lock-banner.is-blocked { border-left:3px solid var(--red,#ff5d5d); }
+.record-lock-banner .inline-actions { margin-top:3px; }
+
 /* A save conflict is not styled as an error. The save did not fail through any
    fault of this user; someone else got there first, and the visual weight should
    say "read this" rather than "you broke something". */
@@ -5287,4 +5601,358 @@ button.btn-sm:not(.btn-block) {
 :root body .master-tab,
 :root body .studio-tabs .btn {
   text-transform: capitalize;
+}
+
+
+/* ============================================================================
+   RESPONSIVE REPAIR — and why this block is at the very end of the file.
+
+   THE BUG. The mobile navigation drawer is declared around line 2015:
+
+     @media (max-width:900px) {
+       .rail { position:fixed; inset:0 auto 0 0; ... transform:translateX(-102%); }
+     }
+
+   and roughly 1,700 lines LATER, outside any media query, a theme pass declares:
+
+     .rail { position: relative; ... }
+
+   Both selectors have identical specificity (0,1,0). A media query adds none —
+   it gates whether a rule applies, it does not make it stronger — so the later,
+   unconditional rule wins at every width, including mobile. The drawer therefore
+   kept `position: relative`, stayed IN FLOW, and went on occupying its full
+   232px of the flex row while being translated off-screen and set to
+   `visibility: hidden`.
+
+   The user-visible result, measured at 375px before this fix:
+
+     .rail   left -237  width 232   (off-screen, but still holding its column)
+     main    left 232   width 143   ← 38% of a 375px screen
+
+   Content was crushed into a 143px sliver with 232px of nothing beside it. It
+   looked like a broken layout because it was one, and it is almost certainly
+   part of what "it should take up the complete screen" was describing.
+
+   THE FIX, and why it is shaped this way. Two changes, both deliberate:
+
+     1. Selector `.shell > .rail` — specificity (0,2,0), which beats any bare
+        `.rail` rule no matter where it lands. Relying on source order is what
+        broke this in the first place; a rule that only works while it happens to
+        be last is a rule that will break again the next time someone appends a
+        theme pass.
+     2. This block sits at the END of the file, so it is also last. Belt and
+        braces: either property alone would hold.
+
+   `position: fixed` takes the drawer out of flow, so `main` collapses to the full
+   viewport width, which is the whole point.
+   ============================================================================ */
+
+@media (max-width: 900px) {
+  .shell > .rail {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: 90;
+    width: var(--rail-w);
+    /* flex-basis must go to zero too. A fixed element is out of flow, but the
+       flex shorthand on the base rule still reserves a 232px basis in some
+       engines' shrink-to-fit maths for the sibling; zeroing it removes any doubt. */
+    flex: 0 0 0;
+    visibility: hidden;
+    transform: translateX(-102%);
+  }
+  .shell > .rail.rail-open {
+    visibility: visible;
+    transform: translateX(0);
+  }
+
+  /* With the rail out of flow, the workspace owns the viewport. */
+  .shell > main {
+    min-width: 0;
+    width: 100%;
+  }
+}
+
+/* ============================================================================
+   TOUCH TARGETS.
+
+   Measured at 375px, the smallest interactive control in the product was 32px
+   tall. That passes WCAG 2.5.8 Target Size (Minimum, AA — 24x24 CSS px) but not
+   2.5.5 (Enhanced, AAA — 44x44), and 32px is genuinely fiddly with a thumb on a
+   dense grid toolbar where controls sit 6px apart.
+
+   Keyed on `pointer: coarse` rather than on a width breakpoint, because the two
+   questions are different: width tells you how much room there is, pointer tells
+   you what is doing the pointing. A 1024px tablet has plenty of width and still
+   needs 44px targets; a 380px window on a desktop has a mouse and does not. Width
+   breakpoints get this wrong in both directions.
+
+   Only min-height and padding change. No colour, no border, no shadow — the
+   controls must still look identical to their desktop selves, per the product
+   rule that a button looks the same wherever it appears.
+   ============================================================================ */
+
+@media (pointer: coarse) {
+  .btn,
+  .icon-btn,
+  .link-btn,
+  .filter-chip,
+  .master-tab,
+  input:not([type="checkbox"]):not([type="radio"]),
+  select,
+  textarea {
+    min-height: 44px;
+  }
+
+  /* Small variants land at 40px rather than 44px: they are used inside grid
+     toolbars where a full 44px stack pushes the table below the fold on a phone.
+     40px still clears the AA minimum with room to spare and is a real thumb
+     target. */
+  .btn-sm,
+  .btn.btn-sm,
+  .grid-filter-row input,
+  .grid-filter-row select {
+    min-height: 40px;
+  }
+
+  /* Checkboxes are the smallest targets in any grid and the most consequential
+     to miss — a mis-tap here selects the wrong record for a bulk edit. */
+  input[type="checkbox"],
+  input[type="radio"] {
+    width: 22px;
+    height: 22px;
+  }
+
+  /* Row actions need vertical breathing room once their controls are 44px. */
+  .inline-actions {
+    row-gap: 8px;
+  }
+}
+
+
+/* ============================================================================
+   THE REPORT LIBRARY AS A COLLAPSIBLE ICON RAIL.
+
+   Expanded, it is the list it always was: collection, name, business question.
+   Collapsed, it becomes a 64px rail of marks — and the document viewer beside it
+   gains about 260px, which is the point. A report preview is a page of tabular
+   output; on a laptop the difference between 330px and 64px of chrome is the
+   difference between reading it and scrolling it.
+
+   The item is restructured into two columns, mark + text, so that collapsing is
+   a matter of dropping the second column rather than restyling the row. The old
+   rules targeted `> strong` and `> small` as direct children; the text now sits
+   in a wrapper, so those selectors are re-pointed below. Left as they were, the
+   name and question would silently lose their styling — the kind of break that
+   only shows up on screen.
+   ============================================================================ */
+
+/* The head holds the hamburger, and keeps holding it when everything else goes.
+   A collapse control that disappears with the panel it collapsed is a trap. */
+.report-library-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--line);
+}
+.report-library-head > div { min-width: 0; }
+.report-library-toggle { flex: 0 0 auto; }
+
+/* Two columns: the mark, then the text. */
+.report-library-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+
+/* The mark: a square badge carrying the collection's two letters. Flat — a fill,
+   a hairline and mono type, with no bevel or gloss, per the no-3D rule. */
+.report-library-mark {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-sunk);
+  color: var(--ion-600);
+  font: 700 10px/1 var(--font-mono);
+  letter-spacing: 0.04em;
+}
+.report-library-item.active .report-library-mark {
+  border-color: var(--ion-600);
+  background: var(--ion-100);
+}
+
+/* The text column. These replace the old direct-child selectors. */
+.report-library-text {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+.report-library-collection {
+  color: var(--ion-600);
+  font: 700 8px/1.2 var(--font-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.report-library-text > strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.report-library-text > small {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--slate);
+  font-size: 10px;
+  line-height: 1.4;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* ---- Collapsed ------------------------------------------------------------
+   Only the marks remain. Every hidden label is still reachable: each item keeps
+   its `title` for pointer users and its `aria-label` for screen readers, so the
+   glyph is a shorthand for the name rather than a replacement for it.
+   -------------------------------------------------------------------------- */
+.report-library.is-collapsed {
+  padding: 18px 12px;
+}
+.report-library.is-collapsed .report-library-head {
+  justify-content: center;
+  padding-bottom: 12px;
+}
+.report-library.is-collapsed .report-library-list {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+.report-library.is-collapsed .report-library-item {
+  grid-template-columns: auto;
+  justify-content: center;
+  width: auto;
+  padding: 5px;
+  /* The 2px active border-left of the expanded row would sit off-centre under a
+     single square, so the selected state moves to the mark itself. */
+  border-left-width: 1px;
+}
+
+/* The studio shell's first column follows the rail. `:has()` would express this
+   more directly but is avoided here — the grid template lives on the parent, and
+   a parent rule that depends on a child's class is exactly what `:has()` is for,
+   but it has no fallback and this layout must not collapse on an engine that
+   lacks it. The class is therefore mirrored onto the shell in the same render. */
+.reports-studio-shell:has(.report-library.is-collapsed) {
+  grid-template-columns: 92px minmax(0, 1fr);
+}
+
+/* Below the tablet breakpoint the studio stacks, so the rail is full width and
+   its collapsed form would be a single row of marks — correct, and it keeps the
+   preview above the fold. */
+@media (max-width: 900px) {
+  .reports-studio-shell,
+  .reports-studio-shell:has(.report-library.is-collapsed) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .report-library {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+  .report-library.is-collapsed .report-library-list {
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    justify-items: start;
+    overflow-x: auto;
+  }
+}
+
+
+/* ============================================================================
+   REPORT RAIL SPACING.
+
+   Reported as "no proper spacing" in the collapsed rail, and the screenshot shows
+   why. TWO faults compounding, neither of which is really about the gap value:
+
+     1. DOUBLE BORDERS. `.report-library-item` draws a border (it is a list row)
+        and `.report-library-mark` draws its own (it is a badge). Expanded, those
+        are 320px apart and read as a row containing a badge. Collapsed, the badge
+        fills the row, so the two borders sit 5px apart and every entry became a
+        box inside a box — twenty-one times down a 64px column. That reads as
+        clutter, and clutter reads as "cramped" long before the gap is the problem.
+     2. A 6px GAP INHERITED FROM THE EXPANDED LIST. Six pixels between 44px-tall
+        text rows is comfortable; six pixels between 21 identical squares is a
+        picket fence, because there is no internal detail to separate them.
+
+   So: collapsed items lose their own border and background entirely and become
+   pure spacing around the mark, the mark alone carries the edge, and the gap goes
+   to 10px. The rail widens to 72px so a 34px mark can sit centred with real room
+   either side and still clear the scrollbar gutter.
+   ============================================================================ */
+
+/* A touch more air in the expanded list too — 6px was tight for rows carrying
+   three lines of text. */
+.report-library-list {
+  gap: 9px;
+  padding-block: 2px;
+}
+
+.report-library.is-collapsed {
+  padding: 18px 12px;
+}
+
+.report-library.is-collapsed .report-library-list {
+  gap: 12px;
+  justify-items: center;
+  padding-block: 6px;
+  /* The gutter is reserved so 21 marks do not shift sideways the moment the list
+     becomes long enough to scroll — but it must be reserved on BOTH edges. With
+     the default single-edge gutter the content box shrinks only on the right, so
+     `justify-items: center` centred the marks in a box that was 10px narrower on
+     one side, and every mark sat 10px left of the rail's true centre. Measured, not
+     guessed: the offset showed up as -10 on all four sampled marks. */
+  padding-right: 0;
+  overflow-x: hidden;
+  scrollbar-gutter: stable both-edges;
+}
+
+/* The row becomes spacing, nothing else. The mark carries the whole visual. */
+.report-library.is-collapsed .report-library-item {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: none;
+}
+
+/* Slightly larger collapsed than expanded: it is now the only thing in the row,
+   and it is also the click target, so it should be a comfortable one. 34px clears
+   the WCAG 2.5.8 minimum on its own, and the pointer:coarse block lifts the
+   surrounding button to 44px on touch. */
+.report-library.is-collapsed .report-library-mark {
+  width: 34px;
+  height: 34px;
+  font-size: 10.5px;
+}
+
+/* Selection has to be unmistakable when the label is gone: a filled mark rather
+   than a border tint, since a 1px border change is nearly invisible at 34px. */
+.report-library.is-collapsed .report-library-item.active .report-library-mark {
+  border-color: var(--ion-600);
+  background: var(--ion-600);
+  color: var(--paper);
+}
+
+/* Below the tablet breakpoint the collapsed rail is a horizontal strip, so the
+   spacing rule flips axis with it. */
+@media (max-width: 900px) {
+  .report-library.is-collapsed .report-library-list {
+    gap: 10px;
+    padding-block: 4px;
+  }
 }

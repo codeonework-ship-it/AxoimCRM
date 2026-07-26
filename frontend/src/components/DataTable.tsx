@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   createCurrentViewExport,
   copyGridSnapshot,
@@ -84,6 +84,7 @@ interface DataTableProps<T> {
 }
 
 type BooleanFilter = "any" | "yes" | "no";
+const DEFAULT_PAGE_SIZE = 100;
 
 function text(value: CellValue): string {
   if (value === null || value === undefined) return "";
@@ -139,6 +140,7 @@ export function DataTable<T>({
   const [filtersOpen, setFiltersOpen] = useState(true);
   const [auditOpen, setAuditOpen] = useState(false);
   const [full, setFull] = useState(false);
+  const [page, setPage] = useState(0);
 
   const columnCount = columns.length + (actions ? 1 : 0);
   const auditEntityType = tableAuditEntityType(name);
@@ -190,6 +192,17 @@ export function DataTable<T>({
     });
   }, [columns, filtered, sort]);
 
+  const totalPages = sorted.length === 0 ? 0 : Math.ceil(sorted.length / DEFAULT_PAGE_SIZE);
+  const pageRows = useMemo(
+    () => sorted.slice(page * DEFAULT_PAGE_SIZE, (page + 1) * DEFAULT_PAGE_SIZE),
+    [page, sorted],
+  );
+
+  useEffect(() => {
+    if (totalPages > 0 && page >= totalPages) setPage(totalPages - 1);
+    if (totalPages === 0 && page !== 0) setPage(0);
+  }, [page, totalPages]);
+
   const groupColumns = useMemo(
     () => groupBy.map((key) => columns.find((column) => column.key === key)).filter((column): column is Column<T> => !!column),
     [columns, groupBy],
@@ -205,16 +218,17 @@ export function DataTable<T>({
   const groups = useMemo(() => {
     if (groupColumns.length === 0) return null;
     const buckets = new Map<string, T[]>();
-    sorted.forEach((row) => {
+    pageRows.forEach((row) => {
       const key = text(groupColumn.value(row)) || (groupColumn.blank ?? "—");
       const bucket = buckets.get(key);
       if (bucket) bucket.push(row);
       else buckets.set(key, [row]);
     });
     return [...buckets.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [groupColumns, sorted]);
+  }, [groupColumns, pageRows]);
 
   function toggleSort(key: string) {
+    setPage(0);
     setSort((current) => {
       if (!current || current.key !== key) return { key, direction: 1 };
       if (current.direction === 1) return { key, direction: -1 };
@@ -232,6 +246,7 @@ export function DataTable<T>({
   }
 
   function setFilter(key: string, value: string) {
+    setPage(0);
     setFilters((current) => ({ ...current, [key]: value }));
   }
 
@@ -398,6 +413,7 @@ export function DataTable<T>({
                   setGroupBy([]);
                   setSort(null);
                   setCollapsed(new Set());
+                  setPage(0);
                 }}
               >
                 Reset view
@@ -414,6 +430,7 @@ export function DataTable<T>({
           columns={columns.filter((column) => column.groupable !== false).map((column) => ({ key: column.key, label: column.header }))}
           selected={groupBy}
           onChange={(next) => {
+            setPage(0);
             setGroupBy(next);
             setCollapsed(new Set());
           }}
@@ -481,7 +498,10 @@ export function DataTable<T>({
                   options: enumOptions[column.key] ?? [],
                 }))}
                 filters={filters}
-                onChange={setFilters}
+                onChange={(next) => {
+                  setPage(0);
+                  setFilters(next);
+                }}
                 trailing={actions ? 1 : 0}
               />
             )}
@@ -518,10 +538,20 @@ export function DataTable<T>({
                     </Fragment>
                   );
                 })
-              : sorted.map((row) => bodyRow(row))}
+              : pageRows.map((row) => bodyRow(row))}
           </tbody>
         </table>
       </div>
+      <footer className="page-controls" aria-label={`${name} pagination`}>
+        <span>Showing {pageRows.length} of {sorted.length} records - {DEFAULT_PAGE_SIZE} rows per page</span>
+        <div>
+          <button type="button" className="btn btn-sm" disabled={page === 0}
+            onClick={() => setPage((value) => Math.max(0, value - 1))}>Previous</button>
+          <strong>Page {totalPages === 0 ? 0 : page + 1} of {totalPages}</strong>
+          <button type="button" className="btn btn-sm" disabled={page + 1 >= totalPages}
+            onClick={() => setPage((value) => value + 1)}>Next</button>
+        </div>
+      </footer>
       {note && <p className="loading-note">{note}</p>}
     </section>
     <AuditDrawer

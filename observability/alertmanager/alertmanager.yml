@@ -1,0 +1,15 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: axiom-operations
+  group_by: [alertname, service, severity]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+# Alerts are retained and visible in the local Alertmanager UI. Production must
+# add an approved email, Teams, Slack, PagerDuty or webhook receiver through its
+# secret-management/deployment layer; no vendor credential belongs in Git.
+receivers:
+  - name: axiom-operations

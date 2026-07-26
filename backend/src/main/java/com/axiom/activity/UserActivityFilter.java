@@ -67,7 +67,15 @@ public class UserActivityFilter extends OncePerRequestFilter {
      * matter.
      */
     private static final List<String> IGNORED_PREFIXES = List.of(
-            "/actuator", "/api/v1/i18n/", "/api/v1/branding/");
+            "/actuator", "/api/v1/i18n/", "/api/v1/branding/",
+            /*
+             * The client-event ingest reports its own rows. Capturing the request
+             * that delivered them would double every screen view: one row for the
+             * view, one for the POST that carried it. The events themselves are
+             * the record, and they are written with source='UI' and no HTTP verb
+             * precisely so a reviewer can tell them apart from requests.
+             */
+            "/api/v1/activity/ui-events");
 
     /**
      * Path segments that name a securable object, so {@code object_type} on the

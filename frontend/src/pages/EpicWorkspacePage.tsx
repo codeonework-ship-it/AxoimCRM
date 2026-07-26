@@ -13,6 +13,7 @@ import { WorkflowGateDrawer } from "../components/WorkflowGateDrawer";
 import { formatDate, formatMoney } from "../lib/format";
 import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
+import { useAppDialog, type DialogApi } from "../components/AppDialog";
 
 export type WorkspaceModule =
   | "forecast"
@@ -121,6 +122,7 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
   const [scenarioResult, setScenarioResult] = useState<ForecastScenario | null>(null);
   const [groupColumns, setGroupColumns, columnFilters, setColumnFilters] = usePersistedGridState(`workspace-${module}`);
   const toasts = useToasts();
+  const dialog = useAppDialog();
   const queryClient = useQueryClient();
   const workspaceQ = useQuery({
     queryKey: ["workspace", module, page, search, status],
@@ -128,7 +130,7 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
     retry: 1,
   });
   const actionMutation = useMutation({
-    mutationFn: (row: WorkspaceRow) => runWorkspaceAction(module, row),
+    mutationFn: (row: WorkspaceRow) => runWorkspaceAction(module, row, dialog),
     onSuccess: (result) => {
       toasts.push("info", "Workspace action complete", result.message);
       void queryClient.invalidateQueries({ queryKey: ["workspace", module] });
@@ -173,7 +175,7 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
     onError: (error) => toasts.push("error", "Scenario rejected", error instanceof Error ? error.message : "Scenario could not be saved."),
   });
   const controlMutation = useMutation({
-    mutationFn: ({ row, input }: { row: WorkspaceRow; input?: string }) => runClosureControl(module, row, input),
+    mutationFn: ({ row, input }: { row: WorkspaceRow; input?: string }) => runClosureControl(module, row, dialog, input),
     onSuccess: (result) => {
       toasts.push("info", result.title, result.message);
       void queryClient.invalidateQueries({ queryKey: ["workspace", module] });
@@ -277,26 +279,32 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
         controlBusyId={controlMutation.variables?.row.id}
         onAction={(row) => actionMutation.mutate(row)}
         onCheckGates={(row) => gateMutation.mutate(row)}
-        onRenewal={(row) => {
-          const rationale = window.prompt(`Prepare a renewal draft for ${row.code}. Why is renewal expected?`, "Renewal window reached; commercial review required.");
+        onRenewal={async (row) => {
+          const rationale = await dialog.prompt({ title: "Prepare Renewal Draft", message: `Explain why renewal is expected for ${row.code}.`, label: "Renewal Rationale", defaultValue: "Renewal window reached; commercial review required.", required: true, multiline: true, confirmLabel: "Prepare Draft" });
           if (rationale?.trim()) renewalMutation.mutate({ row, rationale: rationale.trim() });
         }}
-        onScenario={(row) => {
-          const name = window.prompt(`Scenario name for ${row.code}`, "Upside review");
+        onScenario={async (row) => {
+          const name = await dialog.prompt({ title: "Create Forecast Scenario", message: `Name the scenario for ${row.code}.`, label: "Scenario Name", defaultValue: "Upside review", required: true, confirmLabel: "Next" });
           if (!name?.trim()) return;
-          const adjustment = Number(window.prompt("Amount adjustment percentage (-100 to 500)", "10"));
-          const confidence = Number(window.prompt("Confidence percentage (0 to 100)", String(row.metrics.confidencePct ?? 70)));
-          const riskReduction = Number(window.prompt("How many risk signals are assumed resolved?", "1"));
+          const adjustmentRaw = await dialog.prompt({ title: "Amount Adjustment", message: "Enter an adjustment from -100 to 500 percent.", label: "Adjustment Percentage", defaultValue: "10", required: true, confirmLabel: "Next" });
+          if (adjustmentRaw === null) return;
+          const confidenceRaw = await dialog.prompt({ title: "Scenario Confidence", message: "Enter a confidence percentage from 0 to 100.", label: "Confidence Percentage", defaultValue: String(row.metrics.confidencePct ?? 70), required: true, confirmLabel: "Next" });
+          if (confidenceRaw === null) return;
+          const riskReductionRaw = await dialog.prompt({ title: "Risk Reduction", message: "Enter how many risk signals this scenario assumes are resolved.", label: "Resolved Risk Signals", defaultValue: "1", required: true, confirmLabel: "Save Scenario" });
+          if (riskReductionRaw === null) return;
+          const adjustment = Number(adjustmentRaw);
+          const confidence = Number(confidenceRaw);
+          const riskReduction = Number(riskReductionRaw);
           if (![adjustment, confidence, riskReduction].every(Number.isFinite)) {
             toasts.push("error", "Scenario values are invalid", "Use numbers for adjustment, confidence and risk reduction.");
             return;
           }
           scenarioMutation.mutate({ row, name: name.trim(), adjustment, confidence, riskReduction });
         }}
-        onControl={(row) => {
+        onControl={async (row) => {
           let input: string | undefined;
           if (module === "partners") {
-            input = window.prompt(`Open opportunity UUID to register for ${row.code}`, "")?.trim();
+            input = (await dialog.prompt({ title: "Register Partner Deal", message: `Enter the open opportunity UUID to register for ${row.code}.`, label: "Opportunity UUID", required: true, confirmLabel: "Register Deal" }))?.trim();
             if (!input) return;
           }
           controlMutation.mutate({ row, input });
@@ -451,7 +459,7 @@ function controlLabel(module: WorkspaceModule): string {
   return "Govern";
 }
 
-async function runClosureControl(module: WorkspaceModule, row: WorkspaceRow, input?: string): Promise<{ title: string; message: string }> {
+async function runClosureControl(module: WorkspaceModule, row: WorkspaceRow, dialog: DialogApi, input?: string): Promise<{ title: string; message: string }> {
   if (module === "campaigns") {
     const result = await api.captureCampaignPerformance(row.id);
     const roi = result.roiPercent == null ? "not available because budget is zero" : `${result.roiPercent.toFixed(2)}%`;
@@ -471,7 +479,7 @@ async function runClosureControl(module: WorkspaceModule, row: WorkspaceRow, inp
     const versions = await api.automationRuleVersions(row.id);
     const previous = versions.filter((version) => !version.active).sort((a, b) => b.versionNo - a.versionNo)[0];
     if (!previous) throw new Error("This rule has no prior version to restore.");
-    const confirmed = window.confirm(`Restore ${row.code} version ${previous.versionNo}? A new version will preserve the full audit history.`);
+    const confirmed = await dialog.confirm({ title: "Restore Automation Version", message: `Restore ${row.code} version ${previous.versionNo}? A new version will preserve the full audit history.`, confirmLabel: "Restore Version", tone: "danger" });
     if (!confirmed) throw new Error("Restore cancelled.");
     await api.restoreAutomationRuleVersion(row.id, previous.versionNo);
     return { title: "Automation version restored", message: `Version ${previous.versionNo} was copied forward as the new active version.` };
@@ -544,55 +552,55 @@ function actionFor(module: WorkspaceModule, row: WorkspaceRow): string | null {
   return null;
 }
 
-async function runWorkspaceAction(module: WorkspaceModule, row: WorkspaceRow) {
+async function runWorkspaceAction(module: WorkspaceModule, row: WorkspaceRow, dialog: DialogApi) {
   if (module === "contracts") {
-    const signedDocumentRef = window.prompt(`Signed document reference for ${row.code}`, `signed://${row.code.toLowerCase()}`);
+    const signedDocumentRef = await dialog.prompt({ title: "Activate Contract", message: `Enter the signed document reference for ${row.code}.`, label: "Signed Document Reference", defaultValue: `signed://${row.code.toLowerCase()}`, required: true, confirmLabel: "Activate Contract" });
     if (!signedDocumentRef) throw new Error("Contract activation requires a signed document reference.");
     return api.activateContract(row.id, signedDocumentRef);
   }
   if (module === "campaigns") {
-    const outcome = window.prompt(`Complete campaign ${row.code}. Outcome`, "Campaign completed after operator review.");
+    const outcome = await dialog.prompt({ title: "Complete Campaign", message: `Record the outcome for ${row.code}.`, label: "Campaign Outcome", defaultValue: "Campaign completed after operator review.", required: true, multiline: true, confirmLabel: "Complete Campaign" });
     if (!outcome) throw new Error("Campaign completion outcome is required.");
     return api.completeCampaign(row.id, outcome);
   }
   if (module === "forecast") {
-    const note = window.prompt(`Submit forecast ${row.code}? Optional manager note`, "");
+    const note = await dialog.prompt({ title: "Submit Forecast", message: `Submit forecast ${row.code}. Add an optional manager note.`, label: "Manager Note", multiline: true, confirmLabel: "Submit Forecast" });
     return api.submitForecast(row.id, note ?? undefined);
   }
   if (module === "cases") {
-    const outcome = window.prompt(`Resolve case ${row.code}. Outcome`, "Resolved after operator review.");
+    const outcome = await dialog.prompt({ title: "Resolve Case", message: `Record the resolution outcome for ${row.code}.`, label: "Resolution Outcome", defaultValue: "Resolved after operator review.", required: true, multiline: true, confirmLabel: "Resolve Case" });
     if (!outcome) throw new Error("Case resolution outcome is required.");
     return api.resolveCase(row.id, outcome);
   }
   if (module === "automation") {
-    const raw = window.prompt(`Simulation sample size for ${row.code}`, "25");
+    const raw = await dialog.prompt({ title: "Simulate Automation", message: `Choose the simulation sample size for ${row.code}.`, label: "Sample Size", defaultValue: "25", required: true, confirmLabel: "Run Simulation" });
     const sampleSize = Number(raw || 25);
     if (!Number.isFinite(sampleSize)) throw new Error("Simulation sample size must be numeric.");
     return api.simulateAutomation(row.id, sampleSize);
   }
   if (module === "analytics") {
-    const note = window.prompt(`Refresh dashboard ${row.code}? Optional note`, "");
+    const note = await dialog.prompt({ title: "Refresh Dashboard", message: `Refresh ${row.code}. Add an optional note.`, label: "Refresh Note", multiline: true, confirmLabel: "Refresh Dashboard" });
     return api.refreshDashboard(row.id, note ?? undefined);
   }
   if (module === "partners") return api.activatePartner(row.id);
   if (module === "copilot") {
-    const note = window.prompt(`Accept copilot recommendation ${row.code}? Optional note`, "");
+    const note = await dialog.prompt({ title: "Accept Recommendation", message: `Accept copilot recommendation ${row.code}. Add an optional note.`, label: "Decision Note", multiline: true, confirmLabel: "Accept Recommendation" });
     return api.acceptCopilotRecommendation(row.id, note ?? undefined);
   }
   if (module === "migration") return api.validateMigration(row.id);
   if (module === "mobile") return api.acknowledgeMobileSync(row.id);
   if (module === "integrations") return api.verifyIntegrationContract(row.id);
   if (module === "sandbox") {
-    const reason = window.prompt(`Refresh sandbox ${row.code}. Reason`, "Operator requested environment refresh.");
+    const reason = await dialog.prompt({ title: "Refresh Sandbox", message: `Explain why ${row.code} needs an environment refresh.`, label: "Refresh Reason", defaultValue: "Operator requested environment refresh.", required: true, multiline: true, confirmLabel: "Refresh Sandbox" });
     if (!reason) throw new Error("Sandbox refresh requires a reason.");
     return api.refreshSandbox(row.id, reason);
   }
   if (module === "audit") {
-    const destination = window.prompt(`Export evidence pack ${row.code}. Destination`, "SECURE_DOWNLOAD");
+    const destination = await dialog.prompt({ title: "Export Evidence Pack", message: `Choose the governed destination for ${row.code}.`, label: "Destination", defaultValue: "SECURE_DOWNLOAD", required: true, confirmLabel: "Export Pack" });
     return api.exportAuditPack(row.id, destination || "SECURE_DOWNLOAD");
   }
   if (module === "bfsi") {
-    const note = window.prompt(`Clear BFSI onboarding ${row.code}. Compliance note`, "All screening results are clear or waived.");
+    const note = await dialog.prompt({ title: "Clear BFSI Onboarding", message: `Record the compliance decision for ${row.code}.`, label: "Compliance Note", defaultValue: "All screening results are clear or waived.", required: true, multiline: true, confirmLabel: "Clear Onboarding" });
     if (!note) throw new Error("BFSI clearance requires a compliance note.");
     return api.clearBfsiOnboarding(row.id, note);
   }

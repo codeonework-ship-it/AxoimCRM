@@ -1,4 +1,4 @@
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   api, isUnreachable,
@@ -19,6 +19,8 @@ import { useToasts } from "../components/Toasts";
 import { formatDate } from "../lib/format";
 import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
+import { useAppDialog } from "../components/AppDialog";
+import { useRecordLock } from "../locking/useRecordLock";
 
 /**
  * Contacts, at the depth accounts and leads already had.
@@ -35,6 +37,7 @@ import { usePersistedGridState } from "../lib/usePersistedGridState";
 
 const STATUSES = ["ACTIVE", "INACTIVE", "DO_NOT_CONTACT"];
 const SENIORITIES = ["C_LEVEL", "VP", "DIRECTOR", "MANAGER", "INDIVIDUAL"];
+const CONTACT_PAGE_SIZE = 100;
 
 const CONTACT_GROUP_COLUMNS: GroupColumn<ContactDetail>[] = [
   { key: "name", label: "Name", value: (row) => `${row.firstName} ${row.lastName}`.trim() },
@@ -77,6 +80,7 @@ const FIELDS: RecordField<ContactRequest>[] = [
 export function ContactsPage() {
   const { user } = useAuth();
   const toasts = useToasts();
+  const appDialog = useAppDialog();
   const queryClient = useQueryClient();
   const [groupColumns, setGroupColumns, columnFilters, setColumnFilters] = usePersistedGridState("contacts");
   const [search, setSearch] = useState("");
@@ -84,6 +88,9 @@ export function ContactsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [dialog, setDialog] = useState<{ mode: RecordFormMode; source?: ContactDetail } | null>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [page, setPage] = useState(0);
+  const editingContactId = dialog?.mode === "edit" ? dialog.source?.id ?? null : null;
+  const editLock = useRecordLock("CONTACT", editingContactId, !!editingContactId);
 
   function toggleRow(id: string) {
     setSelected((current) => {
@@ -123,13 +130,16 @@ export function ContactsPage() {
       error instanceof Error ? error.message : "Delete failed."),
   });
 
-  if (isUnreachable(contactsQ.error)) {
-    return <ApiUnreachable onRetry={() => void contactsQ.refetch()} retrying={contactsQ.isFetching} />;
-  }
-
   const activeGroupColumns = selectedGroupColumns(CONTACT_GROUP_COLUMNS, groupColumns);
   const filtered = filterRowsByColumns(contactsQ.data ?? [], CONTACT_GROUP_COLUMNS, columnFilters);
   const contacts = sortByGroups(filtered, activeGroupColumns, (row) => `${row.lastName} ${row.firstName}`);
+  const totalPages = contacts.length === 0 ? 0 : Math.ceil(contacts.length / CONTACT_PAGE_SIZE);
+  const visibleContacts = contacts.slice(page * CONTACT_PAGE_SIZE, (page + 1) * CONTACT_PAGE_SIZE);
+
+  useEffect(() => {
+    if (totalPages > 0 && page >= totalPages) setPage(totalPages - 1);
+    if (totalPages === 0 && page !== 0) setPage(0);
+  }, [page, totalPages]);
 
   /*
    * Owner options come from the rows already loaded rather than a second request.
@@ -160,10 +170,17 @@ export function ContactsPage() {
     };
   }, [dialog]);
 
+  if (isUnreachable(contactsQ.error)) {
+    return <ApiUnreachable onRetry={() => void contactsQ.refetch()} retrying={contactsQ.isFetching} />;
+  }
+
   async function submitRecord(
     values: Partial<ContactRequest>,
     extra: { acknowledgeDuplicates: boolean; duplicateReason: string | null },
   ) {
+    if (dialog?.mode === "edit" && editLock.blocked) {
+      throw new Error(editLock.message ?? "This contact is not reserved for editing. Retry the edit lock before saving.");
+    }
     const body: ContactRequest = {
       firstName: String(values.firstName ?? "").trim(),
       lastName: String(values.lastName ?? "").trim(),
@@ -196,10 +213,16 @@ export function ContactsPage() {
     refresh();
   }
 
-  function remove(row: ContactDetail) {
-    const reason = window.prompt(
-      `Delete ${row.firstName} ${row.lastName}? The record is soft-deleted and stays auditable.\n\nReason:`,
-      "No longer at this company");
+  async function remove(row: ContactDetail) {
+    const reason = await appDialog.prompt({
+      title: "Delete Contact",
+      message: `Delete ${row.firstName} ${row.lastName}? The record is soft-deleted and stays auditable.`,
+      label: "Reason",
+      defaultValue: "No longer at this company",
+      required: true,
+      confirmLabel: "Delete Contact",
+      tone: "danger",
+    });
     if (reason === null) return;
     deleteMutation.mutate({ id: row.id, reason });
   }
@@ -214,7 +237,7 @@ export function ContactsPage() {
         <p>People, reporting lines, engagement history and ownership.</p>
       </div>
       <div className="inline-actions">
-        {contactsQ.isSuccess && <span className="count">{contacts.length} shown</span>}
+        {contactsQ.isSuccess && <span className="count">{visibleContacts.length} of {contacts.length} shown</span>}
         {canManage && (
           <button type="button" className="btn btn-primary btn-sm" onClick={() => setDialog({ mode: "create" })}>
             New contact
@@ -226,18 +249,18 @@ export function ContactsPage() {
     <section className="list-controls" aria-label="Contact search and filters">
       <label>
         <span>Search <InfoTag text="Matches name, email or job title." label="Contact search help" /></span>
-        <input value={search} onChange={(event) => setSearch(event.target.value)}
+        <input value={search} onChange={(event) => { setSearch(event.target.value); setPage(0); }}
           placeholder="Name, email, or title" />
       </label>
       <label>
         <span>Status <InfoTag text="Show only contacts in one lifecycle status." label="Status filter help" /></span>
-        <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+        <select value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(0); }}>
           <option value="">All statuses</option>
           {STATUSES.map((value) => <option key={value} value={value}>{value.replace(/_/g, " ")}</option>)}
         </select>
       </label>
       <button className="btn btn-sm" disabled={!search && !statusFilter}
-        onClick={() => { setSearch(""); setStatusFilter(""); }}>Reset</button>
+        onClick={() => { setSearch(""); setStatusFilter(""); setPage(0); }}>Reset</button>
     </section>
 
     <DataViewFrame
@@ -250,11 +273,11 @@ export function ContactsPage() {
         onToggleGroup={() => setGroupColumns((value) => value.length > 0 ? [] : ["account"])}
         groupColumns={CONTACT_GROUP_COLUMNS.map(({ key, label }) => ({ key, label }))}
         selectedGroupColumns={groupColumns}
-        onGroupColumnsChange={setGroupColumns}
+        onGroupColumnsChange={(next) => { setGroupColumns(next); setPage(0); }}
         columnFilters={columnFilters}
         auditEntityType="CONTACT"
         exportFilename="contacts-current-view"
-        exportRows={contacts.map((row) => ({
+        exportRows={visibleContacts.map((row) => ({
           name: `${row.firstName} ${row.lastName}`,
           account: row.accountName ?? "",
           title: row.title ?? "",
@@ -269,6 +292,7 @@ export function ContactsPage() {
           onApply={(definition) => {
             setGroupColumns(definition.groupColumns ?? []);
             setColumnFilters(definition.columnFilters ?? {});
+            setPage(0);
           }}
         />
         {canManage && <BulkActionBar
@@ -293,10 +317,10 @@ export function ContactsPage() {
                   reaches records they never intended to touch. */}
               <input
                 type="checkbox"
-                aria-label={`Select all ${contacts.length} visible contacts`}
-                checked={contacts.length > 0 && contacts.every((row) => selected.has(row.id))}
+                aria-label={`Select all ${visibleContacts.length} visible contacts`}
+                checked={visibleContacts.length > 0 && visibleContacts.every((row) => selected.has(row.id))}
                 onChange={(event) => setSelected(event.target.checked
-                  ? new Set(contacts.map((row) => row.id))
+                  ? new Set(visibleContacts.map((row) => row.id))
                   : new Set())}
               />
             </th>}
@@ -306,13 +330,13 @@ export function ContactsPage() {
           <GridFilterRow
             columns={CONTACT_FILTER_COLUMNS}
             filters={columnFilters}
-            onChange={setColumnFilters}
+            onChange={(next) => { setColumnFilters(next); setPage(0); }}
             leading={canManage ? 1 : 0}
             trailing={1}
           />
         </thead>
         <tbody>
-          {contacts.map((row) => {
+          {visibleContacts.map((row) => {
             const group = activeGroupColumns.length > 0 ? groupLabelFor(row, activeGroupColumns) : "";
             const showGroup = activeGroupColumns.length > 0 && group !== previousGroup;
             previousGroup = group;
@@ -346,11 +370,19 @@ export function ContactsPage() {
               </tr>
             </Fragment>;
           })}
-          {contacts.length === 0 && <tr>
+          {visibleContacts.length === 0 && <tr>
             <td colSpan={canManage ? 8 : 7} className="empty-note">No contacts match the current query.</td>
           </tr>}
         </tbody>
       </table></div>}
+      {contactsQ.isSuccess && <footer className="page-controls" aria-label="Contact pagination">
+        <span>Showing {visibleContacts.length} of {contacts.length} records - {CONTACT_PAGE_SIZE} rows per page</span>
+        <div>
+          <button className="btn btn-sm" disabled={page === 0} onClick={() => setPage((value) => Math.max(0, value - 1))}>Previous</button>
+          <strong>Page {totalPages === 0 ? 0 : page + 1} of {totalPages}</strong>
+          <button className="btn btn-sm" disabled={page + 1 >= totalPages} onClick={() => setPage((value) => value + 1)}>Next</button>
+        </div>
+      </footer>}
     </DataViewFrame>
 
     <ContactDrawer
@@ -370,6 +402,16 @@ export function ContactsPage() {
       initial={initialValues}
       onClose={() => setDialog(null)}
       onSubmit={submitRecord}
+      editLock={dialog?.mode === "edit" ? {
+        checking: editLock.checking,
+        blocked: editLock.blocked,
+        message: editLock.message,
+        holderName: editLock.lock?.heldByMe ? null : editLock.lock?.holderName,
+        expiresAt: editLock.lock?.expiresAt,
+        canForceRelease: user?.role === "SUPER_ADMIN" || user?.role === "TENANT_ADMIN",
+        onRetry: editLock.retry,
+        onForceRelease: editLock.forceReleaseAndRetry,
+      } : undefined}
     />
   </>;
 }

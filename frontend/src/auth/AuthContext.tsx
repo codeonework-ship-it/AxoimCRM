@@ -15,6 +15,7 @@ import {
   type AuthUser,
   type LoginRequest,
 } from "../api/client";
+import { flushUiEvents, reportUiEvent } from "../activity/uiActivity";
 import { useQueryClient } from "@tanstack/react-query";
 
 const STORAGE_KEY = "axiom.session";
@@ -59,6 +60,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const logout = useCallback(() => {
+    /*
+     * Report and flush BEFORE the token is discarded, in that order.
+     *
+     * The queue is sent with the bearer token, so anything still queued when the
+     * token goes is unsendable — and the events most likely to be sitting there
+     * are the last few screens the user visited, which is exactly the tail an
+     * access review reads. flush() is not awaited: sign-out must not wait on an
+     * audit ping, and the request is already in flight by the time the token is
+     * cleared from memory here.
+     */
+    reportUiEvent("SIGN_OUT", window.location.pathname);
+    void flushUiEvents();
+
     setAuthToken(null);
     localStorage.removeItem(STORAGE_KEY);
     setSession(null);

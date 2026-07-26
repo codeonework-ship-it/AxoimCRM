@@ -62,6 +62,9 @@ services:
       AXIOM_RELAY_DATASOURCE_PASSWORD: axiom_relay_dev_password
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       AXIOM_CORS_ORIGINS: ${AXIOM_CORS_ORIGINS:-http://localhost:5173,http://localhost:4280}
+      # Dedicated machine credential. Non-dev profiles refuse the committed
+      # development default, so QA/UAT/Prod must inject this from a secret store.
+      AXIOM_PROMETHEUS_SCRAPE_TOKEN: ${AXIOM_PROMETHEUS_SCRAPE_TOKEN:-axiom-prometheus-dev-token-change-before-use}
     ports:
       - "${AXIOM_API_PORT:-8080}:8080"
 
@@ -73,3 +76,59 @@ services:
     ports:
       - "${AXIOM_WEB_PORT:-4280}:80"
     restart: unless-stopped
+
+  alertmanager:
+    image: ${AXIOM_ALERTMANAGER_IMAGE:-prom/alertmanager:v0.32.1}
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+      - --storage.path=/alertmanager
+    volumes:
+      - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    ports:
+      # Localhost-only by default. Production exposure belongs behind the
+      # platform reverse proxy and its operator identity provider.
+      - "127.0.0.1:${AXIOM_ALERTMANAGER_PORT:-9096}:9093"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9093/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  prometheus:
+    image: ${AXIOM_PROMETHEUS_IMAGE:-prom/prometheus:v3.12.0}
+    depends_on:
+      api:
+        condition: service_healthy
+      alertmanager:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-ec"]
+    command: |
+      umask 077
+      printf '%s' "$${AXIOM_PROMETHEUS_SCRAPE_TOKEN}" > /tmp/axiom-api-scrape-token
+      exec /bin/prometheus \
+        --config.file=/etc/prometheus/prometheus.yml \
+        --storage.tsdb.path=/prometheus \
+        --storage.tsdb.retention.time=$${AXIOM_PROMETHEUS_RETENTION:-15d} \
+        --web.enable-lifecycle
+    environment:
+      AXIOM_PROMETHEUS_SCRAPE_TOKEN: ${AXIOM_PROMETHEUS_SCRAPE_TOKEN:-axiom-prometheus-dev-token-change-before-use}
+      AXIOM_PROMETHEUS_RETENTION: ${AXIOM_PROMETHEUS_RETENTION:-15d}
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:${AXIOM_PROMETHEUS_PORT:-9090}:9090"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+volumes:
+  prometheus-data:
+  alertmanager-data:

@@ -2,6 +2,7 @@
 **/dist/
 **/target/
 electron-client/release/
+electron-client/audit-output/
 **/.npm-cache/
 **/.m2/
 *.log

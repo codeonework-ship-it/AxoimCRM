@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, type UiTheme } from "../api/client";
+import { reportUiEvent } from "../activity/uiActivity";
 import { useT } from "../i18n/I18nProvider";
 import { ChevronIcon, SunMoonIcon } from "./icons";
 import { useToasts } from "./Toasts";
@@ -190,6 +191,14 @@ export function ThemeSwitcher() {
     buttonRef.current?.focus();
     const selected = themes.find((theme) => theme.code === id);
     toasts.push("info", "Theme applied", `${selected?.name ?? "Selected theme"} is now active.`);
+    /*
+     * Reported as a UI event as well as being persisted. The PUT below is already
+     * captured by the server-side filter, but that row records "the preference
+     * endpoint was called" — it does not say which theme. The UI event carries
+     * the chosen code in object_id's place, so a reviewer can see the actual
+     * change rather than that a change happened.
+     */
+    reportUiEvent("THEME_CHANGED", window.location.pathname, { type: `THEME:${id}` });
     saveMutation.mutate(id);
   };
 
