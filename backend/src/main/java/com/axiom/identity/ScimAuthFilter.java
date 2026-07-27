@@ -62,9 +62,14 @@ public class ScimAuthFilter extends OncePerRequestFilter {
         }
         boolean mutation = !(request.getMethod().equalsIgnoreCase("GET")
                 || request.getMethod().equalsIgnoreCase("HEAD"));
-        if (mutation && !token.scopes().contains("users:write")) {
+        boolean groupPath = request.getRequestURI().startsWith("/scim/v2/Groups");
+        String required = groupPath ? (mutation ? "groups:write" : "groups:read")
+                : (mutation ? "users:write" : "users:read");
+        // Discovery endpoints are readable with either resource's read scope.
+        boolean discovery = request.getRequestURI().matches("/scim/v2/(ServiceProviderConfig|Schemas.*|ResourceTypes.*)");
+        if (!discovery && !token.scopes().contains(required)) {
             forbidden(response, "This provisioning token has read-only scope ("
-                    + String.join(", ", token.scopes()) + "). Issue one with users:write to make changes.");
+                    + String.join(", ", token.scopes()) + "). Required scope: " + required + ".");
             return;
         }
         try {

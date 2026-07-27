@@ -1,4 +1,7 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { api, type DocumentationSection } from "../api/client";
+import { useI18n } from "../i18n/I18nProvider";
 import { CloseIcon } from "./icons";
 
 interface HelpDrawerProps {
@@ -6,24 +9,20 @@ interface HelpDrawerProps {
   onClose: () => void;
 }
 
-const SHORTCUTS = [
-  ["Ctrl K", "Open command center"],
-  ["G then H", "Go to Home"],
-  ["G then P", "Go to Pipeline"],
-  ["G then A", "Go to Accounts"],
-  ["G then L", "Go to Leads"],
-  ["G then E", "Go to Activities"],
-  ["G then R", "Go to Reference Data"],
-  ["G then T", "Go to Reports"],
-  ["G then U", "Go to Administration"],
-  ["Ctrl /", "Open this guide"],
-];
-
+/** Renders the tenant's governed documentation master; no manual content lives in the bundle. */
 export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
+  const { locale, t } = useI18n();
   const panelRef = useRef<HTMLElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const [full, setFull] = useState(false);
   const [width, setWidth] = useState(480);
+  const manualQ = useQuery({
+    queryKey: ["documentation", "drawer", locale],
+    queryFn: () => api.documentationDrawer(locale),
+    enabled: open,
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  });
 
   useEffect(() => {
     if (!open) return;
@@ -58,6 +57,7 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
   }
 
   if (!open) return null;
+  const title = manualQ.data?.title ?? t("ui.manual.title", "User Manual");
   return (
     <div className="drawer-scrim dock-scrim" role="presentation">
       <aside
@@ -66,7 +66,7 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
         style={full ? undefined : { width: `${width}px` }}
         role="dialog"
         aria-modal="true"
-        aria-label="Axiom User Manual"
+        aria-label={`Axiom ${title}`}
         onMouseDown={(event) => event.stopPropagation()}
         onKeyDown={(event) => {
           if (event.key !== "Tab") return;
@@ -79,58 +79,56 @@ export function HelpDrawer({ open, onClose }: HelpDrawerProps) {
           else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
         }}
       >
-        <button className="dock-resizer" aria-label="Resize user manual" onPointerDown={startResize} />
+        <button className="dock-resizer" aria-label={t("ui.manual.resize", "Resize user manual")} onPointerDown={startResize} />
         <header className="drawer-head">
           <div>
-            <span className="eyebrow">Field manual · 01</span>
-            <h2>User Manual</h2>
+            <span className="eyebrow">{manualQ.data?.eyebrow ?? t("ui.manual.fieldManual", "Field manual")}</span>
+            <h2>{title}</h2>
           </div>
           <div className="drawer-actions">
-            <button className="btn btn-sm" onClick={() => setFull((value) => !value)}>{full ? "Restore view" : "Full view"}</button>
-            <button ref={closeRef} className="icon-btn" onClick={onClose} aria-label="Close guide"><CloseIcon /></button>
+            <button className="btn btn-sm" onClick={() => setFull((value) => !value)}>{full ? t("ui.grid.restoreView", "Restore view") : t("ui.grid.fullView", "Full view")}</button>
+            <button ref={closeRef} className="icon-btn" onClick={onClose} aria-label={t("ui.manual.close", "Close guide")}><CloseIcon /></button>
           </div>
         </header>
 
-        <div className="drawer-content">
-          <section className="guide-callout">
-            <span className="status-pip" />
-            <div><strong>Your fastest route</strong><p>Start on Home, resolve flagged deals, then work the pipeline from left to right.</p></div>
-          </section>
-
-          <section className="guide-section">
-            <span className="eyebrow">Core loop</span>
-            <ol className="guide-steps">
-              <li><span>01</span><div><strong>Scan Home</strong><p>Review revenue posture and intervention signals.</p></div></li>
-              <li><span>02</span><div><strong>Qualify leads</strong><p>Convert qualified demand into an account, contact, and deal.</p></div></li>
-              <li><span>03</span><div><strong>Advance deals</strong><p>Drag cards only after stage requirements are satisfied.</p></div></li>
-              <li><span>04</span><div><strong>Capture engagement</strong><p>Use Activities to log tasks, events, calls, notes and manual email summaries against CRM records.</p></div></li>
-            </ol>
-          </section>
-
-          <section className="guide-section">
-            <span className="eyebrow">Admin modules</span>
-            <ol className="guide-steps">
-              <li><span>05</span><div><strong>RBAC first</strong><p>Review role policies before changing users, trials, company status, billing or alerts.</p></div></li>
-              <li><span>06</span><div><strong>Reports</strong><p>Use Reports for governed PDF, Excel and Word downloads for the selected workspace.</p></div></li>
-              <li><span>07</span><div><strong>Alert queues</strong><p>Email and report alerts are validated and queued internally until third-party delivery is connected.</p></div></li>
-            </ol>
-          </section>
-
-          <section className="guide-section">
-            <span className="eyebrow">Keyboard map</span>
-            <dl className="shortcut-list">
-              {SHORTCUTS.map(([keys, action]) => (
-                <div key={keys}><dt><kbd>{keys}</kbd></dt><dd>{action}</dd></div>
-              ))}
-            </dl>
-          </section>
-
-          <section className="guide-section guide-rule">
-            <span className="ai-mark">AI</span>
-            <p><strong>Gold always means machine-generated.</strong> Review it before acting; customer data and system status never use gold.</p>
-          </section>
+        <div className="drawer-content" aria-live="polite">
+          {manualQ.isLoading && <div className="drawer-state"><span className="status-pip" /><p>{t("ui.manual.loading", "Loading user manual…")}</p></div>}
+          {manualQ.isError && <div className="drawer-state drawer-state-error">
+            <strong>{t("ui.manual.unavailable", "User manual unavailable")}</strong>
+            <p>{manualQ.error instanceof Error ? manualQ.error.message : t("ui.manual.retryBody", "The governed documentation could not be loaded.")}</p>
+            <button className="btn btn-sm" onClick={() => void manualQ.refetch()}>{t("ui.action.retry", "Retry")}</button>
+          </div>}
+          {manualQ.data?.sections.map((section) => <DocumentationSectionView key={section.id} section={section} />)}
         </div>
       </aside>
     </div>
   );
+}
+
+function DocumentationSectionView({ section }: { section: DocumentationSection }) {
+  if (section.type === "CALLOUT") {
+    return <>{section.entries.map((entry) => <section className="guide-callout" key={entry.id}>
+      <span className="status-pip" /><div><strong>{entry.title}</strong>{entry.body && <p>{entry.body}</p>}</div>
+    </section>)}</>;
+  }
+  if (section.type === "SHORTCUTS") {
+    return <section className="guide-section">
+      {section.heading && <span className="eyebrow">{section.heading}</span>}
+      <dl className="shortcut-list">{section.entries.map((entry) => <div key={entry.id}>
+        <dt><kbd>{entry.marker}</kbd></dt><dd>{entry.title}</dd>
+      </div>)}</dl>
+    </section>;
+  }
+  if (section.type === "RULE") {
+    return <>{section.entries.map((entry) => <section className="guide-section guide-rule" key={entry.id}>
+      {entry.marker && <span className="ai-mark">{entry.marker}</span>}
+      <p><strong>{entry.title}</strong>{entry.body && <> {entry.body}</>}</p>
+    </section>)}</>;
+  }
+  return <section className="guide-section">
+    {section.heading && <span className="eyebrow">{section.heading}</span>}
+    <ol className="guide-steps">{section.entries.map((entry) => <li key={entry.id}>
+      <span>{entry.marker}</span><div><strong>{entry.title}</strong>{entry.body && <p>{entry.body}</p>}</div>
+    </li>)}</ol>
+  </section>;
 }

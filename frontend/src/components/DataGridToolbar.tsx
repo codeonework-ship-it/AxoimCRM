@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { api, type DownloadedFile } from "../api/client";
+import { useI18n } from "../i18n/I18nProvider";
 import { AuditDrawer } from "./AuditDrawer";
 import { GroupColumnPicker, type GroupColumnOption } from "./GroupColumnPicker";
 import { InfoTag } from "./InfoTag";
@@ -74,11 +75,12 @@ export function DataGridToolbar({
   note,
   children,
 }: DataGridToolbarProps) {
+  const { t, tp } = useI18n();
   const toasts = useToasts();
   const [auditOpen, setAuditOpen] = useState(false);
   const canExport = !!onExport || !!exportRows;
   const viewContext = gridExportContext({
-    title: `${gridName} current view`,
+    title: `${tp(gridName)} ${tp("current view")}`,
     objectType: auditEntityType ?? exportObjectType(gridName),
     rows: exportRows,
     groupColumns,
@@ -92,12 +94,12 @@ export function DataGridToolbar({
       const file = exportRows
         ? createCurrentViewExport(format, exportRows, exportFilename ?? slug(gridName), viewContext)
         : await onExport?.(format);
-      if (!file) throw new Error("No export source is configured for this grid.");
+      if (!file) throw new Error(tp("No export source is configured for this grid."));
       if (exportRows) await recordCurrentViewExportAudit(format, viewContext);
       saveDownloadedFile(file);
-      toasts.push("info", `Export ${formatLabel(format)} ready`, "The download reflects the current Data Grid view.");
+      toasts.push("info", `${tp("Export")} ${formatLabel(format)} ${tp("ready")}`, tp("The download reflects the current Data Grid view."));
     } catch (error) {
-      toasts.push("error", `Export ${formatLabel(format)} failed`, error instanceof Error ? error.message : "Download failed.");
+      toasts.push("error", `${tp("Export")} ${formatLabel(format)} ${tp("failed")}`, error instanceof Error ? error.message : tp("Download failed."));
     }
   }
 
@@ -106,12 +108,12 @@ export function DataGridToolbar({
     try {
       const result = await copyGridSnapshot(exportRows, viewContext, `${slug(gridName)}-view-snapshot`);
       if (result === "clipboard") {
-        toasts.push("info", "Grid snapshot copied", "The image includes the current columns, rows, filters, grouping and timestamp.");
+        toasts.push("info", tp("Grid snapshot copied"), tp("The image includes the current columns, rows, filters, grouping and timestamp."));
       } else {
-        toasts.push("info", "Grid snapshot downloaded", "This browser blocked image clipboard access, so the complete PNG snapshot was downloaded instead.");
+        toasts.push("info", tp("Grid snapshot downloaded"), tp("This browser blocked image clipboard access, so the complete PNG snapshot was downloaded instead."));
       }
     } catch (error) {
-      toasts.push("error", "Grid snapshot not created", error instanceof Error ? error.message : "The snapshot could not be created.");
+      toasts.push("error", tp("Grid snapshot not created"), error instanceof Error ? error.message : tp("The snapshot could not be created."));
     }
   }
 
@@ -128,24 +130,24 @@ export function DataGridToolbar({
       <div className="data-grid-tools-stack">
         <div className="grid-tool-row data-grid-toolbar" role="toolbar" aria-label={`${gridName} data grid tools`}>
           <div className="grid-tool-label">
-            <span>Actions</span>
+            <span>{t("ui.common.actions", "Actions")}</span>
             <InfoTag
-              text="Use these tools to group rows, search columns, view audit history, or download the current grid."
+              text={tp("Use these tools to group rows, search columns, view audit history, or download the current grid.")}
               label={`${gridName} grid tools help`}
             />
           </div>
           <div className="grid-tool-controls">
             {!(groupColumns && onGroupColumnsChange) && (
               <button className={`btn btn-sm${grouped ? " active" : ""}`} aria-pressed={grouped} disabled={!onToggleGroup} onClick={onToggleGroup}>
-                Group: {grouped ? groupLabel : "Off"}
+                {t("ui.grid.group", "Group")}: {grouped ? tp(groupLabel) : tp("Off")}
               </button>
             )}
-            <button className="btn btn-sm" disabled={!auditEntityType} onClick={() => setAuditOpen(true)}>Audit</button>
+            <button className="btn btn-sm" disabled={!auditEntityType} onClick={() => setAuditOpen(true)}>{t("ui.grid.audit", "Audit")}</button>
             <span className="toolbar-divider" aria-hidden />
-            <button className="btn btn-sm" disabled={!canExport} onClick={() => void download("XLSX")}>Export Excel</button>
-            <button className="btn btn-sm" disabled={!canExport} onClick={() => void download("DOCX")}>Export Word</button>
-            <button className="btn btn-sm" disabled={!canExport} onClick={() => void download("PDF")}>Export PDF</button>
-            <button className="btn btn-sm" disabled={!viewContext || !exportRows} onClick={() => void copyViewSnapshot()}>Copy view</button>
+            <button className="btn btn-sm" disabled={!canExport} onClick={() => void download("XLSX")}>{t("ui.grid.exportExcel", "Export Excel")}</button>
+            <button className="btn btn-sm" disabled={!canExport} onClick={() => void download("DOCX")}>{t("ui.grid.exportWord", "Export Word")}</button>
+            <button className="btn btn-sm" disabled={!canExport} onClick={() => void download("PDF")}>{t("ui.grid.exportPdf", "Export PDF")}</button>
+            <button className="btn btn-sm" disabled={!viewContext || !exportRows} onClick={() => void copyViewSnapshot()}>{t("ui.grid.copyView", "Copy view")}</button>
             {children}
           </div>
           <div className="grid-tool-trailing">
@@ -166,7 +168,7 @@ export function DataGridToolbar({
         open={auditOpen}
         entityType={auditEntityType}
         title={auditTitle ?? `${gridName} audit`}
-        emptyLabel="No audited actions for this grid yet."
+        emptyLabel={tp("No audited actions for this grid yet.")}
         onClose={() => setAuditOpen(false)}
       />}
     </>

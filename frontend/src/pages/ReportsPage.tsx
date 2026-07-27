@@ -10,6 +10,7 @@ import { GridFilterRow } from "../components/GridFilterRow";
 import { ReportStudio } from "../components/ReportStudio";
 import { MenuIcon } from "../components/icons";
 import { useToasts } from "../components/Toasts";
+import { useI18n } from "../i18n/I18nProvider";
 
 type ReportWorkspace = "REPORTS_STUDIO" | "CUSTOM_REPORTS";
 type ReportFormat = "PDF" | "XLSX" | "DOCX";
@@ -32,6 +33,7 @@ const COLLECTION_ORDER = ["EXECUTIVE", "SALES", "GROWTH", "CUSTOMER", "COMMERCIA
 GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 export function ReportsPage() {
+  const { t, tp, formatNumber } = useI18n();
   const toasts = useToasts();
   const queryClient = useQueryClient();
   const [workspace, setWorkspace] = useState<ReportWorkspace>("REPORTS_STUDIO");
@@ -188,32 +190,32 @@ export function ReportsPage() {
   return <>
     <div className="page-head reports-page-head">
       <div>
-        <span className="eyebrow">Reporting</span>
-        <h1>CRM Reports</h1>
-        <p>View governed operational reports or build custom analytics from one controlled reporting workspace.</p>
+        <span className="eyebrow">{tp("Reporting")}</span>
+        <h1>{tp("CRM Reports")}</h1>
+        <p>{tp("View governed operational reports or build custom analytics from one controlled reporting workspace.")}</p>
       </div>
       {reportsQ.isSuccess && <div className="report-portfolio-count" aria-label={`${reports.length} reports across ${collections.length} collections`}>
-        <span><strong>{reports.length}</strong><small>Reports</small></span>
-        <span><strong>{collections.length}</strong><small>Collections</small></span>
-        <span><strong>3</strong><small>Formats</small></span>
+        <span><strong>{formatNumber(reports.length)}</strong><small>{t("nav.module.reports", "Reports")}</small></span>
+        <span><strong>{formatNumber(collections.length)}</strong><small>{tp("Collections")}</small></span>
+        <span><strong>{formatNumber(3)}</strong><small>{tp("Formats")}</small></span>
       </div>}
     </div>
 
     <nav className="report-workspace-tabs" aria-label="Report Workspaces">
       <button className={workspace === "REPORTS_STUDIO" ? "active" : ""} aria-current={workspace === "REPORTS_STUDIO" ? "page" : undefined}
         onClick={() => setWorkspace("REPORTS_STUDIO")}>
-        <strong>Reports Studio</strong>
-        <span>Choose, view, download and schedule governed CRM reports.</span>
+        <strong>{t("ui.report.reportsStudio", "Reports Studio")}</strong>
+        <span>{tp("Choose, view, download and schedule governed CRM reports.")}</span>
       </button>
       <button className={workspace === "CUSTOM_REPORTS" ? "active" : ""} aria-current={workspace === "CUSTOM_REPORTS" ? "page" : undefined}
         onClick={() => setWorkspace("CUSTOM_REPORTS")}>
-        <strong>Custom Reports</strong>
-        <span>Build reports, dashboards, formulas, pivots and delivery policies.</span>
+        <strong>{t("ui.report.customReports", "Custom Reports")}</strong>
+        <span>{tp("Build reports, dashboards, formulas, pivots and delivery policies.")}</span>
       </button>
     </nav>
 
     {workspace === "REPORTS_STUDIO" ? <>
-      <section className="reports-studio-shell" aria-label="Reports Studio">
+      <section className="reports-studio-shell" aria-label={t("ui.report.reportsStudio", "Reports Studio")}>
         {/* The library collapses to an icon rail.
             The hamburger is the only control that stays visible in both states,
             so there is always a way back out — a collapse control that collapses
@@ -238,29 +240,29 @@ export function ReportsPage() {
             </button>
             {libraryOpen && (
               <div>
-                <span className="eyebrow">Report Library</span>
-                <h2>Choose A Report</h2>
-                <p>Select a governed CRM report to display its complete grid and document preview.</p>
+                <span className="eyebrow">{tp("Report Library")}</span>
+                <h2>{t("ui.report.chooseReport", "Choose A Report")}</h2>
+                <p>{tp("Select a governed CRM report to display its complete grid and document preview.")}</p>
               </div>
             )}
           </header>
 
           {libraryOpen && <>
             <label className="report-library-search">
-              <span>Search Reports</span>
+              <span>{tp("Search Reports")}</span>
               <input type="search" value={search} onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search title, question or role" />
+                placeholder={tp("Search title, question or role")} />
             </label>
             <div className="report-collection-filter" role="group" aria-label="Filter By Collection">
-              <button className={collection === "ALL" ? "active" : ""} onClick={() => setCollection("ALL")}>All</button>
+              <button className={collection === "ALL" ? "active" : ""} onClick={() => setCollection("ALL")}>{t("ui.common.all", "All")}</button>
               {collections.map((value) => <button key={value} className={collection === value ? "active" : ""}
                 onClick={() => setCollection(value)}>{categoryLabel(value)}</button>)}
             </div>
           </>}
 
-          <div className="report-library-list" id="report-library-list" role="listbox" aria-label="Available Reports">
-            {reportsQ.isLoading && libraryOpen && <p className="loading-note">Loading Reports...</p>}
-            {reportsQ.isError && libraryOpen && <p className="empty-note">Reports Could Not Be Loaded.</p>}
+          <div className="report-library-list" id="report-library-list" role="listbox" aria-label={t("ui.report.availableReports", "Available Reports")}>
+            {reportsQ.isLoading && libraryOpen && <p className="loading-note">{tp("Loading Reports...")}</p>}
+            {reportsQ.isError && libraryOpen && <p className="empty-note">{tp("Reports Could Not Be Loaded.")}</p>}
             {visibleReports.map((report) => (
               <button key={report.id} role="option" aria-selected={selectedReport?.code === report.code}
                 className={`report-library-item${selectedReport?.code === report.code ? " active" : ""}`}
@@ -400,6 +402,7 @@ function ReportDocumentWorkspace({
   onRefresh: () => void;
   onToggleFull: () => void;
 }) {
+  const { t, tp } = useI18n();
   return <section className={`report-document-workspace${full ? " report-document-full" : ""}`} aria-label="Report Document Viewer">
     {report ? <>
       <header className="report-document-head">
@@ -409,36 +412,36 @@ function ReportDocumentWorkspace({
           <p>{report.description}</p>
         </div>
         <div className="report-document-actions" aria-label="Report Download Options">
-          <button className="btn btn-sm primary" onClick={() => void onDownload(report, "PDF")}>Download PDF</button>
-          <button className="btn btn-sm" onClick={() => void onDownload(report, "XLSX")}>Download Excel</button>
-          <button className="btn btn-sm" onClick={() => void onDownload(report, "DOCX")}>Download Word</button>
-          <button className="btn btn-sm" onClick={() => onSchedule(report)}>Schedule Report</button>
+          <button className="btn btn-sm primary" onClick={() => void onDownload(report, "PDF")}>{t("ui.grid.downloadPdf", "Download PDF")}</button>
+          <button className="btn btn-sm" onClick={() => void onDownload(report, "XLSX")}>{t("ui.grid.downloadExcel", "Download Excel")}</button>
+          <button className="btn btn-sm" onClick={() => void onDownload(report, "DOCX")}>{t("ui.grid.downloadWord", "Download Word")}</button>
+          <button className="btn btn-sm" onClick={() => onSchedule(report)}>{t("ui.report.schedule", "Schedule Report")}</button>
         </div>
       </header>
       <div className="report-decision-strip">
-        <div><span>Decision Supported</span><strong>{report.businessQuestion}</strong></div>
-        <div><span>Recommended For</span><p>{(report.audience ?? []).map(roleLabel).join(" · ")}</p></div>
-        <div><span>Available Formats</span><p>{report.allowedFormats.map(formatLabel).join(" · ")}</p></div>
+        <div><span>{t("ui.report.decisionSupported", "Decision Supported")}</span><strong>{tp(report.businessQuestion)}</strong></div>
+        <div><span>{t("ui.report.recommendedFor", "Recommended For")}</span><p>{(report.audience ?? []).map(roleLabel).map(tp).join(" · ")}</p></div>
+        <div><span>{t("ui.report.availableFormats", "Available Formats")}</span><p>{report.allowedFormats.map(formatLabel).join(" · ")}</p></div>
       </div>
       <div className="report-view-tabs" role="tablist" aria-label="Report View">
         <button id="report-grid-tab" type="button" role="tab" aria-selected={activeTab === "GRID"}
           aria-controls="report-grid-panel" className={activeTab === "GRID" ? "active" : ""}
           onClick={() => onTabChange("GRID")}>
-          <strong>Report Grid</strong><span>Work with the current report rows.</span>
+          <strong>{t("ui.report.reportGrid", "Report Grid")}</strong><span>{tp("Work with the current report rows.")}</span>
         </button>
         <button id="report-document-tab" type="button" role="tab" aria-selected={activeTab === "DOCUMENT"}
           aria-controls="report-document-panel" className={activeTab === "DOCUMENT" ? "active" : ""}
           onClick={() => onTabChange("DOCUMENT")}>
-          <strong>Document Preview</strong><span>Review the formatted document.</span>
+          <strong>{t("ui.report.documentPreview", "Document Preview")}</strong><span>{tp("Review the formatted document.")}</span>
         </button>
       </div>
       <div className="report-preview-toolbar">
-        <div><span className="eyebrow">{activeTab === "GRID" ? "Current Report Grid" : "Document Preview"}</span><small>Same Governed Data As The Downloads</small></div>
+        <div><span className="eyebrow">{activeTab === "GRID" ? t("ui.report.currentReportGrid", "Current Report Grid") : t("ui.report.documentPreview", "Document Preview")}</span><small>{tp("Same Governed Data As The Downloads")}</small></div>
         <div>
           <button className="btn btn-sm" disabled={previewLoading} onClick={onRefresh}>
-            {previewLoading ? "Generating Preview..." : "Refresh Preview"}
+            {previewLoading ? tp("Generating Preview...") : t("ui.report.refreshPreview", "Refresh Preview")}
           </button>
-          <button className="btn btn-sm" onClick={onToggleFull}>{full ? "Restore View" : "Full View"}</button>
+          <button className="btn btn-sm" onClick={onToggleFull}>{full ? t("ui.grid.restoreView", "Restore view") : t("ui.grid.fullView", "Full view")}</button>
         </div>
       </div>
       <div id={activeTab === "GRID" ? "report-grid-panel" : "report-document-panel"} className="report-preview-frame"
@@ -452,7 +455,7 @@ function ReportDocumentWorkspace({
         {activeTab === "DOCUMENT" && documentPreviewUrl && !documentPreviewLoading && <PdfDocumentViewer
           url={documentPreviewUrl} title={`${report.label} PDF Preview`} />}
       </div>
-    </> : <div className="report-preview-state"><strong>Choose A Report</strong><p>Select a report from the library to view its complete document.</p></div>}
+    </> : <div className="report-preview-state"><strong>{t("ui.report.chooseReport", "Choose A Report")}</strong><p>{tp("Select a report from the library to view its complete document.")}</p></div>}
   </section>;
 }
 
@@ -464,6 +467,7 @@ function ReportGridView({ report, preview, filters, page, onFiltersChange, onPag
   onFiltersChange: (filters: ReportGridFilters) => void;
   onPageChange: (page: number) => void;
 }) {
+  const { t, tp, formatNumber, formatDate } = useI18n();
   const rows = preview.rows.items;
   const activeFilters = Object.values(filters).filter((value) => value?.trim()).length;
 
@@ -479,18 +483,18 @@ function ReportGridView({ report, preview, filters, page, onFiltersChange, onPag
 
   return <div className="report-grid-view" aria-label={`${report.label} Current Report Grid`}>
     <header>
-      <div><span className="eyebrow">Current Governed Dataset</span><h3>{report.label}</h3>
-        <p>Search and column filters run on the server. Downloads use the same complete filtered result.</p></div>
-      <div className="report-grid-count"><strong>{preview.rows.total}</strong><span>Matching Rows</span></div>
+      <div><span className="eyebrow">{t("ui.report.currentDataset", "Current Governed Dataset")}</span><h3>{tp(report.label)}</h3>
+        <p>{tp("Search and column filters run on the server. Downloads use the same complete filtered result.")}</p></div>
+      <div className="report-grid-count"><strong>{formatNumber(preview.rows.total)}</strong><span>{tp("Matching Rows")}</span></div>
     </header>
     <div className="report-grid-query" role="search" aria-label={`${report.label} report search`}>
-      <label><span>Search All Columns</span><input type="search" value={filters.search ?? ""}
-        placeholder="Search the complete report"
+      <label><span>{tp("Search All Columns")}</span><input type="search" value={filters.search ?? ""}
+        placeholder={tp("Search the complete report")}
         onChange={(event) => onFiltersChange({ ...filters, search: event.target.value })} /></label>
       <div>
-        <span>{activeFilters} Active Filter{activeFilters === 1 ? "" : "s"}</span>
+        <span>{formatNumber(activeFilters)} {tp(activeFilters === 1 ? "Active Filter" : "Active Filters")}</span>
         <button type="button" className="btn btn-sm" disabled={activeFilters === 0}
-          onClick={() => onFiltersChange(EMPTY_REPORT_FILTERS)}>Reset Filters</button>
+          onClick={() => onFiltersChange(EMPTY_REPORT_FILTERS)}>{tp("Reset Filters")}</button>
       </div>
     </div>
     <div className="table-wrap"><table className="data-table report-current-grid">
@@ -508,13 +512,13 @@ function ReportGridView({ report, preview, filters, page, onFiltersChange, onPag
       </tr>)}{rows.length === 0 && <tr><td colSpan={4} className="empty-note">No Report Rows Match This Search And Filter.</td></tr>}</tbody>
     </table></div>
     <footer className="report-grid-footer">
-      <div><span>{preview.tenantName}</span><span>Generated {new Date(preview.generatedAt).toLocaleString()}</span></div>
+      <div><span data-i18n-skip>{preview.tenantName}</span><span>{t("ui.report.generated", "Generated")} {formatDate(preview.generatedAt, { dateStyle: "medium", timeStyle: "short" })}</span></div>
       <div className="page-controls" aria-label="Report pagination">
-        <span>Showing {rows.length} of {preview.rows.total} records - {preview.rows.size} rows per page</span>
+        <span>{tp("Showing")} {formatNumber(rows.length)} {tp("of")} {formatNumber(preview.rows.total)} {tp("records")} - {formatNumber(preview.rows.size)} {t("ui.grid.rowsPerPage", "rows per page")}</span>
         <div>
-          <button className="btn btn-sm" disabled={page === 0} onClick={() => onPageChange(Math.max(0, page - 1))}>Previous</button>
-          <strong>Page {preview.rows.totalPages === 0 ? 0 : page + 1} of {preview.rows.totalPages}</strong>
-          <button className="btn btn-sm" disabled={page + 1 >= preview.rows.totalPages} onClick={() => onPageChange(page + 1)}>Next</button>
+          <button className="btn btn-sm" disabled={page === 0} onClick={() => onPageChange(Math.max(0, page - 1))}>{t("ui.common.previous", "Previous")}</button>
+          <strong>{t("ui.grid.page", "Page")} {formatNumber(preview.rows.totalPages === 0 ? 0 : page + 1)} {tp("of")} {formatNumber(preview.rows.totalPages)}</strong>
+          <button className="btn btn-sm" disabled={page + 1 >= preview.rows.totalPages} onClick={() => onPageChange(page + 1)}>{t("ui.common.next", "Next")}</button>
         </div>
       </div>
     </footer>

@@ -40,7 +40,8 @@ import java.util.UUID;
 public class ScimTokenService {
 
     private static final String PREFIX = "axm_scim";
-    private static final List<String> KNOWN_SCOPES = List.of("users:read", "users:write");
+    private static final List<String> KNOWN_SCOPES = List.of(
+            "users:read", "users:write", "groups:read", "groups:write");
 
     private final JdbcTemplate jdbc;
     private final AuditService audit;
@@ -189,7 +190,7 @@ public class ScimTokenService {
     }
 
     private List<String> normaliseScopes(List<String> requested) {
-        if (requested == null || requested.isEmpty()) return List.of("users:read", "users:write");
+        if (requested == null || requested.isEmpty()) return KNOWN_SCOPES;
         List<String> cleaned = requested.stream().map(String::trim).filter(s -> !s.isEmpty()).distinct().toList();
         List<String> unknown = cleaned.stream().filter(scope -> !KNOWN_SCOPES.contains(scope)).toList();
         if (!unknown.isEmpty()) {

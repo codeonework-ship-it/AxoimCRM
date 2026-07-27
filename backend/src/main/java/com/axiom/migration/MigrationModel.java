@@ -200,6 +200,8 @@ public final class MigrationModel {
                             long recordsSkipped,
                             long recordsRemoved,
                             long issueCount,
+                            UUID retryOfRun,
+                            int attemptNo,
                             Instant queuedAt,
                             Instant startedAt,
                             Instant finishedAt,

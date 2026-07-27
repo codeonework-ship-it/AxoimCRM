@@ -1,6 +1,7 @@
 package com.axiom.leads;
 
 import com.axiom.audit.AuditService;
+import com.axiom.security.AuthorizationService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -21,7 +22,8 @@ class LeadIngestionServiceTest {
         LeadIngestionWorker worker = mock(LeadIngestionWorker.class);
         LeadBatchStore store = mock(LeadBatchStore.class);
         AuditService audit = mock(AuditService.class);
-        LeadIngestionService service = new LeadIngestionService(worker, store, audit);
+        LeadIngestionService service = new LeadIngestionService(worker, store, audit,
+                mock(AuthorizationService.class));
         UUID batchId = UUID.randomUUID();
         UUID leadId = UUID.randomUUID();
         when(store.open("BULK_API", 2)).thenReturn(batchId);

@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
@@ -10,12 +10,13 @@ import {
 } from "../components/ThemeSwitcher";
 import { TrialRequestDialog } from "./TrialRequestDialog";
 import { InfoLabel } from "../components/InfoTag";
+import { LocaleSwitcher } from "../i18n/LocaleSwitcher";
 
 type Mode = "choose" | "credentials";
 const DEFAULT_TENANT_SLUG = (import.meta.env.VITE_DEFAULT_TENANT_SLUG as string | undefined)?.trim() || "meridian";
 
 export function LoginPage() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, completeSso, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -48,6 +49,21 @@ export function LoginPage() {
     staleTime: 30 * 60 * 1000,
     retry: 1,
   });
+
+  useEffect(() => {
+    const ticket = new URLSearchParams(location.search).get("sso_ticket");
+    if (!ticket || isAuthenticated) return;
+    setBusy(true);
+    setError(null);
+    void completeSso(ticket)
+      .then(() => navigate("/", { replace: true }))
+      .catch(() => {
+        setMode("credentials");
+        setError("Single sign-on could not be completed. The ticket may have expired or already been used. You can still use the local administrative sign-in path.");
+        navigate("/login", { replace: true });
+      })
+      .finally(() => setBusy(false));
+  }, [completeSso, isAuthenticated, location.search, navigate]);
   const themes = themesQ.data ?? FALLBACK_THEMES;
 
   if (isAuthenticated) return <Navigate to="/" replace />;
@@ -58,11 +74,9 @@ export function LoginPage() {
    * 1. A tenant with no identity provider is a NORMAL state, not an error, so a
    *    null route drops the user into the credentials form with an explanation
    *    rather than showing a failure.
-   * 2. The browser is only sent to a provider when the handshake can actually
-   *    come back. While `handshakeAvailable` is false the redirect would land on
-   *    a 501 from the callback — the user would be stranded on a JSON error page
-   *    with no way back to a form. Naming the provider and returning them to
-   *    credentials is the honest outcome, and the server writes that wording.
+   * 2. The browser is only sent to a provider when the configured protocol has a
+   *    complete callback. The callback is bound to the initiating browser by an
+   *    HttpOnly state cookie.
    * 3. If anything fails, the user must still be able to get in. Every failure
    *    path below falls back to credentials and says why — a broken IdP
    *    configuration must never lock an administrator out of the system that
@@ -279,6 +293,10 @@ export function LoginPage() {
             </span>
           </button>
         ))}
+      </div>
+
+      <div className="login-locale-switcher" aria-label="Language selection">
+        <LocaleSwitcher />
       </div>
 
       <TrialRequestDialog open={trialOpen} onClose={() => setTrialOpen(false)} />

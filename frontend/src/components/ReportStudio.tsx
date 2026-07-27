@@ -12,29 +12,61 @@ import {
   type SavedReport,
 } from "../api/reporting";
 import { useToasts } from "./Toasts";
+import { useAuth } from "../auth/AuthContext";
+import { useI18n } from "../i18n/I18nProvider";
 
-type StudioTab = "BUILDER" | "DASHBOARDS" | "DELIVERY";
+type StudioTab = "BUILDER" | "DASHBOARDS" | "DELIVERY" | "OPERATIONS";
 type DropZone = "columns" | "groups" | "measures" | "pivot";
 
 const EMPTY_RULE: ConditionalRule = { field: "", operator: "GT", value: "0", foreground: "#F8FAFC", background: "#9A3412" };
 
 export function ReportStudio() {
+  const { t, tp } = useI18n();
   const [tab, setTab] = useState<StudioTab>("BUILDER");
-  return <section className="report-studio panel" aria-label="Custom Reports">
+  const { user } = useAuth();
+  const mayOperate = ["SUPER_ADMIN", "TENANT_ADMIN", "DATA_STEWARD"].includes(user?.role ?? "");
+  return <section className="report-studio panel" aria-label={t("ui.report.customReports", "Custom Reports")}>
     <header className="studio-head">
-      <div><span className="eyebrow">Custom Reports</span><h2>Build, Explain And Distribute</h2>
-        <p>Compose governed reports and dashboards without bypassing tenant access, field security or performance limits.</p></div>
+      <div><span className="eyebrow">{t("ui.report.customReports", "Custom Reports")}</span><h2>{tp("Build, Explain And Distribute")}</h2>
+        <p>{tp("Compose governed reports and dashboards without bypassing tenant access, field security or performance limits.")}</p></div>
       <nav className="studio-tabs" aria-label="Custom Report Sections">
-        {(["BUILDER", "DASHBOARDS", "DELIVERY"] as StudioTab[]).map(value =>
+        {(["BUILDER", "DASHBOARDS", "DELIVERY", ...(mayOperate ? ["OPERATIONS" as const] : [])] as StudioTab[]).map(value =>
           <button key={value} className={`btn btn-sm ${tab === value ? "primary" : ""}`} onClick={() => setTab(value)}>
-            {value === "BUILDER" ? "Report Builder" : value === "DASHBOARDS" ? "Dashboards" : "Share & Deliver"}
+            {value === "BUILDER" ? "Report Builder" : value === "DASHBOARDS" ? "Dashboards" : value === "DELIVERY" ? "Share & Deliver" : "Certification"}
           </button>)}
       </nav>
     </header>
     {tab === "BUILDER" && <Builder />}
     {tab === "DASHBOARDS" && <DashboardDesigner />}
     {tab === "DELIVERY" && <DeliveryWorkspace />}
+    {tab === "OPERATIONS" && mayOperate && <ReportingOperations />}
   </section>;
+}
+
+function ReportingOperations() {
+  const toasts = useToasts();
+  const client = useQueryClient();
+  const certificationsQ = useQuery({ queryKey: ["analytics", "certifications"], queryFn: reportingApi.certifications });
+  const recover = useMutation({
+    mutationFn: () => reportingApi.rebuildAndReconcile("Operator-requested P0E15 recovery"),
+    onSuccess: value => { void client.invalidateQueries({ queryKey: ["analytics"] }); toasts.push(value.status === "PASS" ? "info" : "error", "Projection recovery complete", value.verdict); },
+    onError: error => toasts.push("error", "Projection recovery failed", message(error)),
+  });
+  const reconcile = useMutation({
+    mutationFn: reportingApi.reconcileKpis,
+    onSuccess: value => toasts.push(value.drifted === 0 ? "info" : "error", "KPI reconciliation complete", value.verdict),
+    onError: error => toasts.push("error", "KPI reconciliation failed", message(error)),
+  });
+  const certify = useMutation({
+    mutationFn: reportingApi.certifyProduction,
+    onSuccess: value => { void client.invalidateQueries({ queryKey: ["analytics", "certifications"] }); toasts.push(value.status === "PASS" ? "info" : "error", `Certification: ${title(value.status)}`, value.verdict); },
+    onError: error => toasts.push("error", "Certification failed", message(error)),
+  });
+  const latest = certificationsQ.data?.[0];
+  return <div className="governance-workspace">
+    <div className="governance-compose"><div><span className="eyebrow">P0E15 Control Plane</span><h3>Rebuild, Reconcile And Certify</h3><p>Recovery rebuilds every projection before independent OLTP comparison. Production certification cannot pass without measured scale, latency and zero drift.</p></div><div className="delivery-actions"><button className="btn btn-sm" disabled={recover.isPending} onClick={() => recover.mutate()}>{recover.isPending ? "Recovering…" : "Rebuild And Reconcile"}</button><button className="btn btn-sm" disabled={reconcile.isPending} onClick={() => reconcile.mutate()}>{reconcile.isPending ? "Checking…" : "Reconcile KPIs"}</button><button className="btn btn-sm primary" disabled={certify.isPending} onClick={() => certify.mutate()}>{certify.isPending ? "Certifying…" : "Certify Production"}</button></div></div>
+    {latest ? <div className="performance-strip"><Metric label="Certificate" value={title(latest.status)} /><Metric label="Projected Rows" value={latest.projectedRows.toLocaleString()} /><Metric label="30-Day Executions" value={latest.executions} /><Metric label="P95 Query Time" value={latest.p95Ms == null ? "No Evidence" : `${latest.p95Ms} ms`} /><p>{latest.verdict}</p></div> : <div className="empty-studio">No production certificate has been attempted for this tenant.</div>}
+  </div>;
 }
 
 function Builder() {

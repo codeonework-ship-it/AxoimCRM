@@ -418,6 +418,42 @@ export interface ReconciliationReport {
   verdict: string;
 }
 
+export interface KpiReconciliationReport {
+  runGroupId: string;
+  runAt: string;
+  checksRun: number;
+  matched: number;
+  drifted: number;
+  verdict: string;
+}
+
+export interface ReportingRecoveryReport {
+  rebuild: BackfillRun;
+  projectionReconciliation: ReconciliationReport;
+  kpiReconciliation: KpiReconciliationReport;
+  status: "PASS" | "FAIL";
+  verdict: string;
+}
+
+export interface ProductionCertification {
+  id: string;
+  profile: "PRODUCTION";
+  status: "PASS" | "FAIL" | "INSUFFICIENT_EVIDENCE";
+  projectedRows: number;
+  minimumRows: number;
+  executions: number;
+  minimumExecutions: number;
+  p95Ms: number | null;
+  maximumP95Ms: number;
+  maximumMs: number | null;
+  timeouts: number;
+  projectionDrifts: number;
+  kpiDrifts: number;
+  evidenceWindowDays: number;
+  finishedAt: string;
+  verdict: string;
+}
+
 /* ------------------------------------------------------------------ */
 /* Calls                                                              */
 /* ------------------------------------------------------------------ */
@@ -510,6 +546,24 @@ export const reportingApi = {
 
   reconciliationHistory(): Promise<ReconciliationCheck[]> {
     return request<ReconciliationCheck[]>("/analytics/reconciliation?limit=30");
+  },
+
+  rebuildAndReconcile(reason: string): Promise<ReportingRecoveryReport> {
+    return request<ReportingRecoveryReport>("/analytics/projections/rebuild-and-reconcile", {
+      method: "POST", body: JSON.stringify({ reason }),
+    });
+  },
+
+  reconcileKpis(): Promise<KpiReconciliationReport> {
+    return request<KpiReconciliationReport>("/analytics/kpi-reconciliation/run", { method: "POST" });
+  },
+
+  certifyProduction(): Promise<ProductionCertification> {
+    return request<ProductionCertification>("/analytics/certifications/production", { method: "POST" });
+  },
+
+  certifications(): Promise<ProductionCertification[]> {
+    return request<ProductionCertification[]>("/analytics/certifications?limit=10");
   },
 
   dashboards(): Promise<StudioDashboard[]> {

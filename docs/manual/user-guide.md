@@ -61,7 +61,7 @@ If something here doesn't match what you see on screen, your administrator may h
 
 ### Signing in
 
-The current walking preview uses the local workspace, email, and password form. The target product supports two organization-selected methods:
+Axiom supports local credentials and organization-managed SAML 2.0 or OIDC single sign-on. The local development seed uses the credential form until an administrator configures a live provider:
 
 For the runnable preview at `http://localhost:4280`, use password `axiom-demo` with one of these accounts:
 
@@ -74,6 +74,13 @@ For the runnable preview at `http://localhost:4280`, use password `axiom-demo` w
 | `northstar` | `ava.chen@northstar.example` | Tenant admin |
 
 Platform users can switch active workspace from the top bar. Tenant users stay in their own workspace.
+
+Use the **Language** control on the sign-in screen or in the top bar to switch
+between English, German and Russian. The choice stays on this device and applies
+to navigation, forms, grids and tables, reports, messages, dialogs and the
+in-product User Manual. Names, notes and other customer-entered data are never
+sent to a translation provider or rewritten. Your administrator may also
+configure tenant-specific terms, such as displaying “Accounts” as “Clients”.
 
 - **Single sign-on (SSO).** Most organizations use this. Choose your company's sign-in button and you'll be taken to the same login you use for email or your intranet. No separate Axiom password to remember.
 - **Username and password.** If your organization uses local sign-in, use the email address and password you were given. Forgot it? Use **Forgot password** on the sign-in screen — the reset link goes to your email.
@@ -92,6 +99,7 @@ Across the top:
 
 - **Command center** — the magnifying glass, or press **⌘K** (Mac) / **Ctrl+K** (Windows), to jump among implemented workspaces. Cross-record search is planned but not part of this preview.
 - **The notification bell** — everything that needs your attention, in one place.
+- **Language** — changes all product labels, tables, reports, notifications and the User Manual. Your choice is remembered on this device.
 - **Your avatar** — profile, preferences, theme, connected email and calendar, and sign out.
 
 ### The navigation rail: every module explained
@@ -727,6 +735,14 @@ rotating one is a single action rather than a hunt.
 
 Open **Access governance → Identity providers**. Axiom checks enabled SAML signing certificates every day and notifies tenant administrators 30 days before expiry. Use **Check certificate expiry** after replacing a certificate. Running the check repeatedly is safe; the same certificate warning is not duplicated.
 
+### Single sign-on and directory provisioning
+
+Open **Access governance → SSO setup** as a Tenant Admin or Super Admin. Add an OIDC or SAML provider while it is disabled, map the email and display-name claims, and run **Test configuration**. **Test live federation** then checks the live OIDC discovery/JWKS endpoints or SAML endpoint and certificate prerequisites. Enable routing only after those checks pass. Local administrator sign-in remains available if the provider is unavailable.
+
+Use just-in-time provisioning only when the provider is authoritative for the routed domain. Otherwise provision people through SCIM. SCIM tokens are workspace-specific, shown once and scoped separately for Users and Groups. Removing a person through SCIM deactivates the account, revokes their sessions and keeps their owned records; it never hard-deletes the user.
+
+After the provider's real provisioning test, record the external tenant reference, connector job reference and all observed lifecycle evidence under **Production certification**. An incomplete evidence set is stored as **Failed** and lists exactly what is missing.
+
 ### Access reviews
 
 Open **Authorization → Access reviews**. Enter a code, name and future deadline, then choose **Open review**. Axiom snapshots current roles, permission bundles, manual shares and delegated administration. Use **Confirm** when access is still needed or **Revoke** to remove it immediately. You cannot decide your own access; another tenant administrator must review it.
@@ -786,6 +802,132 @@ Open **Automation** and choose **Restore version**. Axiom selects the latest pri
 ### Scheduling a report
 
 Open **Reports** and choose **Schedule** on a report card. Enter the recipient and a daily, weekly or monthly frequency. **Run due schedules** generates the governed Jasper attachment and advances the next run time. The current first-party boundary generates and records the attachment; external email transport remains pending until its approved adapter is connected.
+
+## How data moves from a screen into a report
+
+This section explains the complete path in plain language. The important idea is that Axiom does not let a report invent a second version of your business data.
+
+1. **You create or change a record.** For example, a lead is captured, an account is updated, or an opportunity moves stage.
+2. **Axiom checks permission and process.** Your tenant, role, record access, required fields, workflow gates and record lock are checked on the server. A button being visible is not permission by itself.
+3. **The business record, audit entry and outbox event succeed together.** If one cannot be saved, all three are rolled back. This prevents a report from showing a change that the operational screen does not contain.
+4. **The event updates the reporting projection.** The projection is a read-optimized copy. It holds report-friendly fields such as stage, amount, weighted amount, age and owner, while the operational tables remain authoritative.
+5. **The report runs in your tenant and security scope.** The Report Grid, Jasper PDF, Excel and Word downloads use the same query contract and filters. The grid is server-paged at 100 rows; downloads use the complete filtered result.
+6. **Drill-through checks permission again.** Selecting a number asks the operational store what you may see now. A projection never grants access.
+7. **Reconciliation detects drift.** Axiom independently recomputes important totals from operational records and compares them with the projection. A non-zero difference blocks production reporting certification.
+
+In database terms, the path is commonly `crm.lead` or `pipeline.opportunity` -> `integration.outbox_event` -> `analytics.lead_fact` or `analytics.opportunity_fact` -> governed report query -> Report Grid/Jasper document. `governance.audit_event` is the immutable evidence alongside that path.
+
+## Field and calculation dictionary
+
+The words below are the published meanings used by screens and reports. A tenant-specific variant must have a different metric name and version; it must not silently redefine the standard number.
+
+| Displayed field or KPI | Plain-language meaning | Published calculation or source | Main tables | What changes it |
+|---|---|---|---|---|
+| Account owner | Person responsible for the customer relationship | Current authorized owner reference | `crm.account`, `identity.app_user` | Account reassignment |
+| Account health | A weighted 0–100 summary of engagement, service, renewal and adoption signals | `sum(factor weight × factor score) ÷ sum(weights)`, rounded half-up | `crm.health_factor_weight`, `crm.account_signal`, `crm.account_health_snapshot`, `engagement.activity` | Recompute Health after an activity, case/SLA, renewal date or adoption change |
+| Health band | Layman label for the health score | Strong >=80; Steady >=65; Watch >=50; At Risk >=35; otherwise Critical | `crm.account_health_snapshot` | A new health snapshot |
+| Engagement recency factor | How recently someone interacted meaningfully with the account | <=7 days 100; <=30 80; <=60 60; <=90 40; older/none 20 | `engagement.activity` | Log or capture an account activity |
+| Open-cases factor | Service friction caused by unresolved cases | 0 cases 100; 1=80; 2=60; 3=40; 4+=20 | `crm.account_signal`, `service.case_record` | Open or resolve a case; refresh signal |
+| SLA-breach factor | Missed service promises | 0 breaches 100; 1=50; 2+=10 | `crm.account_signal`, service SLA data | Breach or resolve the underlying service exception |
+| Renewal-proximity factor | How close the customer is to renewal | no date 50; overdue 10; <=30 days 35; <=90 days 65; later 100 | `crm.account_signal`, `contracting.renewal_plan` | Add/change renewal date or complete renewal |
+| Product-adoption factor | Governed adoption signal | supplied score clamped to 0–100; missing defaults to 50 | `crm.account_signal` | Approved product-usage input or manual governed update |
+| Account-only open pipeline | Open opportunity value owned directly by one account | Sum of open opportunity amount for that account | `pipeline.opportunity`, `analytics.opportunity_fact` | Create, change, win or lose an opportunity |
+| Visible-hierarchy pipeline | Open pipeline for every hierarchy account the viewer may access | Sum of visible account pipeline; restricted nodes are not silently estimated | `crm.account`, `pipeline.opportunity` | Hierarchy, sharing or opportunity change |
+| Weighted amount | Expected-value view of one opportunity | `amount × probability ÷ 100` | `pipeline.opportunity`, `analytics.opportunity_fact` | Amount, stage/probability or currency-rate change |
+| Pipeline coverage | Whether open pipeline is sufficient for the remaining target | `open pipeline value in period ÷ remaining quota` | `analytics.opportunity_fact`, forecast/quota tables | Pipeline, closed-won credit or quota change |
+| Win rate | Share of decided deals that were won | `closed won count ÷ (closed won count + closed lost count)` | `analytics.opportunity_fact` | Win/loss transition or reporting slice |
+| Average deal size | Typical closed-won value | `sum(closed won corporate amount) ÷ closed won count` | `analytics.opportunity_fact` | Closed-won amount or stored conversion rate |
+| Sales velocity | Expected revenue movement per day | `(open qualified count × average deal size × win rate) ÷ average sales-cycle days` | opportunity and stage-transition facts | Qualified pipeline, outcomes or cycle duration |
+| Stage conversion | Share of a stage-entry cohort that moved forward | `forward exits from stage ÷ entries into stage` | `analytics.stage_transition_fact` | Stage entry/exit history |
+| ACV | Annual recurring value of one agreement | `total recurring value ÷ term in years`; one-time value excluded | `contracting.contract_record`, `contracting.subscription` | Contract term or recurring value change |
+| ARR | Recurring revenue active at one measurement date | Sum of annualized active subscription value | `contracting.subscription`, analytics snapshots | Subscription activation, renewal, expansion, contraction or churn |
+| TCV | Full value promised across the contract term | Sum of recurring plus one-time contracted value | contract, order and subscription tables | Contract/order amendment |
+| Quota attainment | How much of an assigned target has been achieved | `credited closed revenue in period ÷ assigned quota` | forecast/quota data, opportunity facts | Closed-won credit, split or quota version |
+| Forecast accuracy | Closeness of a locked submission to actual outcome | `1 - (absolute(actual - submitted) ÷ actual)` | `forecasting.forecast_submission`, opportunity facts | Locked submission and final closed-won actual |
+| Forecast bias | Whether a forecaster is usually optimistic or conservative | Mean of `(submitted - actual) ÷ actual`; positive means over-forecasting | forecast submissions and actuals | Additional completed forecast periods |
+| Slippage rate | Share of opening forecast moved outside its period | `moved-out opportunities ÷ opportunities in opening snapshot` | pipeline/forecast snapshots and close-date history | Close-date move |
+| Campaign ROI | Return attributed to campaign spend | `(attributed closed revenue - actual campaign cost) ÷ actual campaign cost` | marketing campaign, attribution and opportunity facts | Cost, attribution model or closed revenue |
+| MQL-to-SQL conversion | Marketing hand-offs accepted by sales | `accepted MQLs ÷ handed-off MQLs` by hand-off cohort | lead/campaign hand-off data | Accept/reject decision |
+| CAC payback | Months needed for margin to repay acquisition cost | `customer acquisition cost ÷ (average ARR per new customer × gross margin %)` | CRM plus authoritative finance inputs | Finance adapter/manual governed finance inputs; otherwise shown as not computable |
+
+When a denominator is zero or an authoritative input is missing, Axiom shows **Not computable** and names the missing input. A blank or zero that looks precise but is built from incomplete data is treated as a defect.
+
+## Module and screen impact guide
+
+| Module / screen | What users create or control | Downstream impact | Important cautions |
+|---|---|---|---|
+| Home | No new master record; summarizes current work | Reads pipeline, activity, forecast and exception signals | A tile is a summary, not a substitute for drill-through |
+| Leads | Prospective people/companies, status, owner and qualification | Conversion can create/link Account, Contact and Opportunity; feeds funnel and source reports | Conversion is atomic; disqualification needs a reason |
+| Accounts / Account 360 | Customer organization, hierarchy, health and ownership | Drives contacts, opportunities, service, renewals, customer reports and sharing | Hierarchy totals include only visible records; health is a snapshot |
+| Contacts | People, account relationship, role and communication data | Buying groups, activities, quotes and relationship reporting | Respect consent, bounced-email and duplicate controls |
+| Pipeline | Opportunities, stages, amount, probability, close date and roles | Forecast, pipeline, velocity, win-rate and movement reports | Workflow gates block incomplete stage moves; backward movement needs a reason |
+| Activities | Tasks, events, calls, notes and email logs | Engagement recency, productivity, timelines and next actions | Relate activity to the correct record; privacy controls still apply |
+| Products / Price Books | Sellable catalogue and governed prices | Quote lines, whitespace and margin reports | In-use records are inactivated, not hard-deleted |
+| Quotes / CPQ | Commercial offer, lines, discounts and approvals | Contract/order conversion and discount-governance reports | Currency, rounding and approval version must remain reproducible |
+| Contracts | Executed obligations, terms, renewal and subscriptions | ARR/ACV/TCV, renewal/churn and billing handoff | Stage gates protect renewal and activation |
+| Forecast | Period, owner submission, category and scenario | Accuracy, bias, attainment and movement reports | Locked submissions are never retroactively rewritten |
+| Campaigns | Campaign, membership, spend and outcomes | Sourced/influenced pipeline, conversion and ROI | Every attributed number names its attribution model |
+| Cases | Customer issue, priority, SLA and resolution | Health factors, service SLA and renewal-risk views | SLA clocks and exceptions must remain auditable |
+| Partners | Partner account, registration and channel conflict | Partner pipeline and channel performance | Approval and conflict rules apply before credit is granted |
+| Reference Data | Controlled codes, labels, order and effective dates | Changes selections and historical labels across modules | Soft delete only; in-use values are protected; bulk import is atomic |
+| Reports Studio | Standard governed report selection and preview | Grid, Jasper PDF, Excel, Word, schedule and audit | Filters apply identically to every output; grid defaults to 100 rows |
+| Custom Reports / Analytics | Report definitions, joins, formulas, pivots, dashboards and alerts | Shared metrics, embedded views and scheduled delivery | Joins are allow-listed; formulas use the closed expression language |
+| Automation | Rules, versions, gates, approvals and simulations | Can move or update records through the same server rules as a person | Dry-run must write nothing; four-eyes approval prevents self-approval |
+| Migration | Source discovery, mapping, validation, import and rollback ledger | Creates owned CRM records and checkpoints | Rollback removes only migration-owned records and preserves existing data |
+| Integrations | Connector contracts, health, dispatch and recovery | Exchanges events with external systems | Live vendor delivery remains dependent on configured adapters |
+| Administration | Users, RBAC, trials, companies, billing, alerts and documentation | Controls every module’s access and tenant lifecycle | High-risk RBAC changes use maker-checker and immutable audit |
+| Audit / Security | Evidence, activity, access explanation, locks and reviews | Compliance proof and investigations | Audit records are append-only; read access does not imply write/export |
+| Mobile | Offline packages, sync and conflict decisions | Updates authoritative records after revalidation | Expired/revoked packages cannot sync; conflicts need an explicit winner |
+| BFSI | Onboarding, screening, suitability, holdings and exceptions | Regulated client readiness and approval evidence | Screening/approval gates must complete before activation |
+| Commodity | Enquiry, indication, term sheet, approval and execution handoff | Origination pipeline and handoff to CTRM/ETRM | CRM displays authoritative credit/trading data; it does not replace risk/trading systems |
+
+## Workflow gate catalogue
+
+Workflow gates answer three questions for every governed record: **Where am I now? What is missing? What is the next permitted step?**
+
+- **Lead:** captured -> validated -> qualified or disqualified -> converted. Conversion creates or links its customer records in one transaction.
+- **Opportunity:** qualifying -> proposal -> negotiation -> commit -> closed won/lost. Required buying roles, amount, close date and stage-specific evidence are checked before movement.
+- **Quote:** draft -> configured -> priced -> approval when required -> issued -> accepted/rejected/expired. Discounts and margin exceptions cannot bypass approval through API or import.
+- **Contract/renewal:** draft -> review -> approved -> active -> renewal due -> renewed/expired/terminated. Obligations and dates feed recurring-revenue reporting.
+- **Forecast:** open -> submitted -> locked -> reviewed. A correction creates traceable movement; it does not rewrite the prior locked submission.
+- **Campaign:** planned -> active -> completed/cancelled. Cost and outcome completeness protect ROI reporting.
+- **Case:** new -> assigned -> in progress -> resolved -> closed/reopened. SLA and reason evidence remain with the case.
+- **Partner registration:** submitted -> conflict review -> approved/rejected -> expired. Credit is granted only after approval.
+- **Automation:** draft -> validated -> simulated -> active -> paused/retired. Simulation is side-effect free.
+- **Migration:** discovered -> mapped -> validated -> ready -> imported/delta -> reconciled -> rolled back when authorized. Checkpoints make retries resumable.
+- **BFSI onboarding:** draft -> screening -> review -> approval -> active/exception. KYC and screening exceptions are explicit.
+- **Commodity enquiry:** captured -> priced -> term sheet -> approval -> execution handoff/closed. Price basis and handoff acknowledgement remain visible.
+
+If a gate blocks you, do not work around it. Open the gate detail, correct the named prerequisite, and retry. A direct API, bulk file, automation rule or support SQL is subject to the same lifecycle controls.
+
+## Data-grid and drawer controls
+
+- **Load Screen Data** prevents a screen from spending API/database capacity until you ask for its data. The first request retrieves 100 server-filtered rows, not the entire dataset.
+- **Search and column filters** execute on the server. Moving to a new filter resets the list to page one.
+- **Group** exposes eligible column checkboxes. Selecting more than one creates nested groups in the chosen order.
+- **Audit** opens the immutable evidence relevant to the grid or record.
+- **Excel, Word and PDF** use the same filter/search rules as the grid. Export permission is separate from read permission.
+- **Full View / Restore View** changes the available review space without removing grid utilities.
+- **Account 360 and User Manual drawers** dock on the right, resize from their left edge, expand to full view, restore, close with the close control, and close with Escape.
+- **Row actions** such as Open, Edit, Clone and Delete are bordered button controls. Delete means governed soft delete; referenced masters are protected.
+
+## Database table guide for support and audit users
+
+These names help an authorized support or audit user understand evidence. They are not permission to edit the database directly.
+
+| Schema | Main responsibility | Representative tables |
+|---|---|---|
+| `platform`, `identity`, `security` | tenant, user, session, SSO/SCIM and authorization | `tenant`, `app_user`, `user_session`, `idp_config`, authorization/sharing tables |
+| `crm`, `leads`, `pipeline` | account/contact/lead/opportunity customer model | `account`, `contact`, `lead`, `pipeline_stage`, opportunity lifecycle tables |
+| `engagement`, `marketing`, `service`, `channel` | activity, campaigns, cases and partners | `activity`, `email_template`, campaign, case and partner tables |
+| `cpq`, `contracting`, `forecasting`, `billing` | product-to-cash and forecast | `product`, `price_book`, `quote`, `contract_record`, `subscription`, `forecast_submission`, invoice tables |
+| `analytics`, `reporting` | projections, KPI registry, report definitions and evidence | fact/snapshot tables, `metric_definition`, `query_execution`, report catalogue |
+| `automation` | processes, gates, rules and approvals | `process_definition`, `process_instance`, `workflow_gate_status`, approval/rule tables |
+| `integration`, `dispatch`, `migration` | event backbone, adapters and migration | `outbox_event`, dispatch attempts/dead letters, migration plans/runs/ledger/checkpoints |
+| `governance`, `compliance`, `documentation`, `i18n` | immutable evidence, privacy, manual master and language | `audit_event`, field history, documentation drawer tables, translation catalogue |
+| `mobile`, `bfsi`, `commodity` | offline and vertical packs | package/snapshot/conflict, onboarding/screening/holding, enquiry/price/term-sheet tables |
+
+Every tenant-scoped table uses a tenant key and row-level-security policy. Primary keys identify one record; foreign keys prevent a child record from pointing at a missing parent; check/unique constraints stop impossible states and duplicates. Operational support should use application recovery services because they also create audit and outbox evidence.
 
 ---
 

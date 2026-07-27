@@ -77,12 +77,24 @@ export function humanizeKey(key: string): string {
 }
 
 export type TranslateFn = (key: string, fallback?: string) => string;
+export type TranslatePhraseFn = (source: string) => string;
+export type FormatTranslationFn = (
+  key: string,
+  fallback: string,
+  values?: Record<string, string | number>,
+) => string;
 
 interface I18nContextValue {
   locale: SupportedLocale;
   setLocale: (locale: SupportedLocale) => void;
   locales: LocaleOption[];
   t: TranslateFn;
+  /** Translate an exact product phrase. Tenant/business data must not be passed here. */
+  tp: TranslatePhraseFn;
+  /** Translate a keyed template and replace named {tokens}. */
+  format: FormatTranslationFn;
+  formatNumber: (value: number, options?: Intl.NumberFormatOptions) => string;
+  formatDate: (value: Date | string | number, options?: Intl.DateTimeFormatOptions) => string;
   /** True while the first bundle for the current locale is in flight. */
   loading: boolean;
 }
@@ -92,6 +104,7 @@ const I18nContext = createContext<I18nContextValue | null>(null);
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<SupportedLocale>(initialLocale);
   const [bundle, setBundle] = useState<TranslationBundle>({});
+  const [phraseBundle, setPhraseBundle] = useState<TranslationBundle>({});
   const [locales, setLocales] = useState<LocaleOption[]>(FALLBACK_LOCALE_OPTIONS);
   const [loading, setLoading] = useState(true);
 
@@ -99,20 +112,20 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   // browser's translate prompt to leave the page alone.
   useEffect(() => {
     document.documentElement.lang = locale;
+    document.documentElement.dir = "ltr";
   }, [locale]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    api
-      .translationBundle(locale)
-      .then((next) => {
-        if (!cancelled) setBundle(next);
-      })
-      .catch(() => {
-        // API down or locale rejected — keep whatever we had. Every call site
-        // passes an English fallback, so the shell stays usable.
-        if (!cancelled) setBundle({});
+    Promise.allSettled([api.translationBundle(locale), api.translationPhraseBundle(locale)])
+      .then(([keyed, phrases]) => {
+        if (cancelled) return;
+        // The two resources degrade independently. During a rolling deployment
+        // an older API may not expose /phrases yet; keyed shell translation must
+        // continue to work in that window.
+        setBundle(keyed.status === "fulfilled" ? keyed.value : {});
+        setPhraseBundle(phrases.status === "fulfilled" ? phrases.value : {});
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -151,9 +164,38 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     [bundle],
   );
 
+  const tp = useCallback<TranslatePhraseFn>(
+    (source) => phraseBundle[source] ?? source,
+    [phraseBundle],
+  );
+
+  const format = useCallback<FormatTranslationFn>(
+    (key, fallback, values = {}) => {
+      const template = bundle[key] ?? fallback;
+      return template.replace(/\{([a-zA-Z0-9_]+)\}/g, (match, token: string) =>
+        Object.prototype.hasOwnProperty.call(values, token) ? String(values[token]) : match,
+      );
+    },
+    [bundle],
+  );
+
+  const formatNumber = useCallback(
+    (value: number, options?: Intl.NumberFormatOptions) =>
+      new Intl.NumberFormat(locale, options).format(value),
+    [locale],
+  );
+
+  const formatDate = useCallback(
+    (value: Date | string | number, options?: Intl.DateTimeFormatOptions) =>
+      new Intl.DateTimeFormat(locale, options).format(value instanceof Date ? value : new Date(value)),
+    [locale],
+  );
+
+  useEffect(() => installExactPhraseTranslator(phraseBundle), [phraseBundle]);
+
   const value = useMemo<I18nContextValue>(
-    () => ({ locale, setLocale, locales, t, loading }),
-    [locale, setLocale, locales, t, loading],
+    () => ({ locale, setLocale, locales, t, tp, format, formatNumber, formatDate, loading }),
+    [locale, setLocale, locales, t, tp, format, formatNumber, formatDate, loading],
   );
 
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
@@ -173,4 +215,90 @@ export function useT(): TranslateFn {
 /** Full runtime — used by LocaleSwitcher. */
 export function useI18n(): I18nContextValue {
   return useI18nContext();
+}
+
+/**
+ * Compatibility translator for product chrome that predates keyed t() calls.
+ *
+ * It replaces only exact phrases returned by the governed server catalogue.
+ * Text in code samples and any subtree marked data-i18n-skip/translate="no" is
+ * untouched. WeakMap state retains the English source so switching de -> ru ->
+ * en never chains translations, while React updates are detected as new source
+ * text. The observer also covers lazy routes, drawers, toasts and report views.
+ */
+const textState = new WeakMap<Text, { source: string; rendered: string }>();
+const attributeState = new WeakMap<Element, Map<string, { source: string; rendered: string }>>();
+const TRANSLATED_ATTRIBUTES = ["aria-label", "title", "placeholder", "alt"] as const;
+const SKIPPED_TAGS = new Set(["SCRIPT", "STYLE", "CODE", "KBD", "PRE", "NOSCRIPT"]);
+
+function installExactPhraseTranslator(phrases: TranslationBundle): () => void {
+  function skipped(node: Node): boolean {
+    const parent = node instanceof Element ? node : node.parentElement;
+    return (!!parent?.closest('[data-i18n-skip], [translate="no"]')) ||
+      (!!parent && SKIPPED_TAGS.has(parent.tagName));
+  }
+
+  function translateTextNode(node: Text) {
+    if (skipped(node)) return;
+    const current = node.nodeValue ?? "";
+    const previous = textState.get(node);
+    const sourceValue = previous && current === previous.rendered ? previous.source : current;
+    const match = /^(\s*)([\s\S]*?)(\s*)$/.exec(sourceValue);
+    if (!match || !match[2]) return;
+    const translated = phrases[match[2]] ?? match[2];
+    const rendered = `${match[1]}${translated}${match[3]}`;
+    textState.set(node, { source: sourceValue, rendered });
+    if (current !== rendered) node.nodeValue = rendered;
+  }
+
+  function translateAttributes(element: Element) {
+    if (skipped(element)) return;
+    let state = attributeState.get(element);
+    if (!state) {
+      state = new Map();
+      attributeState.set(element, state);
+    }
+    for (const attribute of TRANSLATED_ATTRIBUTES) {
+      const current = element.getAttribute(attribute);
+      if (!current) continue;
+      const previous = state.get(attribute);
+      const source = previous && current === previous.rendered ? previous.source : current;
+      const rendered = phrases[source] ?? source;
+      state.set(attribute, { source, rendered });
+      if (current !== rendered) element.setAttribute(attribute, rendered);
+    }
+  }
+
+  function translateTree(root: Node) {
+    if (root.nodeType === Node.TEXT_NODE) {
+      translateTextNode(root as Text);
+      return;
+    }
+    if (!(root instanceof Element) && root !== document.body) return;
+    if (root instanceof Element) translateAttributes(root);
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
+    let current = walker.nextNode();
+    while (current) {
+      if (current.nodeType === Node.TEXT_NODE) translateTextNode(current as Text);
+      else translateAttributes(current as Element);
+      current = walker.nextNode();
+    }
+  }
+
+  translateTree(document.body);
+  const observer = new MutationObserver((mutations) => {
+    for (const mutation of mutations) {
+      if (mutation.type === "characterData") translateTextNode(mutation.target as Text);
+      else if (mutation.type === "attributes") translateAttributes(mutation.target as Element);
+      else mutation.addedNodes.forEach(translateTree);
+    }
+  });
+  observer.observe(document.body, {
+    subtree: true,
+    childList: true,
+    characterData: true,
+    attributes: true,
+    attributeFilter: [...TRANSLATED_ATTRIBUTES],
+  });
+  return () => observer.disconnect();
 }

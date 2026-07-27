@@ -7,6 +7,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -37,6 +39,29 @@ public class LeadController {
                                                  @RequestParam(required = false) String status,
                                                  @RequestParam(defaultValue = "0") int page) {
         return queries.listLeads(search, status, page);
+    }
+
+    @GetMapping("/{id}")
+    public LeadService.LeadDetail detail(@PathVariable UUID id) {
+        return leadService.get(id);
+    }
+
+    @PutMapping("/{id}")
+    public LeadService.LeadDetail update(@PathVariable UUID id,
+                                         @RequestBody @Valid LeadService.LeadUpdateRequest request) {
+        return leadService.update(id, request);
+    }
+
+    @PatchMapping("/{id}/owner")
+    public LeadService.LeadDetail reassign(@PathVariable UUID id,
+                                           @RequestBody @Valid LeadService.LeadReassignRequest request) {
+        return leadService.reassign(id, request);
+    }
+
+    @PostMapping("/{id}/reactivate")
+    public LeadService.LeadDetail reactivate(@PathVariable UUID id,
+                                             @RequestBody @Valid LeadService.ReactivationRequest request) {
+        return leadService.reactivate(id, request);
     }
 
     public record ConvertRequest(String accountName, String opportunityName, BigDecimal amount) {}

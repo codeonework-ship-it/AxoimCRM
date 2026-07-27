@@ -1,6 +1,8 @@
 package com.axiom.leads;
 
 import com.axiom.audit.AuditService;
+import com.axiom.security.AuthorizationService;
+import com.axiom.security.SecurableObject;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -16,11 +18,14 @@ public class LeadIngestionService {
     private final LeadIngestionWorker worker;
     private final LeadBatchStore batches;
     private final AuditService audit;
+    private final AuthorizationService authorization;
 
-    public LeadIngestionService(LeadIngestionWorker worker, LeadBatchStore batches, AuditService audit) {
+    public LeadIngestionService(LeadIngestionWorker worker, LeadBatchStore batches, AuditService audit,
+                                AuthorizationService authorization) {
         this.worker = worker;
         this.batches = batches;
         this.audit = audit;
+        this.authorization = authorization;
     }
 
     public record RowResult(int rowNumber, String status, UUID recordId, String recordType,
@@ -29,11 +34,13 @@ public class LeadIngestionService {
                               List<RowResult> rows, String note) {}
 
     public RowResult single(LeadIngestRequest request) {
+        authorization.requireCreate(SecurableObject.LEAD);
         LeadIngestionWorker.Outcome outcome = worker.ingest(request, "API", null);
         return row(1, outcome);
     }
 
     public BatchResult bulk(List<LeadIngestRequest> requests) {
+        authorization.requireCreate(SecurableObject.LEAD);
         List<LeadIngestRequest> safe = requests == null ? List.of() : requests;
         if (safe.isEmpty()) throw new IllegalArgumentException("Provide at least one lead row.");
         if (safe.size() > MAX_BATCH) throw new IllegalArgumentException("A bulk request can contain at most 1,000 lead rows.");

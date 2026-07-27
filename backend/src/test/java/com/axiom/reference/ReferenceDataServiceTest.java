@@ -35,4 +35,9 @@ class ReferenceDataServiceTest {
         EntryMutation request = new EntryMutation("TEST", "Test", 10, false, null, null);
         assertThrows(ForbiddenException.class, () -> service.updateEntry("lead_status", "TEST", request));
     }
+
+    @Test void tenantAuditorCannotRetireReferenceEntries() {
+        assertThrows(ForbiddenException.class,
+                () -> service.retireEntry("lead_status", "TEST", "No longer used"));
+    }
 }

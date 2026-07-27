@@ -1,6 +1,7 @@
 package com.axiom.api;
 
 import com.axiom.pipeline.OpportunityLifecycleService;
+import com.axiom.pipeline.OpportunityCommandService;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -14,7 +15,8 @@ import static org.mockito.Mockito.when;
 class OpportunityLifecycleControllerTest {
     @Test void stagePreflightUsesTheSameLifecycleEngineAsTheCommand() {
         OpportunityLifecycleService lifecycle = mock(OpportunityLifecycleService.class);
-        OpportunityController controller = new OpportunityController(mock(OpportunityService.class), lifecycle);
+        OpportunityController controller = new OpportunityController(mock(OpportunityService.class), lifecycle,
+                mock(OpportunityCrudService.class), mock(OpportunityCommandService.class));
         UUID opportunity = UUID.randomUUID();
         UUID target = UUID.randomUUID();
         OpportunityLifecycleService.GatePreview preview = new OpportunityLifecycleService.GatePreview(

@@ -25,6 +25,8 @@
     <parameter name="DIMENSION_LABEL" class="java.lang.String"/>
     <parameter name="VALUE_LABEL" class="java.lang.String"/>
     <parameter name="DETAIL_LABEL" class="java.lang.String"/>
+    <parameter name="DATASET_FINGERPRINT" class="java.lang.String"/>
+    <parameter name="REPORT_ROW_COUNT" class="java.lang.Integer"/>
     <field name="metric" class="java.lang.String"/>
     <field name="value" class="java.lang.String"/>
     <field name="detail" class="java.lang.String"/>
@@ -92,7 +94,7 @@
     </detail>
     <pageFooter>
         <band height="24">
-            <staticText><reportElement x="0" y="8" width="400" height="12" forecolor="#718096"/><textElement><font fontName="SansSerif" size="7"/></textElement><text><![CDATA[Governed by tenant access, RBAC and export audit controls]]></text></staticText>
+            <textField><reportElement x="0" y="8" width="650" height="12" forecolor="#718096"/><textElement><font fontName="SansSerif" size="6"/></textElement><textFieldExpression><![CDATA["Rows " + $P{REPORT_ROW_COUNT} + "  ·  Dataset " + $P{DATASET_FINGERPRINT}]]></textFieldExpression></textField>
             <textField><reportElement x="670" y="8" width="100" height="12" forecolor="#718096"/><textElement textAlignment="Right"><font fontName="SansSerif" size="7"/></textElement><textFieldExpression><![CDATA["Page " + $V{PAGE_NUMBER}]]></textFieldExpression></textField>
         </band>
     </pageFooter>

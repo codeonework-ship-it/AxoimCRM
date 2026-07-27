@@ -36,7 +36,7 @@ public enum SecurableObject {
             "taxId", "tax_id",
             "ownerId", "owner_id")),
 
-    CONTACT("crm.contact", null, "account_id", "ACCOUNT", true, fields(
+    CONTACT("crm.contact", "owner_id", "account_id", "ACCOUNT", true, fields(
             "id", "id",
             "accountId", "account_id",
             "firstName", "first_name",

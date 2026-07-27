@@ -85,6 +85,118 @@ export interface ListParams {
   filter?: string;
 }
 
+export interface MigrationVendor {
+  vendor: string; displayName: string; liveInteropAvailable: boolean; requestedScopes: string[]; note: string;
+}
+export interface MigrationConnection {
+  id: string; name: string; vendor: string; vendorLabel: string; scope: string; status: string;
+  instanceUrl: string | null; credentialStored: boolean; fixtureKey: string | null; fixtureWave: number;
+  discoveredAt: string | null; lastVerifiedAt: string | null; message: string | null;
+  objectCount: number; createdAt: string;
+}
+export interface MigrationPlan {
+  id: string; name: string; connectionId: string; connectionName: string; vendor: string; status: string;
+  retentionDays: number; sampleData: boolean; unmappedAcknowledgedAt: string | null;
+  unmappedAcknowledgedCount: number; deltaWatermark: string | null; importedAt: string | null;
+  createdAt: string; mappedFields: number; unmappedFields: number; mappingVersion: number;
+}
+export interface MigrationMapping {
+  id: string; sourceObject: string; sourceField: string; sourceDataType: string; custom: boolean;
+  targetEntity: string | null; targetField: string | null; status: string; origin: string; note: string | null;
+}
+export interface MigrationMappingReview {
+  planId: string; planName: string; mappings: MigrationMapping[]; unmapped: MigrationMapping[];
+  unmappedObjects: string[]; mappedCount: number; unmappedCount: number;
+  acknowledgementCurrent: boolean; acknowledgedAt: string | null; acknowledgementStatement: string;
+}
+export interface MigrationMappingRevision {
+  id: string; versionNo: number; reason: string; createdBy: string | null; createdAt: string; fieldCount: number;
+}
+export interface MigrationRun {
+  runId: string; planId: string; mode: string; status: string; phase: string | null;
+  totalUnits: number; processedUnits: number; percentComplete: number; recordsCreated: number;
+  recordsUpdated: number; recordsSkipped: number; recordsRemoved: number; issueCount: number;
+  retryOfRun: string | null; attemptNo: number; queuedAt: string; startedAt: string | null;
+  finishedAt: string | null; message: string | null;
+}
+export interface MigrationIssue {
+  severity: string; category: string; sourceObject: string | null; sourceRecordId: string | null;
+  sourceLabel: string | null; fieldName: string | null; relatedObject: string | null;
+  relatedRecordId: string | null; relatedLabel: string | null; reason: string;
+}
+export interface MigrationReconciliationLine {
+  sourceObject: string; targetEntity: string; sourceCount: number; targetCount: number;
+  notMigratedCount: number; sourceAmountSum: number | null; targetAmountSum: number | null;
+  currencyCode: string | null; balanced: boolean;
+}
+export interface MigrationReconciliation {
+  runId: string; planId: string; planName: string; generatedAt: string;
+  lines: MigrationReconciliationLine[]; notMigrated: MigrationIssue[]; balanced: boolean;
+}
+export interface MigrationRecovery {
+  run: MigrationRun; allowedActions: string[]; nextStep: string;
+  targetWritesCommitted: boolean; checkpointAdvanced: boolean;
+  reconciliation: MigrationReconciliation | null;
+}
+export interface MigrationRollbackPreview {
+  planId: string; planName: string; importedAt: string | null; retentionDays: number;
+  retentionExpiresAt: string | null; withinRetention: boolean; countsByEntity: Record<string, number>;
+  totalRecords: number; modifiedSinceMigration: MigrationIssue[];
+  untouched: { entity: string; preExistingRecords: number }[];
+}
+export interface MigrationCheckpoint {
+  sourceObject: string; watermark: string | null; lastSuccessRunId: string | null;
+  recordsCreated: number; recordsUpdated: number; updatedAt: string;
+}
+export interface MigrationTargetEntity {
+  name: string; label: string; table: string;
+  fields: Array<{ name: string; column: string | null; type: string; required: boolean;
+    money: boolean; referenceTo: string | null; aliases: string[] }>;
+}
+
+export interface SandboxControl {
+  id: string; code: string; name: string; sandboxType: string; status: string; dataScope: string;
+  outboundEmailEnabled: boolean; outboundWebhooksEnabled: boolean; outboundIntegrationsEnabled: boolean;
+  configurationItems: number; lastRefreshedAt: string | null;
+}
+export interface ReleasePackage {
+  id: string; code: string; name: string; description: string | null; status: string;
+  sourceSandboxId: string; sandboxName: string; targetEnvironment: string; componentCount: number;
+  approvalRequestId: string | null; fingerprint: string | null; approvedAt: string | null;
+  deployedAt: string | null; updatedAt: string;
+}
+export interface ReleaseComponent {
+  id: string; sequence: number; componentType: string; componentKey: string; operation: string;
+  before: unknown | null; after: unknown | null;
+}
+export interface ReleaseValidation {
+  id: string; packageId: string; status: string; fingerprint: string; componentCount: number;
+  blockingIssueCount: number; diff: Array<Record<string, unknown>>; issues: string[]; validatedAt: string;
+}
+export interface ReleaseApproval {
+  id: string; status: string; actionCode: string; entityType: string; entityId: string;
+}
+export interface ReleaseDeployment {
+  id: string; runNumber: string; status: string; componentsApplied: number; fingerprint: string;
+  summary: string; completedAt: string;
+}
+export interface RollbackPreview {
+  deploymentId: string; reversible: boolean; componentCount: number; deadline: string; blockers: string[];
+}
+export interface ReleaseRollback {
+  id: string; deploymentId: string; status: string; restoredComponents: number;
+  blockers: string[]; message: string; completedAt: string;
+}
+export interface RecoveryBaseline {
+  recordCounts: Record<string, number>; newestOutboxEvent: string | null; databaseVersion: string; capturedAt: string;
+}
+export interface DrValidation {
+  id: string; scenario: string; restoreEnvironment: string; status: string;
+  targetRtoSeconds: number; observedRtoSeconds: number; targetRpoSeconds: number; observedRpoSeconds: number;
+  expectedCounts: Record<string, number>; observedCounts: Record<string, number>;
+  checks: Array<Record<string, unknown>>; blockers: string[]; verdict: string; validatedAt: string;
+}
+
 export interface ReferenceValueSet {
   id: string;
   apiName: string;
@@ -137,6 +249,39 @@ export interface LocaleOption {
 
 /** Flat key_path -> translated value map for one locale. */
 export type TranslationBundle = Record<string, string>;
+
+export interface DocumentationText { title: string; body: string | null; }
+export interface DocumentationDrawerText { eyebrow: string; title: string; }
+export interface DocumentationEntry {
+  id: string; code: string; marker: string | null; title: string; body: string | null; sortOrder: number;
+}
+export interface DocumentationSection {
+  id: string; code: string; type: "CALLOUT" | "STEPS" | "SHORTCUTS" | "RULE";
+  heading: string | null; sortOrder: number; entries: DocumentationEntry[];
+}
+export interface DocumentationDrawer {
+  id: string; code: string; version: number; eyebrow: string; title: string; sections: DocumentationSection[];
+}
+export interface DocumentationMasterEntry {
+  id: string; code: string; marker: string | null; sortOrder: number; active: boolean;
+  translations: Record<string, DocumentationText>;
+}
+export interface DocumentationMasterSection {
+  id: string; code: string; type: DocumentationSection["type"]; sortOrder: number; active: boolean;
+  headings: Record<string, string | null>; entries: DocumentationMasterEntry[];
+}
+export interface DocumentationMaster {
+  id: string; code: string; version: number; active: boolean;
+  translations: Record<string, DocumentationDrawerText>; sections: DocumentationMasterSection[];
+}
+export interface DocumentationSectionMutation {
+  code: string; type: DocumentationSection["type"]; sortOrder: number; active: boolean;
+  headings: Record<string, string>; changeNote: string;
+}
+export interface DocumentationEntryMutation {
+  sectionId: string; code: string; marker?: string; sortOrder: number; active: boolean;
+  translations: Record<string, DocumentationText>; changeNote: string;
+}
 
 export interface MeResponse {
   user: AuthUser;
@@ -894,6 +1039,70 @@ export interface WorkspaceRow {
   metrics: Record<string, unknown>;
 }
 
+// E21 governed offline synchronization -------------------------------------------------
+export interface OfflinePackage {
+  id: string; deviceSessionId: string; packageNumber: string; status: string;
+  objectCount: number; payloadBytes: number; generatedAt: string; expiresAt: string | null;
+  checksum: string | null; cacheAgeSeconds: number;
+}
+export interface OfflineSnapshot {
+  entityType: string; recordId: string; recordVersion: number;
+  payload: Record<string, unknown>; cachedAt: string;
+}
+export interface OfflineChangeResult {
+  id: string; clientMutationId: string; entityType: string; recordId: string;
+  status: string; appliedVersion: number | null; reason: string | null; conflictId: string | null;
+}
+export interface OfflineSyncResult {
+  runId: string; status: string; submitted: number; applied: number;
+  conflicts: number; rejected: number; changes: OfflineChangeResult[];
+}
+export interface OfflineConflict {
+  id: string; changeId: string; entityType: string; recordId: string;
+  baseVersion: number; serverVersion: number; conflictingFields: string[];
+  clientPatch: Record<string, unknown>; serverPayload: Record<string, unknown>;
+  status: string; resolution: string | null; resolutionReason: string | null; detectedAt: string;
+}
+
+// E22 BFSI lifecycle -------------------------------------------------------------------
+export interface BfsiOnboardingSummary {
+  id: string; number: string; accountId: string; accountName: string; clientType: string;
+  kycStatus: string; relationshipStatus: string; riskRating: string; riskScore: number | null;
+  owner: string; dueAt: string; missingKyc: number; openHits: number;
+  holdings: number; whitespace: number; openExceptions: number;
+}
+export interface BfsiKycItem { id: string; code: string; name: string; status: string; owner: string; evidenceReference: string | null; expiresAt: string | null; rejectionReason: string | null; }
+export interface BfsiScreening { id: string; type: string; status: string; hitCount: number; source: string; disposition: string | null; dispositionReason: string | null; screenedAt: string | null; }
+export interface BfsiHolding { id: string; productId: string | null; productCode: string | null; productName: string | null; family: string; status: string; balanceAmount: number; }
+export interface BfsiProductGap { productId: string; productCode: string; productName: string; family: string; minimumSuitability: string; }
+export interface BfsiRecommendation { id: string; productName: string; status: string; outsideSuitability: boolean; overrideReason: string | null; approvalRequestId: string | null; createdAt: string; }
+export interface BfsiException { id: string; type: string; status: string; reason: string; resolution: string | null; approvalRequestId: string | null; owner: string; createdAt: string; }
+export interface BfsiDetail {
+  onboarding: BfsiOnboardingSummary; kycItems: BfsiKycItem[]; screenings: BfsiScreening[];
+  holdings: BfsiHolding[]; whitespace: BfsiProductGap[]; recommendations: BfsiRecommendation[];
+  exceptions: BfsiException[]; riskFactors: Record<string, unknown>[];
+}
+
+// E23 commodity lifecycle --------------------------------------------------------------
+export interface CommodityCounterparty {
+  id: string; code: string; accountName: string; status: string; agreementStatus: string;
+  agreementReference: string | null; agreementExpiresAt: string | null; creditLimit: number;
+  exposure: number; headroom: number | null; source: string | null; asOf: string | null;
+  lastSync: string | null; creditFresh: boolean;
+}
+export interface CommodityEnquiry {
+  id: string; number: string; type: string; commodity: string; grade: string; status: string;
+  quantity: number; unit: string; tolerancePct: number; notional: number;
+  deliveryStart: string | null; deliveryEnd: string | null; locationFrom: string; locationTo: string;
+  incoterm: string; tenderDeadline: string | null; lapseReason: string | null; version: number;
+  executionStatus: string; tradeReference: string | null; counterparty: CommodityCounterparty;
+}
+export interface CommodityPrice { id: string; indexName: string; differential: string; quotationPeriod: string; settlementConvention: string; expression: string; label: string; status: string; createdAt: string; }
+export interface CommodityTermSheet { id: string; number: string; version: number; status: string; incoterm: string; pricingBasis: string; terms: Record<string, unknown>; approvalRequestId: string | null; approvedAt: string | null; }
+export interface CommodityHandoff { id: string; enquiryVersion: number; idempotencyKey: string; status: string; attempts: number; maxAttempts: number; payload: Record<string, unknown>; tradeReference: string | null; lastError: string | null; createdAt: string; }
+export interface CommodityException { id: string; type: string; status: string; reason: string; owner: string; createdAt: string; }
+export interface CommodityDetail { enquiry: CommodityEnquiry; prices: CommodityPrice[]; termSheets: CommodityTermSheet[]; handoffs: CommodityHandoff[]; exceptions: CommodityException[]; gates: string[]; }
+
 export interface WorkspacePage {
   moduleCode: string;
   title: string;
@@ -1168,6 +1377,39 @@ export const api = {
       undefined, { skipAuthRedirect: true });
   },
 
+  translationPhraseBundle(locale: string): Promise<TranslationBundle> {
+    return request<TranslationBundle>("GET", `/i18n/phrases/${encodeURIComponent(locale)}`,
+      undefined, { skipAuthRedirect: true });
+  },
+
+  documentationDrawer(locale: string): Promise<DocumentationDrawer> {
+    return request<DocumentationDrawer>("GET", `/documentation/drawer${queryString({ locale })}`);
+  },
+
+  documentationMaster(includeInactive = true): Promise<DocumentationMaster> {
+    return request<DocumentationMaster>("GET", `/documentation/master${queryString({ includeInactive })}`);
+  },
+
+  updateDocumentationMaster(payload: { translations: Record<string, DocumentationDrawerText>; active: boolean; changeNote: string }): Promise<DocumentationMaster> {
+    return request<DocumentationMaster>("PATCH", "/documentation/master", payload);
+  },
+
+  createDocumentationSection(payload: DocumentationSectionMutation): Promise<DocumentationMaster> {
+    return request<DocumentationMaster>("POST", "/documentation/master/sections", payload);
+  },
+
+  updateDocumentationSection(id: string, payload: DocumentationSectionMutation): Promise<DocumentationMaster> {
+    return request<DocumentationMaster>("PATCH", `/documentation/master/sections/${encodeURIComponent(id)}`, payload);
+  },
+
+  createDocumentationEntry(payload: DocumentationEntryMutation): Promise<DocumentationMaster> {
+    return request<DocumentationMaster>("POST", "/documentation/master/entries", payload);
+  },
+
+  updateDocumentationEntry(id: string, payload: DocumentationEntryMutation): Promise<DocumentationMaster> {
+    return request<DocumentationMaster>("PATCH", `/documentation/master/entries/${encodeURIComponent(id)}`, payload);
+  },
+
   tenants(): Promise<TenantOption[]> {
     return request<TenantOption[]>("GET", "/auth/tenants");
   },
@@ -1354,6 +1596,11 @@ export const api = {
 
   updateReferenceEntry(apiName: string, code: string, entry: ReferenceEntryMutation): Promise<ReferenceEntry> {
     return request<ReferenceEntry>("PATCH", `/reference/value-sets/${encodeURIComponent(apiName)}/entries/${encodeURIComponent(code)}`, entry);
+  },
+
+  deleteReferenceEntry(apiName: string, code: string, reason: string): Promise<ReferenceEntry> {
+    return request<ReferenceEntry>("DELETE",
+      `/reference/value-sets/${encodeURIComponent(apiName)}/entries/${encodeURIComponent(code)}${queryString({ reason })}`);
   },
 
   accounts(params?: ListParams): Promise<PageResult<Account>> {
@@ -1681,6 +1928,79 @@ export const api = {
     return request<QuoteRevisionResult>("POST", `/cpq/quotes/${encodeURIComponent(quoteId)}/revisions`, { reason });
   },
 
+  migrationVendors(): Promise<{ vendors: MigrationVendor[]; fixtureKeys: string[] }> {
+    return request("GET", "/migration/vendors");
+  },
+  migrationConnections(): Promise<MigrationConnection[]> {
+    return request("GET", "/migration/connections");
+  },
+  migrationTargetSchema(): Promise<MigrationTargetEntity[]> {
+    return request("GET", "/migration/target-schema");
+  },
+  createMigrationConnection(req: { name: string; vendor: string; fixtureKey?: string }): Promise<MigrationConnection> {
+    return request("POST", "/migration/connections", req);
+  },
+  discoverMigrationConnection(id: string): Promise<unknown> {
+    return request("POST", `/migration/connections/${encodeURIComponent(id)}/discover`);
+  },
+  advanceMigrationFixture(id: string, wave: number): Promise<MigrationConnection> {
+    return request("POST", `/migration/connections/${encodeURIComponent(id)}/fixture-wave`, { wave });
+  },
+  migrationPlans(): Promise<MigrationPlan[]> {
+    return request("GET", "/migration/plans");
+  },
+  createMigrationPlan(req: { connectionId: string; name: string; retentionDays: number; sampleData?: boolean }): Promise<MigrationPlan> {
+    return request("POST", "/migration/plans", req);
+  },
+  migrationMapping(planId: string): Promise<MigrationMappingReview> {
+    return request("GET", `/migration/plans/${encodeURIComponent(planId)}/mapping`);
+  },
+  saveMigrationMappings(planId: string, edits: Array<{ sourceObject: string; sourceField: string;
+    targetEntity?: string | null; targetField?: string | null; status: string; note?: string | null }>): Promise<MigrationMappingReview> {
+    return request("PATCH", `/migration/plans/${encodeURIComponent(planId)}/mapping`, edits);
+  },
+  acknowledgeMigrationMapping(planId: string): Promise<MigrationMappingReview> {
+    return request("POST", `/migration/plans/${encodeURIComponent(planId)}/mapping/acknowledge`);
+  },
+  migrationMappingRevisions(planId: string): Promise<MigrationMappingRevision[]> {
+    return request("GET", `/migration/plans/${encodeURIComponent(planId)}/mapping/revisions`);
+  },
+  restoreMigrationMapping(planId: string, versionNo: number): Promise<MigrationMappingReview> {
+    return request("POST", `/migration/plans/${encodeURIComponent(planId)}/mapping/revisions/${versionNo}/restore`);
+  },
+  migrationRuns(planId: string): Promise<MigrationRun[]> {
+    return request("GET", `/migration/plans/${encodeURIComponent(planId)}/runs`);
+  },
+  queueMigrationRun(planId: string, mode: "DRY_RUN" | "IMPORT" | "DELTA"): Promise<MigrationRun> {
+    return request("POST", `/migration/plans/${encodeURIComponent(planId)}/runs`, { mode });
+  },
+  migrationRecovery(runId: string): Promise<MigrationRecovery> {
+    return request("GET", `/migration/runs/${encodeURIComponent(runId)}/recovery`);
+  },
+  migrationIssues(runId: string, params?: ListParams & { category?: string }): Promise<PageResult<MigrationIssue>> {
+    return request("GET", `/migration/runs/${encodeURIComponent(runId)}/issues${queryString({
+      page: params?.page ?? 0, search: params?.search, category: params?.category ?? params?.filter,
+    })}`);
+  },
+  retryMigrationRun(runId: string, reason: string): Promise<MigrationRun> {
+    return request("POST", `/migration/runs/${encodeURIComponent(runId)}/retry`, { reason });
+  },
+  cancelMigrationRun(runId: string, reason: string): Promise<MigrationRun> {
+    return request("POST", `/migration/runs/${encodeURIComponent(runId)}/cancel`, { reason });
+  },
+  reconcileMigration(planId: string, reason: string): Promise<MigrationRun> {
+    return request("POST", `/migration/plans/${encodeURIComponent(planId)}/reconcile`, { reason });
+  },
+  migrationRollbackPreview(planId: string): Promise<MigrationRollbackPreview> {
+    return request("GET", `/migration/plans/${encodeURIComponent(planId)}/rollback-preview`);
+  },
+  rollbackMigration(planId: string, reason: string): Promise<MigrationRun> {
+    return request("POST", `/migration/plans/${encodeURIComponent(planId)}/rollback`, { reason });
+  },
+  migrationCheckpoints(planId: string): Promise<MigrationCheckpoint[]> {
+    return request("GET", `/migration/plans/${encodeURIComponent(planId)}/checkpoints`);
+  },
+
   workspace(module: "forecast" | "contracts" | "campaigns" | "cases" | "migration" | "partners" | "automation" | "analytics" | "copilot" | "mobile" | "integrations" | "sandbox" | "audit" | "bfsi" | "commodity", params?: ListParams & { status?: string }): Promise<WorkspacePage> {
     return request<WorkspacePage>("GET", `/workspaces/${module}${queryString({
       page: params?.page ?? 0,
@@ -1791,11 +2111,163 @@ export const api = {
     return request<WorkspaceActionResult>("POST", `/workspaces/sandbox/${encodeURIComponent(id)}/refresh`, { reason });
   },
 
+  releaseSandboxes(): Promise<SandboxControl[]> {
+    return request("GET", "/release/sandboxes");
+  },
+  createReleaseSandbox(payload: { code: string; name: string; sandboxType: string; dataScope: string }): Promise<SandboxControl> {
+    return request("POST", "/release/sandboxes", payload);
+  },
+  configureSandboxOutbound(id: string, payload: { email: boolean; webhooks: boolean; integrations: boolean; acknowledgement: string }): Promise<SandboxControl> {
+    return request("POST", `/release/sandboxes/${encodeURIComponent(id)}/outbound`, payload);
+  },
+  releasePackages(): Promise<ReleasePackage[]> {
+    return request("GET", "/release/packages");
+  },
+  createReleasePackage(payload: { code: string; name: string; description?: string; sourceSandboxId: string; targetEnvironment: string }): Promise<ReleasePackage> {
+    return request("POST", "/release/packages", payload);
+  },
+  releaseComponents(packageId: string): Promise<ReleaseComponent[]> {
+    return request("GET", `/release/packages/${encodeURIComponent(packageId)}/components`);
+  },
+  addReleaseComponent(packageId: string, payload: { componentType: string; componentKey: string; operation: string; before: unknown | null; after: unknown | null }): Promise<ReleaseComponent> {
+    return request("POST", `/release/packages/${encodeURIComponent(packageId)}/components`, payload);
+  },
+  validateRelease(packageId: string): Promise<ReleaseValidation> {
+    return request("POST", `/release/packages/${encodeURIComponent(packageId)}/validate`);
+  },
+  submitReleaseApproval(packageId: string): Promise<ReleaseApproval> {
+    return request("POST", `/release/packages/${encodeURIComponent(packageId)}/submit-approval`);
+  },
+  decideRelease(packageId: string, decision: "approve" | "reject", approvalRequestId: string, note: string): Promise<ReleasePackage> {
+    return request("POST", `/release/packages/${encodeURIComponent(packageId)}/${decision}`, { approvalRequestId, note });
+  },
+  deployRelease(packageId: string): Promise<ReleaseDeployment> {
+    return request("POST", `/release/packages/${encodeURIComponent(packageId)}/deploy`);
+  },
+  rollbackPreview(deploymentId: string): Promise<RollbackPreview> {
+    return request("GET", `/release/deployments/${encodeURIComponent(deploymentId)}/rollback-preview`);
+  },
+  rollbackRelease(deploymentId: string, reason: string): Promise<ReleaseRollback> {
+    return request("POST", `/release/deployments/${encodeURIComponent(deploymentId)}/rollback`, { reason });
+  },
+  recoveryBaseline(): Promise<RecoveryBaseline> {
+    return request("GET", "/release/dr/baseline");
+  },
+  recoveryHistory(limit = 20): Promise<DrValidation[]> {
+    return request("GET", `/release/dr/validations?limit=${limit}`);
+  },
+  validateRecovery(payload: { scenario: string; restoreEnvironment: string; backupReference: string;
+    backupChecksum: string; recoveryStartedAt: string; recoveryCompletedAt: string;
+    sourceLastEventAt: string; restoredLastEventAt: string; expectedCounts: Record<string, number> }): Promise<DrValidation> {
+    return request("POST", "/release/dr/validate", payload);
+  },
+
   exportAuditPack(id: string, destination = "SECURE_DOWNLOAD"): Promise<WorkspaceActionResult> {
     return request<WorkspaceActionResult>("POST", `/workspaces/audit/${encodeURIComponent(id)}/export`, { destination });
   },
 
   offerCommodityEnquiry(id: string): Promise<WorkspaceActionResult> {
     return request<WorkspaceActionResult>("POST", `/workspaces/commodity/${encodeURIComponent(id)}/offer`);
+  },
+
+  // E21 offline packages and explicit conflict resolution
+  createOfflinePackage(deviceSessionId: string, entityTypes: string[]): Promise<OfflinePackage> {
+    return request("POST", "/mobile/offline/packages", { deviceSessionId, entityTypes });
+  },
+  offlinePackages(deviceSessionId: string): Promise<OfflinePackage[]> {
+    return request("GET", `/mobile/offline/devices/${encodeURIComponent(deviceSessionId)}/packages`);
+  },
+  offlineSnapshots(packageId: string): Promise<OfflineSnapshot[]> {
+    return request("GET", `/mobile/offline/packages/${encodeURIComponent(packageId)}/records`);
+  },
+  synchronizeOffline(packageId: string, changes: Array<{ clientMutationId: string; entityType: string;
+    recordId: string; baseVersion: number; patch: Record<string, unknown> }>): Promise<OfflineSyncResult> {
+    return request("POST", `/mobile/offline/packages/${encodeURIComponent(packageId)}/sync`, { changes });
+  },
+  offlineConflicts(deviceSessionId: string, status = "OPEN"): Promise<OfflineConflict[]> {
+    return request("GET", `/mobile/offline/devices/${encodeURIComponent(deviceSessionId)}/conflicts${queryString({ status })}`);
+  },
+  resolveOfflineConflict(id: string, resolution: string, reason: string,
+    mergedPayload?: Record<string, unknown>): Promise<OfflineConflict> {
+    return request("POST", `/mobile/offline/conflicts/${encodeURIComponent(id)}/resolve`, {
+      resolution, reason, mergedPayload: mergedPayload ?? null,
+    });
+  },
+
+  // E22 BFSI regulated workflow
+  bfsiOnboardings(status?: string, page = 0): Promise<BfsiOnboardingSummary[]> {
+    return request("GET", `/bfsi/onboardings${queryString({ status, page })}`);
+  },
+  bfsiDetail(id: string): Promise<BfsiDetail> { return request("GET", `/bfsi/onboardings/${encodeURIComponent(id)}`); },
+  updateBfsiKyc(onboardingId: string, itemId: string, payload: { status: string; evidenceReference?: string; expiresAt?: string; rejectionReason?: string }): Promise<WorkspaceActionResult> {
+    return request("POST", `/bfsi/onboardings/${encodeURIComponent(onboardingId)}/kyc-items/${encodeURIComponent(itemId)}`, payload);
+  },
+  runBfsiScreening(id: string, payload: { screeningType: string; hitCount: number; sourceSystem?: string; result?: Record<string, unknown> }): Promise<BfsiScreening> {
+    return request("POST", `/bfsi/onboardings/${encodeURIComponent(id)}/screenings`, payload);
+  },
+  dispositionBfsiScreening(id: string, disposition: string, rationale: string): Promise<BfsiScreening> {
+    return request("POST", `/bfsi/screenings/${encodeURIComponent(id)}/disposition`, { disposition, rationale });
+  },
+  rateBfsiRisk(id: string, factors: Array<{ factor: string; weight: number; score: number; evidence: string }>, rationale: string): Promise<WorkspaceActionResult> {
+    return request("POST", `/bfsi/onboardings/${encodeURIComponent(id)}/risk`, { factors, rationale });
+  },
+  activateBfsiRelationship(id: string, note: string): Promise<WorkspaceActionResult> {
+    return request("POST", `/bfsi/onboardings/${encodeURIComponent(id)}/activate`, { note });
+  },
+  addBfsiHolding(id: string, payload: { productId: string; status: string; balanceAmount: number; openedAt?: string }): Promise<WorkspaceActionResult> {
+    return request("POST", `/bfsi/onboardings/${encodeURIComponent(id)}/holdings`, payload);
+  },
+  assessBfsiSuitability(id: string, level: string, factors: Record<string, unknown>, expiresAt: string): Promise<WorkspaceActionResult> {
+    return request("POST", `/bfsi/onboardings/${encodeURIComponent(id)}/suitability`, { level, factors, expiresAt });
+  },
+  recommendBfsiProduct(id: string, productId: string, overrideReason?: string): Promise<BfsiRecommendation> {
+    return request("POST", `/bfsi/onboardings/${encodeURIComponent(id)}/recommendations`, { productId, overrideReason: overrideReason ?? null });
+  },
+  decideBfsiRecommendation(id: string, decision: "approve" | "reject", approvalRequestId: string, note: string): Promise<BfsiRecommendation> {
+    return request("POST", `/bfsi/recommendations/${encodeURIComponent(id)}/${decision}`, { approvalRequestId, note });
+  },
+  createBfsiException(id: string, exceptionType: string, reason: string): Promise<BfsiException> {
+    return request("POST", `/bfsi/onboardings/${encodeURIComponent(id)}/exceptions`, { exceptionType, reason });
+  },
+  decideBfsiException(id: string, decision: "approve" | "reject", approvalRequestId: string, note: string): Promise<BfsiException> {
+    return request("POST", `/bfsi/exceptions/${encodeURIComponent(id)}/${decision}`, { approvalRequestId, note });
+  },
+
+  // E23 commodity origination and connector-neutral execution queue
+  commodityEnquiries(status?: string, page = 0): Promise<CommodityEnquiry[]> {
+    return request("GET", `/commodity/enquiries${queryString({ status, page })}`);
+  },
+  commodityDetail(id: string): Promise<CommodityDetail> { return request("GET", `/commodity/enquiries/${encodeURIComponent(id)}`); },
+  refreshCommoditySource(id: string, payload: { sourceSystem: string; sourceAsOf: string; creditLimit: number;
+    exposure: number; headroom: number; agreementStatus: string; agreementReference?: string; agreementExpiresAt?: string }): Promise<CommodityCounterparty> {
+    return request("POST", `/commodity/counterparties/${encodeURIComponent(id)}/source-state`, payload);
+  },
+  priceCommodity(id: string, payload: { indexName: string; differential: string; quotationPeriod: string; settlementConvention: string }): Promise<CommodityPrice> {
+    return request("POST", `/commodity/enquiries/${encodeURIComponent(id)}/prices`, payload);
+  },
+  createCommodityTerm(id: string, payload: { incoterm: string; pricingBasis: string; terms: Record<string, unknown> }): Promise<CommodityTermSheet> {
+    return request("POST", `/commodity/enquiries/${encodeURIComponent(id)}/term-sheets`, payload);
+  },
+  submitCommodityTerm(id: string, note: string): Promise<CommodityTermSheet> {
+    return request("POST", `/commodity/term-sheets/${encodeURIComponent(id)}/submit`, { note });
+  },
+  decideCommodityTerm(id: string, decision: "approve" | "reject", approvalRequestId: string, note: string): Promise<CommodityTermSheet> {
+    return request("POST", `/commodity/term-sheets/${encodeURIComponent(id)}/${decision}`, { approvalRequestId, note });
+  },
+  releaseCommodityOffer(id: string): Promise<WorkspaceActionResult> {
+    return request("POST", `/commodity/enquiries/${encodeURIComponent(id)}/offer`);
+  },
+  closeCommodityWon(id: string, note: string): Promise<CommodityHandoff> {
+    return request("POST", `/commodity/enquiries/${encodeURIComponent(id)}/close-won`, { note });
+  },
+  recordCommodityHandoffAttempt(id: string, delivered: boolean, error?: string): Promise<CommodityHandoff> {
+    return request("POST", `/commodity/handoffs/${encodeURIComponent(id)}/attempt`, { delivered, error: error ?? null });
+  },
+  acknowledgeCommodityHandoff(id: string, tradeReference: string): Promise<CommodityHandoff> {
+    return request("POST", `/commodity/handoffs/${encodeURIComponent(id)}/acknowledge`, { tradeReference });
+  },
+  sweepCommodityTenders(): Promise<WorkspaceActionResult> { return request("POST", "/commodity/tenders/sweep"); },
+  commodityExceptions(status = "OPEN"): Promise<CommodityException[]> {
+    return request("GET", `/commodity/exceptions${queryString({ status })}`);
   },
 };

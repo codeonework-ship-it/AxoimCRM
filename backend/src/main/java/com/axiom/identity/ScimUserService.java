@@ -77,29 +77,32 @@ public class ScimUserService {
         int size = count == null || count < 1 ? 50 : Math.min(count, MAX_PAGE);
         ParsedFilter parsed = parseFilter(filter);
 
-        StringBuilder where = new StringBuilder(" where tenant_id = ?");
+        StringBuilder where = new StringBuilder(" where u.tenant_id = ?");
         List<Object> args = new ArrayList<>();
         args.add(tenantId);
         if (parsed.userName() != null) {
-            where.append(" and lower(email) = lower(?)");
+            where.append(" and lower(u.email) = lower(?)");
             args.add(parsed.userName());
         }
         if (parsed.active() != null) {
-            where.append(" and active = ?");
+            where.append(" and u.active = ?");
             args.add(parsed.active());
         }
         Integer total = jdbc.queryForObject(
-                "select count(*) from identity.app_user" + where, Integer.class, args.toArray());
+                "select count(*) from identity.app_user u" + where, Integer.class, args.toArray());
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add(size);
         pageArgs.add(start - 1);
         List<Map<String, Object>> resources = jdbc.query("""
-                select id, email, display_name, role, active, created_at, updated_at
-                from identity.app_user
-                """ + where + " order by created_at limit ? offset ?",
+                select u.id, u.email, u.display_name, u.role, u.active, u.created_at, u.updated_at,
+                       l.external_id, coalesce(l.version, 1) as scim_version
+                from identity.app_user u
+                left join identity.scim_user_link l on l.tenant_id=u.tenant_id and l.user_id=u.id
+                """ + where + " order by u.created_at limit ? offset ?",
                 (rs, i) -> toScim(rs.getObject("id", UUID.class), rs.getString("email"),
                         rs.getString("display_name"), rs.getString("role"), rs.getBoolean("active"),
-                        rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant()),
+                        rs.getTimestamp("created_at").toInstant(), rs.getTimestamp("updated_at").toInstant(),
+                        rs.getString("external_id"), rs.getLong("scim_version")),
                 pageArgs.toArray());
 
         Map<String, Object> response = new LinkedHashMap<>();
@@ -152,6 +155,8 @@ public class ScimUserService {
             throw new ConflictException("A user with userName \"" + email + "\" already exists in this workspace. "
                     + "Update that user instead of creating another.");
         }
+        jdbc.update("insert into identity.scim_user_link(tenant_id,user_id,external_id) values (?,?,?)",
+                tenantId, id, string(payload.get("externalId")));
         audit.record("SCIM_USER_CREATE", "APP_USER", id,
                 "User provisioned from the directory: " + email,
                 Map.of("source", "SCIM", "userName", email, "role", role, "active", active));
@@ -183,6 +188,13 @@ public class ScimUserService {
         } catch (DuplicateKeyException e) {
             throw new ConflictException("Another user in this workspace already uses \"" + email + "\".");
         }
+        jdbc.update("""
+                insert into identity.scim_user_link(tenant_id,user_id,external_id,version)
+                values (?,?,?,1)
+                on conflict (tenant_id,user_id) do update set
+                  external_id=coalesce(excluded.external_id,identity.scim_user_link.external_id),
+                  version=identity.scim_user_link.version+1,updated_at=now()
+                """, tenantId, id, string(payload.get("externalId")));
         if (!active && Boolean.TRUE.equals(existing.get("active"))) {
             deactivationSideEffects(tenantId, id, (String) existing.get("email"), "SCIM replace set active=false");
         }
@@ -247,6 +259,10 @@ public class ScimUserService {
                 set email = ?, display_name = ?, active = ?, updated_at = now()
                 where tenant_id = ? and id = ?
                 """, email.toLowerCase(), displayName, active, tenantId, id);
+        jdbc.update("""
+                insert into identity.scim_user_link(tenant_id,user_id,version) values (?,?,2)
+                on conflict (tenant_id,user_id) do update set version=identity.scim_user_link.version+1,updated_at=now()
+                """, tenantId, id);
         if (!active && Boolean.TRUE.equals(existing.get("active"))) {
             deactivationSideEffects(tenantId, id, email, "SCIM patch set active=false");
         }
@@ -273,6 +289,10 @@ public class ScimUserService {
         jdbc.update("""
                 update identity.app_user set active = false, updated_at = now()
                 where tenant_id = ? and id = ?
+                """, tenantId, id);
+        jdbc.update("""
+                insert into identity.scim_user_link(tenant_id,user_id,version) values (?,?,2)
+                on conflict (tenant_id,user_id) do update set version=identity.scim_user_link.version+1,updated_at=now()
                 """, tenantId, id);
         int revoked = deactivationSideEffects(tenantId, id, email, "SCIM delete: user removed in the directory");
         audit.record("SCIM_USER_DEPROVISION", "APP_USER", id,
@@ -304,14 +324,18 @@ public class ScimUserService {
         return toScim(id, (String) row.get("email"), (String) row.get("display_name"),
                 (String) row.get("role"), (Boolean) row.get("active"),
                 ((java.sql.Timestamp) row.get("created_at")).toInstant(),
-                ((java.sql.Timestamp) row.get("updated_at")).toInstant());
+                ((java.sql.Timestamp) row.get("updated_at")).toInstant(),
+                (String) row.get("external_id"), ((Number) row.get("scim_version")).longValue());
     }
 
     private Map<String, Object> loadRow(UUID id) {
         try {
             return jdbc.queryForMap("""
-                    select id, email, display_name, role, active, created_at, updated_at
-                    from identity.app_user where tenant_id = ? and id = ?
+                    select u.id, u.email, u.display_name, u.role, u.active, u.created_at, u.updated_at,
+                           l.external_id, coalesce(l.version,1) as scim_version
+                    from identity.app_user u
+                    left join identity.scim_user_link l on l.tenant_id=u.tenant_id and l.user_id=u.id
+                    where u.tenant_id = ? and u.id = ?
                     """, TenantContext.get().tenantId(), id);
         } catch (EmptyResultDataAccessException e) {
             throw new NotFoundException("No user with that id exists in this workspace");
@@ -319,7 +343,8 @@ public class ScimUserService {
     }
 
     private Map<String, Object> toScim(UUID id, String email, String displayName, String role,
-                                       boolean active, Instant created, Instant modified) {
+                                       boolean active, Instant created, Instant modified,
+                                       String externalId, long version) {
         String[] split = splitName(displayName);
         Map<String, Object> name = new LinkedHashMap<>();
         name.put("formatted", displayName);
@@ -331,6 +356,7 @@ public class ScimUserService {
         meta.put("created", created.toString());
         meta.put("lastModified", modified.toString());
         meta.put("location", "/scim/v2/Users/" + id);
+        meta.put("version", "W/\"" + version + "\"");
 
         Map<String, Object> extension = new LinkedHashMap<>();
         extension.put("role", role);
@@ -338,6 +364,7 @@ public class ScimUserService {
         Map<String, Object> resource = new LinkedHashMap<>();
         resource.put("schemas", List.of(USER_SCHEMA, AXIOM_EXTENSION));
         resource.put("id", id.toString());
+        if (externalId != null) resource.put("externalId", externalId);
         resource.put("userName", email);
         resource.put("name", name);
         resource.put("displayName", displayName);

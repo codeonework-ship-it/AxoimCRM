@@ -2,6 +2,7 @@ import { Fragment, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   idpApi,
+  IDENTITY_CERTIFICATION_EVIDENCE,
   stepUp,
   trialApi,
   type ApprovalResult,
@@ -9,6 +10,7 @@ import {
   type IdpMutation,
   type IdpProtocol,
   type IdpTestResult,
+  type IdentityCertificationRequest,
   type TrialRequestRow,
 } from "../api/access";
 import { useAuth } from "../auth/AuthContext";
@@ -32,7 +34,7 @@ import { useToasts } from "../components/Toasts";
  */
 
 const PLATFORM_ROLES = new Set(["SUPER_ADMIN", "SUPER_AUDIT"]);
-const SSO_ROLES = new Set(["SUPER_ADMIN", "TENANT_ADMIN"]);
+const SSO_ROLES = new Set(["SUPER_ADMIN", "TENANT_ADMIN", "SUPER_AUDIT", "AUDITOR"]);
 const READ_ONLY_ROLES = new Set(["SUPER_AUDIT", "AUDITOR"]);
 
 const STATUS_FILTERS = ["ALL", "PENDING", "APPROVED", "PROVISIONED", "REJECTED", "EXPIRED"] as const;
@@ -49,6 +51,9 @@ const EMPTY_IDP: IdpMutation & { certificate: string } = {
   clientSecret: "",
   discoveryUrl: "",
   attributeMap: { email: "email", displayName: "name" },
+  jitEnabled: false,
+  defaultRole: "SALES",
+  clientAuthMethod: "CLIENT_SECRET_BASIC",
 };
 
 type TabKey = "sso" | "requests" | "accounts";
@@ -154,15 +159,21 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
   }
 
   // ---------------------------------------------------------------- SSO state
-  const idpQ = useQuery({ queryKey: ["access", "idp"], queryFn: idpApi.list, enabled: canConfigureSso, retry: 1 });
+  const idpQ = useQuery({ queryKey: ["access", "idp"], queryFn: idpApi.list,
+    enabled: canConfigureSso && tab === "sso", retry: 1 });
   const certificateAlertsQ = useQuery({ queryKey: ["access", "idp", "certificate-alerts"],
-    queryFn: idpApi.certificateAlerts, enabled: canConfigureSso, retry: 1 });
+    queryFn: idpApi.certificateAlerts, enabled: canConfigureSso && tab === "sso", retry: 1 });
+  const certificationsQ = useQuery({ queryKey: ["access", "idp", "certifications"],
+    queryFn: idpApi.certifications, enabled: canConfigureSso && tab === "sso", retry: 1 });
   const [idpDraft, setIdpDraft] = useState(EMPTY_IDP);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [attributeText, setAttributeText] = useState("email=email\ndisplayName=name");
   const [testResult, setTestResult] = useState<{ name: string; result: IdpTestResult } | null>(null);
   const [routeProbe, setRouteProbe] = useState("");
   const [routeAnswer, setRouteAnswer] = useState<string | null>(null);
+  const [certDraft, setCertDraft] = useState<IdentityCertificationRequest>({
+    idpConfigId: null, provider: "", externalTenantRef: "", connectorJobRef: "", evidence: {},
+  });
 
   function parseAttributes(text: string): Record<string, string> {
     const map: Record<string, string> = {};
@@ -187,6 +198,9 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
       clientSecret: idpDraft.clientSecret?.trim() || null,
       discoveryUrl: idpDraft.discoveryUrl?.trim() || null,
       attributeMap: parseAttributes(attributeText),
+      jitEnabled: idpDraft.jitEnabled,
+      defaultRole: idpDraft.defaultRole,
+      clientAuthMethod: idpDraft.clientAuthMethod,
     };
   }
 
@@ -210,7 +224,7 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
   const removeIdp = useMutation({
     mutationFn: (id: string) => idpApi.remove(id),
     onSuccess: () => {
-      toasts.push("info", "Provider removed", "Users on that domain fall back to password sign-in.");
+      toasts.push("info", "Provider inactivated", "The master and its audit links were retained; users on that domain fall back to password sign-in.");
       resetIdpForm();
       void queryClient.invalidateQueries({ queryKey: ["access", "idp"] });
     },
@@ -221,6 +235,14 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
     mutationFn: (row: IdpConfig) => idpApi.test(row.id).then((result) => ({ name: row.displayName, result })),
     onSuccess: (value) => setTestResult(value),
     onError: (error) => handle("Test could not run", error),
+  });
+  const liveTestIdp = useMutation({
+    mutationFn: (row: IdpConfig) => idpApi.liveTest(row.id).then((result) => ({ row, result })),
+    onSuccess: ({ row, result }) => {
+      toasts.push("info", `${row.displayName} live test passed`, result.message);
+      void queryClient.invalidateQueries({ queryKey: ["access", "idp"] });
+    },
+    onError: (error) => handle("Live federation test failed", error),
   });
 
   const probeRoute = useMutation({
@@ -239,6 +261,15 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
     },
     onError: (error) => toasts.push("error", "Certificate control failed", messageOf(error)),
   });
+  const recordCertification = useMutation({
+    mutationFn: () => idpApi.recordCertification(certDraft),
+    onSuccess: (row) => {
+      toasts.push(row.status === "PASSED" ? "info" : "error", `Certification ${row.status.toLowerCase()}`,
+        row.missing.length ? `Missing evidence: ${row.missing.join(", ")}` : "All production evidence controls passed.");
+      void queryClient.invalidateQueries({ queryKey: ["access", "idp", "certifications"] });
+    },
+    onError: (error) => handle("Certification evidence not recorded", error),
+  });
 
   function editIdp(row: IdpConfig) {
     setEditingId(row.id);
@@ -254,6 +285,9 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
       clientSecret: "",
       discoveryUrl: row.discoveryUrl ?? "",
       attributeMap: row.attributeMap,
+      jitEnabled: row.jitEnabled,
+      defaultRole: row.defaultRole,
+      clientAuthMethod: row.clientAuthMethod,
     });
     setAttributeText(Object.entries(row.attributeMap ?? {}).map(([k, v]) => `${k}=${v}`).join("\n"));
   }
@@ -263,13 +297,13 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
   const requestsQ = useQuery({
     queryKey: ["access", "trial-requests", statusFilter],
     queryFn: () => trialApi.requests(statusFilter),
-    enabled: platform,
+    enabled: platform && tab === "requests",
     retry: 1,
   });
   const companiesQ = useQuery({
     queryKey: ["access", "companies"],
     queryFn: trialApi.companies,
-    enabled: platform,
+    enabled: platform && tab === "accounts",
     retry: 1,
   });
 
@@ -420,7 +454,7 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
         <div className="table-wrap"><table className="data-table">
           <thead><tr>
             <th>Provider</th><th>Protocol</th><th>Routes</th><th>State</th>
-            <th>Secret</th><th>Certificate</th><th>Updated</th>
+            <th>Secret</th><th>Certificate</th><th>Live Test</th><th>Updated</th>
             {!readOnly && <th className="table-action">Action</th>}
           </tr></thead>
           <tbody>{idpQ.data.map((row) => <Fragment key={row.id}>
@@ -440,11 +474,16 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
                     </span>
                   : <span className="chip chip-draft">None</span>}
               </td>
+              <td>{row.lastLiveTestStatus
+                ? <span className={row.lastLiveTestStatus === "PASSED" ? "chip chip-accepted" : "chip chip-rejected"}>
+                    {row.lastLiveTestStatus} {when(row.lastLiveTestAt)}</span>
+                : <span className="chip chip-draft">Not Run</span>}</td>
               <td>{when(row.updatedAt)}</td>
               {!readOnly && <td className="table-action">
                 <button className="link-btn" onClick={() => editIdp(row)}>Edit</button>
                 <button className="link-btn" onClick={() => testIdp.mutate(row)}>Test configuration</button>
-                <button className="link-btn danger-link" onClick={() => removeIdp.mutate(row.id)}>Remove</button>
+                <button className="link-btn" onClick={() => liveTestIdp.mutate(row)}>Test live federation</button>
+                <button className="link-btn danger-link" onClick={() => removeIdp.mutate(row.id)}>Inactivate</button>
               </td>}
             </tr>
           </Fragment>)}</tbody>
@@ -491,6 +530,21 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
           </select>
         </div>
         <div className="field">
+          <label className="label" htmlFor="idp-default-role">Default role for just-in-time users</label>
+          <select id="idp-default-role" value={idpDraft.defaultRole ?? "SALES"}
+            onChange={(e) => setIdpDraft((v) => ({ ...v, defaultRole: e.target.value }))}>
+            {['SALES','SALES_MANAGER','MARKETING','SERVICE','OPERATIONS','FINANCE','DATA_STEWARD','AUDITOR','TENANT_ADMIN']
+              .map((role) => <option key={role} value={role}>{role.replace(/_/g, ' ')}</option>)}
+          </select>
+        </div>
+        <div className="field">
+          <label className="label" htmlFor="idp-jit">
+            <input id="idp-jit" type="checkbox" checked={Boolean(idpDraft.jitEnabled)}
+              onChange={(e) => setIdpDraft((v) => ({ ...v, jitEnabled: e.target.checked }))} />
+            {" "}Create a user after a fully verified assertion when SCIM has not provisioned one
+          </label>
+        </div>
+        <div className="field">
           <label className="label" htmlFor="idp-name">Display name</label>
           <input id="idp-name" value={idpDraft.displayName}
             onChange={(e) => setIdpDraft((v) => ({ ...v, displayName: e.target.value }))}
@@ -535,6 +589,15 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
               placeholder={editingId ? "Leave empty to keep the stored secret" : "Stored encrypted; never shown again"} />
           </div>
           <div className="field">
+            <label className="label" htmlFor="idp-client-auth">Token endpoint authentication</label>
+            <select id="idp-client-auth" value={idpDraft.clientAuthMethod ?? "CLIENT_SECRET_BASIC"}
+              onChange={(e) => setIdpDraft((v) => ({ ...v,
+                clientAuthMethod: e.target.value as "CLIENT_SECRET_BASIC" | "CLIENT_SECRET_POST" }))}>
+              <option value="CLIENT_SECRET_BASIC">Client secret basic (recommended)</option>
+              <option value="CLIENT_SECRET_POST">Client secret post</option>
+            </select>
+          </div>
+          <div className="field">
             <label className="label" htmlFor="idp-discovery">Discovery URL</label>
             <input id="idp-discovery" value={idpDraft.discoveryUrl ?? ""}
               onChange={(e) => setIdpDraft((v) => ({ ...v, discoveryUrl: e.target.value }))}
@@ -568,7 +631,7 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
         {editingId && <button className="btn btn-sm" style={{ marginLeft: 8 }} onClick={resetIdpForm}>Cancel</button>}
       </div>}
 
-      <div className="panel" style={{ padding: 16 }}>
+      <div className="panel" style={{ padding: 16, marginBottom: 14 }}>
         <span className="eyebrow">Routing check</span>
         <h2>Which provider would serve an address?</h2>
         <div className="field">
@@ -581,6 +644,47 @@ export function AccessGovernancePage({ initialTab }: { initialTab?: TabKey }) {
           {probeRoute.isPending ? <InlineLoader label="Checking" /> : "Check routing"}
         </button>
         {routeAnswer && <p className="form-notice" style={{ marginTop: 12 }}>{routeAnswer}</p>}
+      </div>
+
+      <div className="panel" style={{ padding: 16 }}>
+        <span className="eyebrow">Production certification</span>
+        <h2>SAML, OIDC and SCIM evidence register</h2>
+        <p className="form-notice">Axiom only records a pass when every control is checked and the external
+          provider tenant and connector job references are supplied. A local configuration test is not a vendor certification.</p>
+        {!readOnly && <>
+          <div className="field"><label className="label" htmlFor="cert-idp">Identity provider</label>
+            <select id="cert-idp" value={certDraft.idpConfigId ?? ""}
+              onChange={(e) => setCertDraft((v) => ({ ...v, idpConfigId: e.target.value || null }))}>
+              <option value="">SCIM-only certification</option>
+              {(idpQ.data ?? []).map((idp) => <option key={idp.id} value={idp.id}>{idp.displayName}</option>)}
+            </select></div>
+          <div className="field"><label className="label" htmlFor="cert-provider">Provider</label>
+            <input id="cert-provider" value={certDraft.provider}
+              onChange={(e) => setCertDraft((v) => ({ ...v, provider: e.target.value }))}
+              placeholder="Microsoft Entra ID or Okta" /></div>
+          <div className="field"><label className="label" htmlFor="cert-tenant">External tenant reference</label>
+            <input id="cert-tenant" value={certDraft.externalTenantRef}
+              onChange={(e) => setCertDraft((v) => ({ ...v, externalTenantRef: e.target.value }))} /></div>
+          <div className="field"><label className="label" htmlFor="cert-job">Connector or test-job reference</label>
+            <input id="cert-job" value={certDraft.connectorJobRef}
+              onChange={(e) => setCertDraft((v) => ({ ...v, connectorJobRef: e.target.value }))} /></div>
+          <div className="field"><span className="label">Verified controls</span>
+            <div className="check-grid">{IDENTITY_CERTIFICATION_EVIDENCE.map((key) => <label key={key}>
+              <input type="checkbox" checked={Boolean(certDraft.evidence[key])}
+                onChange={(e) => setCertDraft((v) => ({ ...v,
+                  evidence: { ...v.evidence, [key]: e.target.checked } }))} /> {key.replace(/([A-Z])/g, " $1")}
+            </label>)}</div></div>
+          <button className="btn btn-primary btn-sm" disabled={recordCertification.isPending}
+            onClick={() => recordCertification.mutate()}>Record certification evidence</button>
+        </>}
+        {certificationsQ.isLoading && <PanelLoader label="Reading certification evidence" />}
+        {certificationsQ.isSuccess && certificationsQ.data.length > 0 && <div className="table-wrap" style={{ marginTop: 14 }}>
+          <table className="data-table"><thead><tr><th>Provider</th><th>External tenant</th><th>Job reference</th><th>Status</th><th>Missing evidence</th><th>Completed</th></tr></thead>
+            <tbody>{certificationsQ.data.map((row) => <tr key={row.id}><td>{row.provider}</td>
+              <td className="mono">{row.externalTenantRef}</td><td className="mono">{row.connectorJobRef}</td>
+              <td><span className={row.status === "PASSED" ? "chip chip-accepted" : "chip chip-rejected"}>{row.status}</span></td>
+              <td>{row.missing.length ? row.missing.join(", ") : "None"}</td><td>{when(row.completedAt)}</td></tr>)}</tbody>
+          </table></div>}
       </div>
     </>}
 

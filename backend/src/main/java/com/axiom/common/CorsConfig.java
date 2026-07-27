@@ -51,7 +51,9 @@ public class CorsConfig {
                 CorrelationIdFilter.HEADER,
                 "X-Requested-With"));
         configuration.setExposedHeaders(List.of(CorrelationIdFilter.HEADER, HttpHeaders.CONTENT_DISPOSITION));
-        configuration.setAllowCredentials(false);
+        // Federation state is bound to an HttpOnly cookie. Wildcards are rejected
+        // above, so credentialed CORS remains limited to explicitly trusted UIs.
+        configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

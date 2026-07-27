@@ -14,6 +14,7 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 import java.io.ByteArrayInputStream;
 import java.security.cert.CertificateFactory;
@@ -30,14 +31,10 @@ import java.util.UUID;
 /**
  * Tenant identity-provider configuration (FR-TEN-004, FR-TEN-005, FR-TEN-006).
  *
- * <p><b>Scope boundary, stated plainly.</b> Everything on our side of the
- * federation contract is real here: storage, validation, certificate parsing and
- * expiry reporting, attribute/claim mapping, domain-based routing, and a
- * test-connection facility that reports specific failures without activating
- * anything. Consuming a live SAML assertion or completing a live OIDC token
- * exchange is not implemented and is not claimed — that needs a purchased
- * identity provider to prove, and a "works on my mock" claim about SSO is exactly
- * the kind of thing that fails on a customer's first attempt.
+ * <p>The configuration is consumed by the live SAML assertion and OIDC
+ * authorization-code/PKCE flows. Local validation and live prerequisite checks
+ * remain distinct from production provider certification, which requires
+ * evidence from an external provider tenant.
  *
  * <p>Two safety properties matter more than the feature itself:
  *
@@ -77,12 +74,18 @@ public class IdpConfigService {
                             String emailDomain, String entityId, String ssoUrl,
                             boolean certificatePresent, String clientId, String clientSecret,
                             String discoveryUrl, Map<String, String> attributeMap,
+                            boolean jitEnabled, String defaultRole, String clientAuthMethod,
+                            Instant lastLiveTestAt, String lastLiveTestStatus, String lastLiveTestDetail,
                             Instant certificateNotAfter, boolean certificateExpiringSoon,
                             Instant updatedAt) {}
 
     public record IdpMutation(String protocol, String displayName, Boolean enabled, String emailDomain,
                               String entityId, String ssoUrl, String certificate, String clientId,
-                              String clientSecret, String discoveryUrl, Map<String, String> attributeMap) {}
+                              String clientSecret, String discoveryUrl, Map<String, String> attributeMap,
+                              Boolean jitEnabled, String defaultRole, String clientAuthMethod) {}
+
+    /** Server-only configuration. Secrets and certificate bodies never cross an API response. */
+    public record FederationConfig(IdpConfig publicConfig, String certificate, String clientSecret) {}
 
     public record TestResult(boolean ready, List<String> problems, List<String> warnings,
                              Map<String, Object> inspected, String note) {}
@@ -99,7 +102,8 @@ public class IdpConfigService {
         return jdbc.query("""
                 select id, protocol, display_name, enabled, email_domain, entity_id, sso_url,
                        certificate, client_id, client_secret_cipher, discovery_url,
-                       attribute_map::text, updated_at
+                       attribute_map::text, jit_enabled, default_role, client_auth_method, last_live_test_at,
+                       last_live_test_status, last_live_test_detail, updated_at
                 from identity.idp_config
                 where tenant_id = ?
                 order by enabled desc, display_name
@@ -112,7 +116,8 @@ public class IdpConfigService {
             return jdbc.queryForObject("""
                     select id, protocol, display_name, enabled, email_domain, entity_id, sso_url,
                            certificate, client_id, client_secret_cipher, discovery_url,
-                           attribute_map::text, updated_at
+                           attribute_map::text, jit_enabled, default_role, client_auth_method, last_live_test_at,
+                           last_live_test_status, last_live_test_detail, updated_at
                     from identity.idp_config
                     where tenant_id = ? and id = ?
                     """, (rs, i) -> map(rs), TenantContext.get().tenantId(), id);
@@ -144,13 +149,15 @@ public class IdpConfigService {
             jdbc.update("""
                     insert into identity.idp_config
                       (id, tenant_id, protocol, display_name, enabled, email_domain, entity_id, sso_url,
-                       certificate, client_id, client_secret_cipher, discovery_url, attribute_map)
-                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb)
+                       certificate, client_id, client_secret_cipher, discovery_url, attribute_map,
+                       jit_enabled, default_role, client_auth_method)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::jsonb, ?, ?, ?)
                     """, id, principal.tenantId(), protocol, displayName, enabled,
                     lowerOrNull(request.emailDomain()), clean(request.entityId()), clean(request.ssoUrl()),
                     clean(request.certificate()), clean(request.clientId()),
                     cipher.encrypt(clean(request.clientSecret())), clean(request.discoveryUrl()),
-                    writeMap(request.attributeMap()));
+                    writeMap(request.attributeMap()), Boolean.TRUE.equals(request.jitEnabled()),
+                    tenantRole(request.defaultRole()), clientAuthMethod(request.clientAuthMethod()));
         } catch (DuplicateKeyException e) {
             throw new ConflictException("Another provider in this workspace already uses that name or "
                     + "already routes that email domain. Domain routing must be unambiguous.");
@@ -195,12 +202,17 @@ public class IdpConfigService {
                       client_secret_cipher = coalesce(?, client_secret_cipher),
                       discovery_url = coalesce(?, discovery_url),
                       attribute_map = coalesce(?::jsonb, attribute_map),
+                      jit_enabled = coalesce(?, jit_enabled),
+                      default_role = coalesce(?, default_role),
+                      client_auth_method = coalesce(?, client_auth_method),
                       updated_at = now()
                     where tenant_id = ? and id = ?
                     """, protocol, clean(request.displayName()), enabled, lowerOrNull(request.emailDomain()),
                     clean(request.entityId()), clean(request.ssoUrl()), certificate, clean(request.clientId()),
                     cipher.encrypt(secret), clean(request.discoveryUrl()),
                     request.attributeMap() == null ? null : writeMap(request.attributeMap()),
+                    request.jitEnabled(), request.defaultRole() == null ? null : tenantRole(request.defaultRole()),
+                    request.clientAuthMethod() == null ? null : clientAuthMethod(request.clientAuthMethod()),
                     principal.tenantId(), id);
         } catch (DuplicateKeyException e) {
             throw new ConflictException("Another provider in this workspace already uses that name or "
@@ -213,6 +225,26 @@ public class IdpConfigService {
         return get(id);
     }
 
+    @Transactional(readOnly = true)
+    public FederationConfig federation(UUID id) {
+        IdpConfig config = get(id);
+        Map<String, Object> secret = jdbc.queryForMap("""
+                select certificate, client_secret_cipher from identity.idp_config
+                where tenant_id = ? and id = ?
+                """, TenantContext.get().tenantId(), id);
+        return new FederationConfig(config, (String) secret.get("certificate"),
+                cipher.decrypt((String) secret.get("client_secret_cipher")));
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordLiveTest(UUID id, boolean passed, String detail) {
+        jdbc.update("""
+                update identity.idp_config
+                   set last_live_test_at = now(), last_live_test_status = ?, last_live_test_detail = ?, updated_at = now()
+                 where tenant_id = ? and id = ?
+                """, passed ? "PASSED" : "FAILED", detail, TenantContext.get().tenantId(), id);
+    }
+
     @Transactional
     public void delete(UUID id) {
         requireAdmin();
@@ -221,9 +253,12 @@ public class IdpConfigService {
         IdpConfig existing = get(id);
         jdbc.update("delete from identity.sso_auth_request where tenant_id = ? and idp_config_id = ?",
                 principal.tenantId(), id);
-        jdbc.update("delete from identity.idp_config where tenant_id = ? and id = ?", principal.tenantId(), id);
-        audit.record("IDP_CONFIG_DELETE", "IDP_CONFIG", id,
-                "Identity provider removed: " + existing.displayName(),
+        // Identity-provider configuration is a governed master. Retain it for
+        // federation/audit attribution and make DELETE an idempotent inactivation.
+        jdbc.update("update identity.idp_config set enabled = false, updated_at = now() where tenant_id = ? and id = ?",
+                principal.tenantId(), id);
+        audit.record("IDP_CONFIG_INACTIVATE", "IDP_CONFIG", id,
+                "Identity provider inactivated: " + existing.displayName(),
                 Map.of("protocol", existing.protocol()));
     }
 
@@ -239,7 +274,8 @@ public class IdpConfigService {
      * runs without activating the configuration (US-E01-03's first criterion).
      *
      * <p>What it cannot tell them: whether the provider will actually accept us.
-     * That requires the live handshake this build does not do.
+     * That requires the separate live prerequisite test and a browser handshake
+     * against the production provider.
      */
     @Transactional(readOnly = true)
     public TestResult test(UUID id) {
@@ -406,7 +442,11 @@ public class IdpConfigService {
                 certificate != null && !certificate.isBlank(), rs.getString("client_id"),
                 // The stored secret is never returned; only whether one exists.
                 rs.getString("client_secret_cipher") == null ? null : SECRET_MASK,
-                rs.getString("discovery_url"), attributeMap, notAfter, expiringSoon,
+                rs.getString("discovery_url"), attributeMap, rs.getBoolean("jit_enabled"),
+                rs.getString("default_role"), rs.getString("client_auth_method"),
+                rs.getTimestamp("last_live_test_at") == null ? null : rs.getTimestamp("last_live_test_at").toInstant(),
+                rs.getString("last_live_test_status"), rs.getString("last_live_test_detail"),
+                notAfter, expiringSoon,
                 rs.getTimestamp("updated_at").toInstant());
     }
 
@@ -443,6 +483,23 @@ public class IdpConfigService {
         String value = requested == null ? "" : requested.trim().toUpperCase();
         if (!List.of("SAML2", "OIDC").contains(value)) {
             throw new IllegalArgumentException("Protocol must be SAML2 or OIDC");
+        }
+        return value;
+    }
+
+    private static String tenantRole(String requested) {
+        String value = requested == null || requested.isBlank() ? "SALES" : requested.trim().toUpperCase();
+        CrmRole role = CrmRole.current(value);
+        if (role.platform() || role == CrmRole.INTEGRATION) {
+            throw new IllegalArgumentException("A federated interactive user must receive a tenant human-user role");
+        }
+        return role.name();
+    }
+
+    private static String clientAuthMethod(String requested) {
+        String value = requested == null || requested.isBlank() ? "CLIENT_SECRET_BASIC" : requested.trim().toUpperCase();
+        if (!List.of("CLIENT_SECRET_BASIC", "CLIENT_SECRET_POST").contains(value)) {
+            throw new IllegalArgumentException("OIDC client authentication must be CLIENT_SECRET_BASIC or CLIENT_SECRET_POST");
         }
         return value;
     }

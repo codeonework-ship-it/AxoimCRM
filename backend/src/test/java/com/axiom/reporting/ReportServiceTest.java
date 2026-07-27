@@ -48,6 +48,8 @@ class ReportServiceTest {
     @Test void crmInsightJasperTemplateCompiles() throws Exception {
         var resource = new ClassPathResource("reports/crm-insight-report.jrxml");
         assertNotNull(net.sf.jasperreports.engine.JasperCompileManager.compileReport(resource.getInputStream()));
+        var summary = new ClassPathResource("reports/tenant-summary.jrxml");
+        assertNotNull(net.sf.jasperreports.engine.JasperCompileManager.compileReport(summary.getInputStream()));
     }
 
     @Test void reportFiltersSearchEveryColumnAndCombineColumnCriteria() {
@@ -62,5 +64,19 @@ class ReportServiceTest {
         assertEquals(List.of("North"), ReportService.filterRows(rows,
                         new ReportService.ReportFilters(null, null, "120", "renewals", "risk"))
                 .stream().map(ReportService.ReportRow::getMetric).toList());
+    }
+
+    @Test void gridAndDocumentUseTheSameOrderSensitiveDatasetFingerprint() {
+        List<ReportService.ReportRow> rows = List.of(
+                new ReportService.ReportRow("North", "120", "Enterprise renewals", "AT RISK"),
+                new ReportService.ReportRow("South", "95", "New business", "CURRENT"));
+
+        String gridFingerprint = ReportService.datasetFingerprint(rows);
+        String documentFingerprint = ReportService.datasetFingerprint(List.copyOf(rows));
+        assertEquals(64, gridFingerprint.length());
+        assertEquals(gridFingerprint, documentFingerprint);
+        assertNotNull(gridFingerprint);
+        org.junit.jupiter.api.Assertions.assertNotEquals(gridFingerprint,
+                ReportService.datasetFingerprint(List.of(rows.get(1), rows.get(0))));
     }
 }

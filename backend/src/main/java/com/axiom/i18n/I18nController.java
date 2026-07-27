@@ -32,4 +32,9 @@ public class I18nController {
     public Map<String, String> bundle(@PathVariable String locale) {
         return service.bundle(locale);
     }
+
+    @GetMapping("/phrases/{locale}")
+    public Map<String, String> phraseBundle(@PathVariable String locale) {
+        return service.phraseBundle(locale);
+    }
 }

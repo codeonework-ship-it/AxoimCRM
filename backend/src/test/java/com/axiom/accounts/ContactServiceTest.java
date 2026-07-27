@@ -3,6 +3,8 @@ package com.axiom.accounts;
 import com.axiom.audit.AuditService;
 import com.axiom.common.ConflictException;
 import com.axiom.tenancy.TenantContext;
+import com.axiom.outbox.OutboxWriter;
+import com.axiom.security.AuthorizationService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -57,7 +59,8 @@ class ContactServiceTest {
         audit = mock(AuditService.class);
         duplicates = mock(DuplicateService.class);
         actor = mock(ActorSession.class);
-        service = new ContactService(jdbc, audit, duplicates, actor);
+        service = new ContactService(jdbc, audit, duplicates, actor,
+                mock(AuthorizationService.class), mock(OutboxWriter.class));
         TenantContext.set(new TenantContext.Principal(TENANT, USER, "TENANT_ADMIN", "Raj", "raj@example.test"));
     }
 

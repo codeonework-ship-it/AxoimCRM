@@ -17,6 +17,8 @@
               uuid="6f8820c3-725f-406b-9f6d-7c4a7c6a59c5">
     <parameter name="REPORT_TITLE" class="java.lang.String"/>
     <parameter name="GENERATED_AT" class="java.lang.String"/>
+    <parameter name="DATASET_FINGERPRINT" class="java.lang.String"/>
+    <parameter name="REPORT_ROW_COUNT" class="java.lang.Integer"/>
     <field name="metric" class="java.lang.String"/>
     <field name="value" class="java.lang.String"/>
     <field name="detail" class="java.lang.String"/>
@@ -59,4 +61,9 @@
             <textField><reportElement x="300" y="0" width="215" height="20"/><textElement><font size="9"/></textElement><textFieldExpression><![CDATA[$F{detail}]]></textFieldExpression></textField>
         </band>
     </detail>
+    <pageFooter>
+        <band height="24">
+            <textField><reportElement x="0" y="8" width="515" height="12"/><textElement><font size="6"/></textElement><textFieldExpression><![CDATA["Rows " + $P{REPORT_ROW_COUNT} + "  ·  Dataset " + $P{DATASET_FINGERPRINT}]]></textFieldExpression></textField>
+        </band>
+    </pageFooter>
 </jasperReport>

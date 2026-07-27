@@ -14,7 +14,9 @@ import {
   type AuthTenant,
   type AuthUser,
   type LoginRequest,
+  type LoginResponse,
 } from "../api/client";
+import { exchangeSsoTicket } from "../api/access";
 import { flushUiEvents, reportUiEvent } from "../activity/uiActivity";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -31,6 +33,7 @@ interface AuthState {
   tenant: AuthTenant | null;
   isAuthenticated: boolean;
   login: (req: LoginRequest) => Promise<void>;
+  completeSso: (ticket: string) => Promise<void>;
   switchTenant: (tenantSlug: string) => Promise<void>;
   logout: () => void;
 }
@@ -78,8 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
   }, []);
 
-  const login = useCallback(async (req: LoginRequest) => {
-    const res = await api.login(req);
+  const persist = useCallback((res: LoginResponse) => {
     const next: StoredSession = {
       token: res.token,
       user: res.user,
@@ -89,6 +91,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
     setSession(next);
   }, []);
+
+  const login = useCallback(async (req: LoginRequest) => {
+    persist(await api.login(req));
+  }, [persist]);
+
+  const completeSso = useCallback(async (ticket: string) => {
+    persist(await exchangeSsoTicket(ticket));
+  }, [persist]);
 
   const switchTenant = useCallback(async (tenantSlug: string) => {
     const res = await api.switchTenant(tenantSlug);
@@ -112,10 +122,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       tenant: session?.tenant ?? null,
       isAuthenticated: !!session,
       login,
+      completeSso,
       switchTenant,
       logout,
     }),
-    [session, login, switchTenant, logout],
+    [session, login, completeSso, switchTenant, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

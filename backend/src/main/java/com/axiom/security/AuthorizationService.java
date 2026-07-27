@@ -227,7 +227,8 @@ public class AuthorizationService {
         if (object.hasOwner()) {
             terms.add(alias + "." + object.ownerColumn() + " = ?");
             args.add(ctx.userId());
-        } else if (object.parent().isPresent() && depth < 2) {
+        }
+        if (object.parent().isPresent() && depth < 2) {
             // An object with no owner column inherits its parent's visibility. The
             // recursion depth is capped because the registry is a tree today and a
             // cycle in it would be a build defect, not a runtime condition.

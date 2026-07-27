@@ -47,12 +47,16 @@ public class AnalyticsController {
     private final ProjectionBackfillService backfill;
     private final SnapshotService snapshots;
     private final ReconciliationService reconciliation;
+    private final KpiReconciliationService kpiReconciliation;
+    private final ReportingCertificationService certification;
 
     public AnalyticsController(ReportQueryService queries, ReportViewService views,
                                DrillThroughService drill, MetricRegistryService metrics,
                                KpiCalculationService kpis, ProjectionStatusService projections,
                                ProjectionBackfillService backfill, SnapshotService snapshots,
-                               ReconciliationService reconciliation) {
+                               ReconciliationService reconciliation,
+                               KpiReconciliationService kpiReconciliation,
+                               ReportingCertificationService certification) {
         this.queries = queries;
         this.views = views;
         this.drill = drill;
@@ -62,6 +66,8 @@ public class AnalyticsController {
         this.backfill = backfill;
         this.snapshots = snapshots;
         this.reconciliation = reconciliation;
+        this.kpiReconciliation = kpiReconciliation;
+        this.certification = certification;
     }
 
     // ------------------------------------------------------------------ builder metadata
@@ -284,5 +290,34 @@ public class AnalyticsController {
     public List<ReconciliationService.CheckResult> reconciliationHistory(
             @RequestParam(defaultValue = "20") int limit) {
         return reconciliation.recentRuns(limit);
+    }
+
+    /** Rebuild and immediately prove the rebuilt read model; one operator action, one verdict. */
+    @PostMapping("/projections/rebuild-and-reconcile")
+    public ReportingCertificationService.RecoveryReport rebuildAndReconcile(
+            @RequestBody(required = false) @Valid ProjectionBackfillService.BackfillRequest request) {
+        return certification.rebuildAndReconcile(request);
+    }
+
+    @PostMapping("/kpi-reconciliation/run")
+    public KpiReconciliationService.KpiReport reconcileKpis() {
+        return kpiReconciliation.reconcileCurrentTenant();
+    }
+
+    @GetMapping("/kpi-reconciliation")
+    public List<KpiReconciliationService.KpiCheck> kpiReconciliationHistory(
+            @RequestParam(defaultValue = "20") int limit) {
+        return kpiReconciliation.recent(limit);
+    }
+
+    @PostMapping("/certifications/production")
+    public ReportingCertificationService.Certification certifyProduction() {
+        return certification.certifyProduction();
+    }
+
+    @GetMapping("/certifications")
+    public List<ReportingCertificationService.Certification> certificationHistory(
+            @RequestParam(defaultValue = "10") int limit) {
+        return certification.recent(limit);
     }
 }

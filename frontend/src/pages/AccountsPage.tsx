@@ -1,4 +1,5 @@
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, isUnreachable, type Account, type AccountDetail, type AccountHealth, type AccountHierarchy, type AccountRollup } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -12,6 +13,7 @@ import { GridLoader } from "../components/Loaders";
 import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
 import { useAppDialog } from "../components/AppDialog";
+import { CloseIcon } from "../components/icons";
 
 const ACCOUNT_GROUP_COLUMNS: GroupColumn<Account>[] = [
   { key: "name", label: "Name", value: (row) => row.name },
@@ -184,10 +186,66 @@ function AccountDrawer({ detail, hierarchy, rollup, health, loading, error, refr
   onRefreshHealth: () => void;
   onClose: () => void;
 }) {
+  const panelRef = useRef<HTMLElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  const [full, setFull] = useState(false);
+  const [width, setWidth] = useState(640);
+
+  useEffect(() => {
+    if (!loading && !detail && !error) return;
+    const opener = document.activeElement as HTMLElement | null;
+    window.setTimeout(() => closeRef.current?.focus(), 0);
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") onCloseRef.current(); };
+    window.addEventListener("keydown", escape);
+    return () => { window.removeEventListener("keydown", escape); opener?.focus(); };
+  }, [detail?.id, error, loading]);
+
+  useEffect(() => {
+    if (full) return;
+    const resize = () => setWidth((value) => Math.min(value, Math.max(360, window.innerWidth - 24)));
+    window.addEventListener("resize", resize);
+    resize();
+    return () => window.removeEventListener("resize", resize);
+  }, [full]);
+
+  function startResize(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (full) return;
+    event.preventDefault();
+    const move = (moveEvent: globalThis.PointerEvent) => {
+      setWidth(Math.min(Math.max(window.innerWidth - moveEvent.clientX, 360), Math.max(360, window.innerWidth - 12)));
+    };
+    const stop = () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  }
+
   if (!loading && !detail && !error) return null;
-  return <div className="drawer-scrim" role="presentation" onMouseDown={onClose}>
-    <aside className="audit-drawer account-360-drawer" role="dialog" aria-modal="true" aria-label="Account 360" onMouseDown={(event) => event.stopPropagation()}>
-      <header className="drawer-head"><div><span className="eyebrow">Account 360</span><h2>{detail?.name ?? "Loading account"}</h2></div><button className="icon-btn" onClick={onClose} aria-label="Close account 360">×</button></header>
+  return createPortal(<div className="drawer-scrim dock-scrim" role="presentation">
+    <aside ref={panelRef} className={`audit-drawer account-360-drawer${full ? " account-360-drawer-full" : ""}`}
+      style={full ? undefined : { width: `${width}px` }} role="dialog" aria-modal="true" aria-label="Account 360"
+      onMouseDown={(event) => event.stopPropagation()} onKeyDown={(event) => {
+        if (event.key !== "Tab") return;
+        const focusable = [...(panelRef.current?.querySelectorAll<HTMLElement>("button, [href], input, select, textarea") ?? [])]
+          .filter((element) => !element.hasAttribute("disabled"));
+        if (!focusable.length) return;
+        const first = focusable[0]; const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }}>
+      <button className="dock-resizer" aria-label="Resize Account 360" onPointerDown={startResize} />
+      <header className="drawer-head"><div><span className="eyebrow">Account 360</span><h2>{detail?.name ?? "Loading account"}</h2></div>
+        <div className="drawer-actions">
+          <button className="btn btn-sm" onClick={() => setFull((value) => !value)}>{full ? "Restore View" : "Full View"}</button>
+          <button ref={closeRef} className="icon-btn" onClick={onClose} aria-label="Close Account 360"><CloseIcon /></button>
+        </div>
+      </header>
       {loading && <p className="loading-note">Loading relationship, health and ownership context...</p>}
       {error && <p className="empty-note">Account 360 failed to load.</p>}
       {detail && <div className="audit-list">
@@ -214,5 +272,5 @@ function AccountDrawer({ detail, hierarchy, rollup, health, loading, error, refr
         </article>}
       </div>}
     </aside>
-  </div>;
+  </div>, document.body);
 }

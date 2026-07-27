@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { desktopNotify } from "../lib/desktop";
+import { useI18n } from "../i18n/I18nProvider";
 
 export type ToastKind = "info" | "warn" | "error";
 
@@ -33,6 +34,7 @@ const KIND_LABEL: Record<ToastKind, string> = {
 const TOAST_TTL_MS = 6000;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const { tp } = useI18n();
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(1);
 
@@ -57,7 +59,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={apiValue}>
       {children}
-      <div className="toast-region" role="region" aria-label="Status notifications" aria-live="polite" aria-relevant="additions">
+      <div className="toast-region" role="region" aria-label={tp("Status notifications")} aria-live="polite" aria-relevant="additions">
         {toasts.map((t) => (
           <div
             key={t.id}
@@ -66,13 +68,13 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           >
             <div className="toast-copy">
               <span className="toast-kind">
-                {KIND_LABEL[t.kind]} — {t.title}
+                {tp(KIND_LABEL[t.kind])} — {tp(t.title)}
               </span>
-              <p>{t.message}</p>
+              <p>{tp(t.message)}</p>
             </div>
             <button
               className="toast-close"
-              aria-label="Dismiss notification"
+              aria-label={tp("Dismiss notification")}
               onClick={() => dismiss(t.id)}
             >
               ×

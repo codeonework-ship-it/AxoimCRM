@@ -4,6 +4,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -48,5 +49,17 @@ public class ReferenceDataController {
                                                      @PathVariable String code,
                                                      @RequestBody @Valid EntryMutation request) {
         return service.updateEntry(apiName, code, request);
+    }
+
+    /**
+     * REST delete means retirement for governed master data. The row and its
+     * version history remain in place so historical CRM records and reports
+     * continue to resolve the original label.
+     */
+    @DeleteMapping("/value-sets/{apiName}/entries/{code}")
+    public ReferenceDataService.EntryRow retireEntry(@PathVariable String apiName,
+                                                     @PathVariable String code,
+                                                     @RequestParam String reason) {
+        return service.retireEntry(apiName, code, reason);
     }
 }

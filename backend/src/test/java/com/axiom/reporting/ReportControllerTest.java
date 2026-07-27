@@ -19,7 +19,8 @@ class ReportControllerTest {
         ReportController controller = new ReportController(reports, subscriptions);
         byte[] pdf = "%PDF-1.7".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
         when(reports.documentPreview(org.mockito.ArgumentMatchers.eq("pipeline_snapshot"), any()))
-                .thenReturn(new ReportService.FilePayload(pdf, "application/pdf", "pipeline-snapshot-preview.pdf"));
+                .thenReturn(new ReportService.FilePayload(pdf, "application/pdf", "pipeline-snapshot-preview.pdf",
+                        "abc123", 6));
 
         var response = controller.documentPreview("pipeline_snapshot", null, null, null, null, null);
 
@@ -27,6 +28,8 @@ class ReportControllerTest {
         assertEquals("inline; filename=\"pipeline-snapshot-preview.pdf\"",
                 response.getHeaders().getFirst("Content-Disposition"));
         assertEquals("nosniff", response.getHeaders().getFirst("X-Content-Type-Options"));
+        assertEquals("abc123", response.getHeaders().getFirst("X-Axiom-Dataset-Fingerprint"));
+        assertEquals("6", response.getHeaders().getFirst("X-Axiom-Report-Rows"));
         assertArrayEquals(pdf, response.getBody());
         verify(reports).documentPreview(org.mockito.ArgumentMatchers.eq("pipeline_snapshot"), any());
     }

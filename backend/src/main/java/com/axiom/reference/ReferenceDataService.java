@@ -185,6 +185,79 @@ public class ReferenceDataService {
         }
     }
 
+    /**
+     * Soft-delete a tenant-created reference value. System-managed values and
+     * values participating in an active dependent-picklist mapping are treated
+     * as "in use" and are rejected with an actionable conflict.
+     */
+    @Transactional
+    public EntryRow retireEntry(String apiName, String code, String reason) {
+        CrmRole.requireMasterAdmin(TenantContext.get().role());
+        String normalizedApiName = normalizeApiName(apiName);
+        String normalizedCode = normalizeCode(code);
+        String retirementReason = reason == null ? "" : reason.trim();
+        if (retirementReason.isBlank()) {
+            throw new ConflictException("A retirement reason is required so the master-data history remains understandable");
+        }
+        UUID valueSetId = valueSetId(normalizedApiName);
+        EntryRow current;
+        try {
+            current = jdbc.queryForObject("""
+                    select id, code, label, sort_order, active, system_managed,
+                           effective_from, effective_to
+                    from reference.value_set_entry
+                    where tenant_id = ? and value_set_id = ? and code = ?
+                    for update
+                    """, (rs, i) -> new EntryRow(
+                    rs.getObject("id", UUID.class), rs.getString("code"), rs.getString("label"),
+                    rs.getInt("sort_order"), rs.getBoolean("active"), rs.getBoolean("system_managed"),
+                    rs.getObject("effective_from", LocalDate.class),
+                    rs.getObject("effective_to", LocalDate.class)),
+                    TenantContext.get().tenantId(), valueSetId, normalizedCode);
+        } catch (EmptyResultDataAccessException ex) {
+            throw new NotFoundException("Reference entry not found");
+        }
+        if (current.systemManaged()) {
+            throw new ConflictException("This value is system managed and is in use by an Axiom workflow. Clone it to create a tenant-owned alternative; it cannot be deleted.");
+        }
+
+        Integer mapped = jdbc.queryForObject("""
+                select count(*)
+                from reference.dependent_value_map m
+                join reference.value_set_dependency d
+                  on d.tenant_id = m.tenant_id and d.id = m.dependency_id
+                where m.tenant_id = ? and m.active
+                  and ((d.controlling_value_set_id = ? and m.controlling_code = ?)
+                    or (d.dependent_value_set_id = ? and m.dependent_code = ?))
+                """, Integer.class, TenantContext.get().tenantId(), valueSetId, normalizedCode,
+                valueSetId, normalizedCode);
+        if (mapped != null && mapped > 0) {
+            throw new ConflictException("This value cannot be deleted because it is in use by " + mapped
+                    + " active dependent-picklist mapping" + (mapped == 1 ? "" : "s")
+                    + ". Remove or replace those mappings first.");
+        }
+        if (!current.active()) return current;
+
+        LocalDate retirementDate = LocalDate.now();
+        if (current.effectiveFrom() != null && retirementDate.isBefore(current.effectiveFrom())) {
+            retirementDate = current.effectiveFrom();
+        }
+        LocalDate effectiveTo = current.effectiveTo() == null || current.effectiveTo().isAfter(retirementDate)
+                ? retirementDate : current.effectiveTo();
+        jdbc.update("""
+                update reference.value_set_entry
+                set active = false, effective_to = ?, updated_at = now()
+                where tenant_id = ? and id = ?
+                """, effectiveTo, TenantContext.get().tenantId(), current.id());
+        EntryRow retired = new EntryRow(current.id(), current.code(), current.label(), current.sortOrder(),
+                false, current.systemManaged(), current.effectiveFrom(), effectiveTo);
+        recordVersion(valueSetId, retired);
+        audit.record("REFERENCE_ENTRY_RETIRE", "REFERENCE_VALUE_SET", valueSetId,
+                "Retired reference entry " + normalizedCode + " in " + normalizedApiName,
+                Map.of("code", normalizedCode, "reason", retirementReason, "hardDelete", false));
+        return retired;
+    }
+
     private void recordVersion(UUID valueSetId, EntryRow row) {
         jdbc.update("""
                 insert into reference.value_set_entry_version

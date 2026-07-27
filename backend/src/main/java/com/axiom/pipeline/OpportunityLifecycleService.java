@@ -6,6 +6,8 @@ import com.axiom.common.NotFoundException;
 import com.axiom.notifications.NotificationWriter;
 import com.axiom.outbox.OutboxWriter;
 import com.axiom.tenancy.TenantContext;
+import com.axiom.security.AuthorizationService;
+import com.axiom.security.SecurableObject;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -42,15 +44,18 @@ public class OpportunityLifecycleService {
     private final AuditService audit;
     private final OutboxWriter outbox;
     private final NotificationWriter notifications;
+    private final AuthorizationService authorization;
 
     public OpportunityLifecycleService(JdbcTemplate jdbc, PipelineQueries queries, StageGateEvaluator evaluator,
-                                       AuditService audit, OutboxWriter outbox, NotificationWriter notifications) {
+                                       AuditService audit, OutboxWriter outbox, NotificationWriter notifications,
+                                       AuthorizationService authorization) {
         this.jdbc = jdbc;
         this.queries = queries;
         this.evaluator = evaluator;
         this.audit = audit;
         this.outbox = outbox;
         this.notifications = notifications;
+        this.authorization = authorization;
     }
 
     // ------------------------------------------------------------------ requests
@@ -162,6 +167,7 @@ public class OpportunityLifecycleService {
      */
     @Transactional(readOnly = true)
     public GatePreview previewGate(UUID opportunityId, UUID targetStageId) {
+        authorization.requireRead(SecurableObject.OPPORTUNITY, opportunityId);
         OpportunityState opp = load(opportunityId);
         PipelineQueries.StageRow from = queries.stage(opp.stageId());
         PipelineQueries.StageRow to = queries.stage(targetStageId);
@@ -183,6 +189,7 @@ public class OpportunityLifecycleService {
 
     @Transactional
     public StageChangeResult changeStage(UUID opportunityId, StageChangeRequest request) {
+        authorization.requireEdit(SecurableObject.OPPORTUNITY, opportunityId);
         PipelinePermissions.requireWrite(TenantContext.get().role());
         OpportunityState opp = load(opportunityId);
         requireOpen(opp);
@@ -338,6 +345,7 @@ public class OpportunityLifecycleService {
 
     @Transactional
     public ClosureResult close(UUID opportunityId, CloseRequest request) {
+        authorization.requireEdit(SecurableObject.OPPORTUNITY, opportunityId);
         PipelinePermissions.requireWrite(TenantContext.get().role());
         OpportunityState opp = load(opportunityId);
         requireOpen(opp);
@@ -458,6 +466,7 @@ public class OpportunityLifecycleService {
 
     @Transactional
     public ReopenResult reopen(UUID opportunityId, ReopenRequest request) {
+        authorization.requireEdit(SecurableObject.OPPORTUNITY, opportunityId);
         PipelinePermissions.requireReopen(TenantContext.get().role());
         OpportunityState opp = load(opportunityId);
         requireVersion(opp, request.expectedVersion());
@@ -543,6 +552,7 @@ public class OpportunityLifecycleService {
 
     @Transactional
     public CloseDateResult changeCloseDate(UUID opportunityId, CloseDateRequest request) {
+        authorization.requireEdit(SecurableObject.OPPORTUNITY, opportunityId);
         PipelinePermissions.requireWrite(TenantContext.get().role());
         OpportunityState opp = load(opportunityId);
         requireOpen(opp);
@@ -623,6 +633,7 @@ public class OpportunityLifecycleService {
 
     @Transactional
     public RecurringRevenueResult setRecurringRevenue(UUID opportunityId, RecurringRevenueRequest request) {
+        authorization.requireEdit(SecurableObject.OPPORTUNITY, opportunityId);
         PipelinePermissions.requireWrite(TenantContext.get().role());
         OpportunityState opp = load(opportunityId);
         requireOpen(opp);

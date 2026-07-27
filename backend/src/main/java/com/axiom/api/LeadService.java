@@ -17,6 +17,12 @@ import com.axiom.domain.PipelineStageRepository;
 import com.axiom.outbox.OutboxWriter;
 import com.axiom.notifications.NotificationWriter;
 import com.axiom.tenancy.TenantContext;
+import com.axiom.security.AuthorizationService;
+import com.axiom.security.SecurableObject;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -26,6 +32,8 @@ import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.time.Instant;
+import java.util.List;
 
 @Service
 public class LeadService {
@@ -39,10 +47,12 @@ public class LeadService {
     private final NotificationWriter notifications;
     private final JdbcTemplate jdbc;
     private final AuditService audit;
+    private final AuthorizationService authorization;
 
     public LeadService(LeadRepository leads, AccountRepository accounts, ContactRepository contacts,
                        OpportunityRepository opportunities, PipelineStageRepository stages, OutboxWriter outbox,
-                       NotificationWriter notifications, JdbcTemplate jdbc, AuditService audit) {
+                       NotificationWriter notifications, JdbcTemplate jdbc, AuditService audit,
+                       AuthorizationService authorization) {
         this.leads = leads;
         this.accounts = accounts;
         this.contacts = contacts;
@@ -52,10 +62,111 @@ public class LeadService {
         this.notifications = notifications;
         this.jdbc = jdbc;
         this.audit = audit;
+        this.authorization = authorization;
     }
 
     public record ConversionResult(UUID leadId, UUID accountId, UUID contactId, UUID opportunityId) {}
     public record DisqualificationResult(UUID leadId, String status, String reasonCode, LocalDate recycleDate) {}
+    public record LeadDetail(UUID id, String firstName, String lastName, String company, String email,
+                             String phone, String title, String status, UUID ownerId, String ownerName,
+                             int score, String rating, String source, String territory, String segment,
+                             String productInterest, LocalDate recycleDate, Instant createdAt,
+                             Instant updatedAt, long version) {}
+    public record LeadUpdateRequest(
+            @NotBlank @Size(max = 120) String firstName,
+            @NotBlank @Size(max = 120) String lastName,
+            @NotBlank @Size(max = 240) String company,
+            @Email @Size(max = 240) String email,
+            @Size(max = 60) String phone,
+            String title, String rating, String source, String territory, String segment,
+            String productInterest, UUID ownerId, long expectedVersion) {}
+    public record LeadReassignRequest(@NotNull UUID ownerId, @NotBlank String reason, long expectedVersion) {}
+    public record ReactivationRequest(@NotBlank String reason, long expectedVersion) {}
+
+    @Transactional(readOnly = true)
+    public LeadDetail get(UUID leadId) {
+        authorization.requireRead(SecurableObject.LEAD, leadId);
+        List<LeadDetail> rows = jdbc.query("""
+                select l.id, l.first_name, l.last_name, l.company, l.email, l.phone, l.title,
+                       l.status, l.owner_id, u.display_name owner_name, l.score, l.rating, l.source,
+                       l.territory, l.segment, l.product_interest, l.recycle_date, l.created_at,
+                       l.updated_at, l.version
+                from crm.lead l
+                left join identity.app_user u on u.tenant_id = l.tenant_id and u.id = l.owner_id
+                where l.tenant_id = ? and l.id = ? and l.deleted_at is null
+                """, (rs, i) -> new LeadDetail(rs.getObject("id", UUID.class), rs.getString("first_name"),
+                rs.getString("last_name"), rs.getString("company"), rs.getString("email"),
+                rs.getString("phone"), rs.getString("title"), rs.getString("status"),
+                rs.getObject("owner_id", UUID.class), rs.getString("owner_name"), rs.getInt("score"),
+                rs.getString("rating"), rs.getString("source"), rs.getString("territory"),
+                rs.getString("segment"), rs.getString("product_interest"),
+                rs.getObject("recycle_date", LocalDate.class), rs.getTimestamp("created_at").toInstant(),
+                rs.getTimestamp("updated_at").toInstant(), rs.getLong("version")),
+                TenantContext.get().tenantId(), leadId);
+        if (rows.isEmpty()) throw new NotFoundException("Lead not found");
+        return rows.get(0);
+    }
+
+    @Transactional
+    public LeadDetail update(UUID leadId, LeadUpdateRequest request) {
+        authorization.requireEdit(SecurableObject.LEAD, leadId);
+        LeadDetail before = get(leadId);
+        if ("CONVERTED".equals(before.status())) throw new ConflictException("Converted leads are read-only");
+        int changed = jdbc.update("""
+                update crm.lead set first_name = ?, last_name = ?, company = ?, email = ?, phone = ?,
+                    title = ?, rating = ?, source = ?, territory = ?, segment = ?, product_interest = ?,
+                    owner_id = coalesce(?, owner_id), updated_at = now(), version = version + 1
+                where tenant_id = ? and id = ? and deleted_at is null and version = ?
+                """, request.firstName().trim(), request.lastName().trim(), request.company().trim(),
+                clean(request.email()), clean(request.phone()), clean(request.title()), clean(request.rating()),
+                clean(request.source()), clean(request.territory()), clean(request.segment()),
+                clean(request.productInterest()), request.ownerId(), TenantContext.get().tenantId(), leadId,
+                request.expectedVersion());
+        if (changed == 0) throw new ConflictException("This lead changed while you were editing it. Reload and try again.");
+        audit.record("LEAD_UPDATE", "LEAD", leadId, "Updated lead " + before.firstName() + " " + before.lastName(),
+                Map.of("fromVersion", request.expectedVersion(), "before", Map.of("company", before.company()),
+                        "after", Map.of("company", request.company().trim())));
+        outbox.write("lead", leadId, "lead.updated", Map.of("leadId", leadId.toString(),
+                "fromVersion", request.expectedVersion()));
+        return get(leadId);
+    }
+
+    @Transactional
+    public LeadDetail reassign(UUID leadId, LeadReassignRequest request) {
+        authorization.requireEdit(SecurableObject.LEAD, leadId);
+        LeadDetail before = get(leadId);
+        Integer ownerExists = jdbc.queryForObject("select count(*) from identity.app_user where tenant_id = ? and id = ? and active",
+                Integer.class, TenantContext.get().tenantId(), request.ownerId());
+        if (ownerExists == null || ownerExists == 0) throw new NotFoundException("Active lead owner not found");
+        int changed = jdbc.update("""
+                update crm.lead set owner_id = ?, assigned_at = now(), updated_at = now(), version = version + 1
+                where tenant_id = ? and id = ? and deleted_at is null and version = ?
+                """, request.ownerId(), TenantContext.get().tenantId(), leadId, request.expectedVersion());
+        if (changed == 0) throw new ConflictException("This lead changed while you were editing it. Reload and try again.");
+        audit.recordWithReason("LEAD_REASSIGN", "LEAD", leadId, "Reassigned lead", request.reason(),
+                Map.of("beforeOwnerId", String.valueOf(before.ownerId()), "ownerId", request.ownerId().toString()));
+        outbox.write("lead", leadId, "lead.reassigned", Map.of("leadId", leadId.toString(),
+                "ownerId", request.ownerId().toString(), "reason", request.reason()));
+        return get(leadId);
+    }
+
+    @Transactional
+    public LeadDetail reactivate(UUID leadId, ReactivationRequest request) {
+        authorization.requireEdit(SecurableObject.LEAD, leadId);
+        LeadDetail before = get(leadId);
+        if (!"DISQUALIFIED".equals(before.status())) throw new ConflictException("Only disqualified leads can be reactivated");
+        int changed = jdbc.update("""
+                update crm.lead set status = 'NEW', disqualify_reason = null,
+                    disqualification_reason_code = null, disqualified_at = null, recycle_date = null,
+                    recycled_at = now(), updated_at = now(), version = version + 1
+                where tenant_id = ? and id = ? and deleted_at is null and version = ?
+                """, TenantContext.get().tenantId(), leadId, request.expectedVersion());
+        if (changed == 0) throw new ConflictException("This lead changed while you were editing it. Reload and try again.");
+        audit.recordWithReason("LEAD_REACTIVATE", "LEAD", leadId, "Reactivated disqualified lead",
+                request.reason(), Map.of("beforeStatus", before.status(), "status", "NEW"));
+        outbox.write("lead", leadId, "lead.reactivated", Map.of("leadId", leadId.toString(), "reason", request.reason()));
+        return get(leadId);
+    }
 
     /**
      * Atomic lead conversion (FR-LED-011 shape, skeleton scope): account is
@@ -67,6 +178,7 @@ public class LeadService {
      */
     @Transactional
     public ConversionResult convert(UUID leadId, String accountName, String opportunityName, BigDecimal amount) {
+        authorization.requireEdit(SecurableObject.LEAD, leadId);
         if (CrmRole.current(TenantContext.get().role()).readOnly()) {
             throw new ConflictException("Read-only roles cannot convert leads");
         }
@@ -110,6 +222,7 @@ public class LeadService {
         payload.put("contactId", contact.getId().toString());
         payload.put("opportunityId", opportunityId == null ? null : opportunityId.toString());
         outbox.write("lead", lead.getId(), "lead.converted", payload);
+        audit.record("LEAD_CONVERT", "LEAD", leadId, "Converted lead " + lead.getFirstName() + " " + lead.getLastName(), payload);
         if (canNotifyCurrentUser(tenantId, principal.userId())) {
             notifications.notifyCurrentUser(
                     "SYSTEM", "NORMAL", "Lead conversion complete",
@@ -123,6 +236,7 @@ public class LeadService {
 
     @Transactional
     public DisqualificationResult disqualify(UUID leadId, String reasonCode, String note, LocalDate recycleDate) {
+        authorization.requireEdit(SecurableObject.LEAD, leadId);
         if (CrmRole.current(TenantContext.get().role()).readOnly()) {
             throw new ConflictException("Read-only roles cannot disqualify leads");
         }

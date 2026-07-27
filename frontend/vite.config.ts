@@ -1,13 +1,12 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 
-export default defineConfig({
-  // Absolute, not "./": the SPA is served from the domain root (see
-  // frontend/nginx.conf) and has routes more than one segment deep, e.g.
-  // /reference-data/:setCode. With a relative base, a cold load or refresh on
-  // such a route resolves "./assets/..." against the route directory and 404s,
-  // leaving a blank page. Only change this if the app ever moves to a sub-path.
-  base: "/",
+export default defineConfig(({ mode }) => ({
+  // The hosted SPA is served from the domain root. The packaged Electron app
+  // loads index.html through file:// and therefore needs relative assets; an
+  // absolute /assets URL points at the filesystem root and leaves a blank
+  // renderer before React can mount.
+  base: mode === "desktop" ? "./" : "/",
   plugins: [react()],
   server: {
     port: 5173,
@@ -17,4 +16,4 @@ export default defineConfig({
     outDir: "dist",
     sourcemap: false,
   },
-});
+}));

@@ -4,7 +4,13 @@
 electron-client/release/
 electron-client/audit-output/
 **/.npm-cache/
+**/.tmp-npm/
+**/.test-tmp/
 **/.m2/
+**/playwright-report/
+**/test-results/
+/.npm-tmp/
+/tmp/
 *.log
 .DS_Store
 Thumbs.db

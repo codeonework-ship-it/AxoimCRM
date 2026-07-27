@@ -201,7 +201,7 @@ public class AuthController {
      * deployment sits behind a reverse proxy; it is used only for network rules and
      * telemetry, never for tenant identity (ADR-001 rule 4).
      */
-    static String clientIp(HttpServletRequest request) {
+    public static String clientIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {
             return forwarded.split(",")[0].trim();

@@ -1,5 +1,7 @@
 package com.axiom.api;
 
+import com.axiom.security.AuthorizationService;
+import com.axiom.security.SecurableObject;
 import com.axiom.tenancy.TenantContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -26,9 +28,11 @@ public class QueryService {
     public static final int PAGE_SIZE = 100;
 
     private final JdbcTemplate jdbc;
+    private final AuthorizationService authorization;
 
-    public QueryService(JdbcTemplate jdbc) {
+    public QueryService(JdbcTemplate jdbc, AuthorizationService authorization) {
         this.jdbc = jdbc;
+        this.authorization = authorization;
     }
 
     private static UUID tenantId() {
@@ -43,7 +47,10 @@ public class QueryService {
         int safePage = Math.max(page, 0);
         List<Object> args = new ArrayList<>();
         args.add(tenantId());
-        String where = accountWhere(search, industry, args);
+        AuthorizationService.RecordPredicate visible = authorization.visibleRecordPredicate(
+                SecurableObject.ACCOUNT, "a");
+        args.addAll(visible.args());
+        String where = accountWhere(search, industry, visible.sql(), args);
         long total = total("select count(*) from account a left join app_user u on u.id = a.owner_id and u.tenant_id = a.tenant_id " + where, args);
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add(PAGE_SIZE);
@@ -81,11 +88,15 @@ public class QueryService {
                 """);
         List<Object> args = new ArrayList<>();
         args.add(tenantId());
+        AuthorizationService.RecordPredicate visible = authorization.visibleRecordPredicate(
+                SecurableObject.CONTACT, "c");
+        sql.append(" and (").append(visible.sql()).append(")");
+        args.addAll(visible.args());
         if (accountId != null) {
             sql.append(" and c.account_id = ?");
             args.add(accountId);
         }
-        sql.append(" order by c.last_name, c.first_name");
+        sql.append(" order by c.last_name, c.first_name limit 100");
         return jdbc.query(sql.toString(),
                 (rs, i) -> new ContactRow(
                         rs.getObject("id", UUID.class),
@@ -108,7 +119,10 @@ public class QueryService {
         int safePage = Math.max(page, 0);
         List<Object> args = new ArrayList<>();
         args.add(tenantId());
-        String where = leadWhere(search, status, args);
+        AuthorizationService.RecordPredicate visible = authorization.visibleRecordPredicate(
+                SecurableObject.LEAD, "l");
+        args.addAll(visible.args());
+        String where = leadWhere(search, status, visible.sql(), args);
         long total = total("select count(*) from lead l left join app_user u on u.id = l.owner_id and u.tenant_id = l.tenant_id " + where, args);
         List<Object> pageArgs = new ArrayList<>(args);
         pageArgs.add(PAGE_SIZE);
@@ -138,8 +152,9 @@ public class QueryService {
         return PageResult.of(items, safePage, PAGE_SIZE, total);
     }
 
-    private String accountWhere(String search, String industry, List<Object> args) {
-        StringBuilder where = new StringBuilder(" where a.tenant_id = ? and a.deleted_at is null");
+    private String accountWhere(String search, String industry, String visibleSql, List<Object> args) {
+        StringBuilder where = new StringBuilder(" where a.tenant_id = ? and a.deleted_at is null and (")
+                .append(visibleSql).append(")");
         String q = searchPattern(search);
         if (q != null) {
             where.append(" and (lower(a.name) like ? or lower(coalesce(a.industry,'')) like ? or lower(coalesce(u.display_name,'')) like ?)");
@@ -153,8 +168,9 @@ public class QueryService {
         return where.toString();
     }
 
-    private String leadWhere(String search, String status, List<Object> args) {
-        StringBuilder where = new StringBuilder(" where l.tenant_id = ? and l.deleted_at is null");
+    private String leadWhere(String search, String status, String visibleSql, List<Object> args) {
+        StringBuilder where = new StringBuilder(" where l.tenant_id = ? and l.deleted_at is null and (")
+                .append(visibleSql).append(")");
         String q = searchPattern(search);
         if (q != null) {
             where.append(" and (lower(l.first_name) like ? or lower(l.last_name) like ? or lower(l.company) like ? or lower(coalesce(l.email,'')) like ? or lower(coalesce(u.display_name,'')) like ?)");

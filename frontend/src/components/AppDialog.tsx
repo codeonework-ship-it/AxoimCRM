@@ -11,6 +11,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { CloseIcon } from "./icons";
+import { useI18n } from "../i18n/I18nProvider";
 
 export type AppDialogTone = "neutral" | "danger";
 
@@ -60,6 +61,7 @@ function copyOf(value: DialogCopy | string): DialogCopy {
  * so multi-step workflows remain deterministic.
  */
 export function AppDialogProvider({ children }: { children: ReactNode }) {
+  const { t, tp } = useI18n();
   const [active, setActive] = useState<DialogRequest | null>(null);
   const [value, setValue] = useState("");
   const queue = useRef<DialogRequest[]>([]);
@@ -154,7 +156,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
 
   const api = useMemo<DialogApi>(() => ({ alert, confirm, prompt }), [alert, confirm, prompt]);
   const options = active?.options;
-  const title = options?.title ?? (active?.kind === "prompt" ? "Additional Information" : active?.kind === "alert" ? "Notice" : "Confirm Action");
+  const title = tp(options?.title ?? (active?.kind === "prompt" ? "Additional Information" : active?.kind === "alert" ? "Notice" : "Confirm Action"));
   const requiredPromptEmpty = active?.kind === "prompt" && active.options.required && !value.trim();
 
   return (
@@ -174,24 +176,24 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
           >
             <header className="app-dialog-head">
               <div>
-                <span className="eyebrow">Axiom Workspace</span>
+                <span className="eyebrow">{tp("Axiom Workspace")}</span>
                 <h2 id="app-dialog-title">{title}</h2>
               </div>
-              <button type="button" className="icon-btn app-dialog-close" aria-label="Close Dialog" onClick={cancel}>
+              <button type="button" className="icon-btn app-dialog-close" aria-label={t("ui.dialog.close", "Close Dialog")} onClick={cancel}>
                 <CloseIcon />
               </button>
             </header>
 
             <div className="app-dialog-body">
-              <p id="app-dialog-message">{options.message}</p>
+              <p id="app-dialog-message">{tp(options.message)}</p>
               {active.kind === "prompt" && (
                 <label className="app-dialog-field">
-                  <span>{active.options.label ?? "Response"}{active.options.required && <em> Required</em>}</span>
+                  <span>{tp(active.options.label ?? "Response")}{active.options.required && <em> {t("ui.common.required", "Required")}</em>}</span>
                   {active.options.multiline ? (
                     <textarea
                       ref={inputRef as RefObject<HTMLTextAreaElement>}
                       value={value}
-                      placeholder={active.options.placeholder}
+                      placeholder={active.options.placeholder ? tp(active.options.placeholder) : undefined}
                       rows={4}
                       onChange={(event) => setValue(event.target.value)}
                     />
@@ -199,7 +201,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
                     <input
                       ref={inputRef as RefObject<HTMLInputElement>}
                       value={value}
-                      placeholder={active.options.placeholder}
+                      placeholder={active.options.placeholder ? tp(active.options.placeholder) : undefined}
                       onChange={(event) => setValue(event.target.value)}
                       onKeyDown={(event) => {
                         if (event.key === "Enter" && !requiredPromptEmpty) accept();
@@ -213,7 +215,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
             <footer className="app-dialog-actions">
               {active.kind !== "alert" && (
                 <button type="button" className="btn btn-secondary" onClick={cancel}>
-                  {active.options.cancelLabel ?? "Cancel"}
+                  {tp(active.options.cancelLabel ?? t("ui.common.cancel", "Cancel"))}
                 </button>
               )}
               <button
@@ -223,7 +225,7 @@ export function AppDialogProvider({ children }: { children: ReactNode }) {
                 disabled={requiredPromptEmpty}
                 onClick={accept}
               >
-                {options.confirmLabel ?? (active.kind === "alert" ? "Close" : "Continue")}
+                {tp(options.confirmLabel ?? (active.kind === "alert" ? t("ui.common.close", "Close") : "Continue"))}
               </button>
             </footer>
           </div>

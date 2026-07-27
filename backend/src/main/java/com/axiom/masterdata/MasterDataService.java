@@ -197,6 +197,10 @@ public class MasterDataService {
             } else if (c == ',' && !quoted) { values.add(value.toString()); value.setLength(0); }
             else value.append(c);
         }
+        if (quoted) {
+            throw new BulkValidationException("CSV contains an unterminated quoted value",
+                    List.of("Close every quoted value and retry the complete file"));
+        }
         values.add(value.toString());
         return values;
     }

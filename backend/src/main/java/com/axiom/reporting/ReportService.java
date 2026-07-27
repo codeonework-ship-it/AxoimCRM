@@ -25,7 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.OffsetDateTime;
+import java.util.HexFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -50,7 +54,12 @@ public class ReportService {
     public record ReportDefinitionRow(UUID id, String code, String label, String description,
                                       List<String> allowedFormats, boolean active, String category,
                                       String businessQuestion, List<String> audience, int sortOrder) {}
-    public record FilePayload(byte[] bytes, String contentType, String filename) {}
+    public record FilePayload(byte[] bytes, String contentType, String filename,
+                              String datasetFingerprint, int rowCount) {
+        public FilePayload(byte[] bytes, String contentType, String filename) {
+            this(bytes, contentType, filename, "UNAVAILABLE", -1);
+        }
+    }
     public record ReportPreviewColumns(String dimension, String value, String detail, String signal) {}
     public record ReportPreviewRow(String metric, String value, String detail, String signal) {}
     public record ReportFilters(String search, String metric, String value, String detail, String signal) {
@@ -59,8 +68,10 @@ public class ReportService {
     public record ReportPreview(String code, String label, String description, String category,
                                 String businessQuestion, List<String> audience, String tenantName,
                                 OffsetDateTime generatedAt, ReportPreviewColumns columns,
-                                PageResult<ReportPreviewRow> rows) {}
+                                PageResult<ReportPreviewRow> rows, String datasetFingerprint,
+                                int matchedRowCount) {}
     record ReportSpec(String dimensionLabel, String valueLabel, String detailLabel) {}
+    record ResolvedRows(List<ReportRow> rows, String fingerprint) {}
 
     private static final Map<String, ReportSpec> REPORT_SPECS = Map.ofEntries(
             Map.entry("tenant_summary", new ReportSpec("CRM area", "Current value", "Meaning")),
@@ -155,14 +166,16 @@ public class ReportService {
         Map<String, Object> definition = findDefinition(code, format);
         ReportSpec spec = REPORT_SPECS.get(code);
         if (spec == null) throw new NotFoundException("Report query is not implemented");
-        List<ReportRow> rows = filterRows(rowsFor(code), filters);
-        byte[] bytes = render(definition, spec, format, rows);
+        ResolvedRows dataset = resolveRows(code, filters);
+        List<ReportRow> rows = dataset.rows();
+        byte[] bytes = render(definition, spec, format, rows, dataset.fingerprint());
         jdbc.update("""
                 insert into reporting.report_run(tenant_id, report_definition_id, format, status, row_count, generated_by)
                 values (?, ?, ?, 'GENERATED', ?, ?)
                 """, TenantContext.get().tenantId(), definition.get("id"), format.name(), rows.size(), TenantContext.get().userId());
         String fileCode = code.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-");
-        return new FilePayload(bytes, format.contentType, fileCode + "." + format.extension);
+        return new FilePayload(bytes, format.contentType, fileCode + "." + format.extension,
+                dataset.fingerprint(), rows.size());
     }
 
     /**
@@ -184,9 +197,11 @@ public class ReportService {
         Map<String, Object> definition = findDefinition(code, ReportFormat.PDF);
         ReportSpec spec = REPORT_SPECS.get(code);
         if (spec == null) throw new NotFoundException("Report query is not implemented");
-        byte[] bytes = render(definition, spec, ReportFormat.PDF, filterRows(rowsFor(code), filters));
+        ResolvedRows dataset = resolveRows(code, filters);
+        byte[] bytes = render(definition, spec, ReportFormat.PDF, dataset.rows(), dataset.fingerprint());
         String fileCode = code.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-");
-        return new FilePayload(bytes, ReportFormat.PDF.contentType, fileCode + "-preview.pdf");
+        return new FilePayload(bytes, ReportFormat.PDF.contentType, fileCode + "-preview.pdf",
+                dataset.fingerprint(), dataset.rows().size());
     }
 
     /**
@@ -204,7 +219,8 @@ public class ReportService {
         if (spec == null) throw new NotFoundException("Report query is not implemented");
         int page = Math.max(0, requestedPage);
         int size = Math.max(1, Math.min(100, requestedSize));
-        List<ReportPreviewRow> matchedRows = filterRows(rowsFor(code), filters).stream()
+        ResolvedRows dataset = resolveRows(code, filters);
+        List<ReportPreviewRow> matchedRows = dataset.rows().stream()
                 .map(row -> new ReportPreviewRow(row.getMetric(), row.getValue(), row.getDetail(), row.getSignal()))
                 .toList();
         int from = (int) Math.min((long) page * size, matchedRows.size());
@@ -222,8 +238,40 @@ public class ReportService {
                 tenantName,
                 OffsetDateTime.now(),
                 new ReportPreviewColumns(spec.dimensionLabel(), spec.valueLabel(), spec.detailLabel(), "Signal"),
-                rows
+                rows,
+                dataset.fingerprint(),
+                matchedRows.size()
         );
+    }
+
+    private ResolvedRows resolveRows(String code, ReportFilters filters) {
+        List<ReportRow> rows = List.copyOf(filterRows(rowsFor(code), filters));
+        return new ResolvedRows(rows, datasetFingerprint(rows));
+    }
+
+    /** Stable content identity shared by grid, PDF, Excel and Word regression checks. */
+    static String datasetFingerprint(List<ReportRow> rows) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            for (ReportRow row : rows) {
+                updateDigest(digest, row.getMetric());
+                updateDigest(digest, row.getValue());
+                updateDigest(digest, row.getDetail());
+                updateDigest(digest, row.getSignal());
+            }
+            return HexFormat.of().formatHex(digest.digest());
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("Required SHA-256 digest is unavailable", ex);
+        }
+    }
+
+    private static void updateDigest(MessageDigest digest, String value) {
+        byte[] bytes = String.valueOf(value).getBytes(StandardCharsets.UTF_8);
+        digest.update((byte) (bytes.length >>> 24));
+        digest.update((byte) (bytes.length >>> 16));
+        digest.update((byte) (bytes.length >>> 8));
+        digest.update((byte) bytes.length);
+        digest.update(bytes);
     }
 
     /**
@@ -761,7 +809,7 @@ public class ReportService {
     }
 
     private byte[] render(Map<String, Object> definition, ReportSpec spec,
-                          ReportFormat format, List<ReportRow> rows) {
+                          ReportFormat format, List<ReportRow> rows, String datasetFingerprint) {
         Resource resource = resources.getResource("classpath:" + definition.get("template_path"));
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             JasperReport report = JasperCompileManager.compileReport(resource.getInputStream());
@@ -777,6 +825,8 @@ public class ReportService {
             params.put("DIMENSION_LABEL", spec.dimensionLabel());
             params.put("VALUE_LABEL", spec.valueLabel());
             params.put("DETAIL_LABEL", spec.detailLabel());
+            params.put("DATASET_FINGERPRINT", datasetFingerprint);
+            params.put("REPORT_ROW_COUNT", rows.size());
             JasperPrint print = JasperFillManager.fillReport(report, params, new JRBeanCollectionDataSource(rows));
             switch (format) {
                 case PDF -> {

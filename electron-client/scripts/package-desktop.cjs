@@ -6,6 +6,7 @@ const { execFileSync } = require("node:child_process");
 
 const root = path.resolve(__dirname, "..", "..");
 const electronRoot = path.join(root, "electron-client");
+const frontendRoot = path.join(root, "frontend");
 const packageJson = require(path.join(electronRoot, "package.json"));
 const electronDist = path.join(electronRoot, "node_modules", "electron", "dist");
 const frontendDist = path.join(root, "frontend", "dist");
@@ -25,7 +26,24 @@ function copyDir(source, destination) {
 }
 
 assertExists(electronDist, "Run npm install in electron-client first.");
-assertExists(frontendDist, "Run npm run build in frontend first.");
+
+// A desktop package is not a copy of the hosted web build. Electron loads the
+// renderer through file://, which requires relative assets and an explicit API
+// origin. Always produce that bundle here so publishing cannot package a stale
+// or incompatible frontend/dist directory.
+const typeScriptCli = path.join(frontendRoot, "node_modules", "typescript", "bin", "tsc");
+const viteCli = path.join(frontendRoot, "node_modules", "vite", "bin", "vite.js");
+assertExists(typeScriptCli, "Run npm install in frontend first.");
+assertExists(viteCli, "Run npm install in frontend first.");
+execFileSync(process.execPath, [typeScriptCli, "--noEmit"], {
+  cwd: frontendRoot,
+  stdio: "inherit",
+});
+execFileSync(process.execPath, [viteCli, "build", "--mode", "desktop"], {
+  cwd: frontendRoot,
+  stdio: "inherit",
+});
+assertExists(frontendDist, "The desktop frontend build did not produce dist.");
 
 fs.mkdirSync(releaseRoot, { recursive: true });
 fs.rmSync(target, { recursive: true, force: true });

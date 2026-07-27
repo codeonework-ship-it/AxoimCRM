@@ -2,6 +2,8 @@ package com.axiom.accounts;
 
 import com.axiom.common.NotFoundException;
 import com.axiom.tenancy.TenantContext;
+import com.axiom.security.AuthorizationService;
+import com.axiom.security.SecurableObject;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.ResultSetExtractor;
@@ -37,10 +39,12 @@ import java.util.UUID;
 public class RollupService {
 
     private final JdbcTemplate jdbc;
+    private final AuthorizationService authorization;
     private Boolean opportunityHasTombstone;
 
-    public RollupService(JdbcTemplate jdbc) {
+    public RollupService(JdbcTemplate jdbc, AuthorizationService authorization) {
         this.jdbc = jdbc;
+        this.authorization = authorization;
     }
 
     public record Figures(int accountsIncluded,
@@ -59,11 +63,7 @@ public class RollupService {
                              List<UnavailableMeasure> unavailableMeasures) {}
 
     public RollupView rollup(UUID accountId) {
-        RecordAccess.Scope scope = RecordAccess.current();
-        List<Object> anchorArgs = new ArrayList<>();
-        anchorArgs.add(TenantContext.get().tenantId());
-        anchorArgs.add(accountId);
-        String anchorOwnerFilter = scope.ownerPredicate("a.owner_id", anchorArgs);
+        authorization.requireRead(SecurableObject.ACCOUNT, accountId);
         Anchor anchor;
         try {
             anchor = jdbc.queryForObject("""
@@ -72,16 +72,20 @@ public class RollupService {
                     from crm.account a
                     left join crm.account up on up.tenant_id = a.tenant_id and up.id = a.ultimate_parent_id
                     where a.tenant_id = ? and a.id = ? and a.deleted_at is null
-                    """ + anchorOwnerFilter, (rs, i) -> new Anchor(rs.getString("name"), rs.getString("hierarchy_path"),
+                    """, (rs, i) -> new Anchor(rs.getString("name"), rs.getString("hierarchy_path"),
                             rs.getInt("hierarchy_depth"), rs.getObject("ultimate_parent_id", UUID.class),
                             rs.getString("ultimate_parent_name")),
-                    anchorArgs.toArray());
+                    TenantContext.get().tenantId(), accountId);
         } catch (EmptyResultDataAccessException ex) {
             throw new NotFoundException("Account not found");
         }
 
-        Figures self = figures(anchor.path(), false, scope);
-        Figures family = figures(anchor.path(), true, scope);
+        AuthorizationService.RecordPredicate accountScope = authorization.visibleRecordPredicate(
+                SecurableObject.ACCOUNT, "a");
+        AuthorizationService.RecordPredicate opportunityScope = authorization.visibleRecordPredicate(
+                SecurableObject.OPPORTUNITY, "o");
+        Figures self = figures(anchor.path(), false, accountScope, opportunityScope);
+        Figures family = figures(anchor.path(), true, accountScope, opportunityScope);
 
         List<UnavailableMeasure> unavailable = new ArrayList<>();
         if (family.openCases() == null) {
@@ -96,24 +100,27 @@ public class RollupService {
         }
         return new RollupView(accountId, anchor.name(), anchor.ultimateParentId(),
                 anchor.ultimateParentName(), anchor.depth(), self, family,
-                scope.restricted(), scope.restricted() ? scope.restrictionNote() : null,
+                !(accountScope.allowsEverything() && opportunityScope.allowsEverything()),
+                !(accountScope.allowsEverything() && opportunityScope.allowsEverything())
+                        ? "Totals cover only records your sharing and object permissions allow." : null,
                 List.copyOf(unavailable));
     }
 
     private record Anchor(String name, String path, int depth, UUID ultimateParentId, String ultimateParentName) {}
 
-    private Figures figures(String selfPath, boolean includeDescendants, RecordAccess.Scope scope) {
+    private Figures figures(String selfPath, boolean includeDescendants,
+                            AuthorizationService.RecordPredicate accountScope,
+                            AuthorizationService.RecordPredicate opportunityScope) {
         UUID tenantId = TenantContext.get().tenantId();
         String pathPattern = includeDescendants ? selfPath + "%" : selfPath;
         List<Object> args = new ArrayList<>();
 
         args.add(tenantId);
         args.add(pathPattern);
-        String accountOwnerFilter = scope.ownerPredicate("a.owner_id", args);
+        args.addAll(accountScope.args());
         args.add(tenantId);
-        String oppOwnerFilter = scope.ownerPredicate("o.owner_id", args);
+        args.addAll(opportunityScope.args());
         args.add(tenantId);
-        String activityOwnerFilter = scope.ownerPredicate("act.owner_id", args);
         args.add(tenantId);
 
         String sql = """
@@ -121,13 +128,14 @@ public class RollupService {
                   select a.id
                   from crm.account a
                   where a.tenant_id = ? and a.deleted_at is null and a.hierarchy_path like ?
-                """ + accountOwnerFilter + """
+                    and (%s)
                 ),
                 opps as (
                   select o.amount, o.is_closed, coalesce(o.is_won, false) as is_won
                   from sales.opportunity o
                   where o.tenant_id = ? and o.account_id in (select id from scope)
-                """ + oppOwnerFilter + opportunityTombstoneFilter() + """
+                    and (%s)
+                    %s
                 ),
                 acts as (
                   select act.occurred_at
@@ -135,7 +143,6 @@ public class RollupService {
                   where act.tenant_id = ? and act.deleted_at is null
                     and act.related_entity_type = 'ACCOUNT'
                     and act.related_entity_id in (select id from scope)
-                """ + activityOwnerFilter + """
                 ),
                 sig as (
                   select s.signal_code, s.numeric_value, s.as_of, s.source_system
@@ -154,7 +161,7 @@ public class RollupService {
                   (select min(source_system) from sig where signal_code in ('OPEN_CASES','SLA_BREACHES')) as case_source,
                   (select max(occurred_at) from acts)                                     as last_activity_at,
                   (select count(*) from acts where occurred_at >= now() - interval '90 days') as activity_90d
-                """;
+                """.formatted(accountScope.sql(), opportunityScope.sql(), opportunityTombstoneFilter());
 
         Figures figures = jdbc.queryForObject(sql, (rs, i) -> new Figures(
                 rs.getInt("accounts_included"),

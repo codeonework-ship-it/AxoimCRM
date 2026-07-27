@@ -35,6 +35,7 @@ const EpicWorkspacePage = lazyPage<WorkspaceRouteProps>(() => import("./pages/Ep
 const SearchPage = lazyPage(() => import("./pages/SearchPage"), "SearchPage");
 const AdminPage = lazyPage(() => import("./pages/AdminPage"), "AdminPage");
 const IntegrationDispatchPage = lazyPage(() => import("./pages/IntegrationDispatchPage"), "IntegrationDispatchPage");
+const MigrationPage = lazyPage(() => import("./pages/MigrationPage"), "MigrationPage");
 const AccessGovernancePage = lazyPage<AccessGovernanceRouteProps>(() => import("./pages/AccessGovernancePage"), "AccessGovernancePage");
 const RbacAdminPage = lazyPage(() => import("./pages/RbacAdminPage"), "RbacAdminPage");
 const UserActivityPage = lazyPage(() => import("./pages/UserActivityPage"), "UserActivityPage");
@@ -74,7 +75,7 @@ export function App() {
           <Route path="/reports" element={<ReportsPage />} />
           {workspaceRoute("/analytics", "analytics")}
           {workspaceRoute("/copilot", "copilot")}
-          {workspaceRoute("/migration", "migration")}
+          <Route path="/migration" element={<MigrationPage />} />
           {workspaceRoute("/integrations", "integrations")}
           <Route path="/integrations/dispatch" element={<IntegrationDispatchPage />} />
           {workspaceRoute("/sandbox", "sandbox")}

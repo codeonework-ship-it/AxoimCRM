@@ -56,6 +56,8 @@ public class ReportController {
         ReportService.FilePayload file = reports.export(code, format, filters(search, metric, value, detail, signal));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + file.filename() + "\"")
+                .header("X-Axiom-Dataset-Fingerprint", file.datasetFingerprint())
+                .header("X-Axiom-Report-Rows", String.valueOf(file.rowCount()))
                 .contentType(MediaType.parseMediaType(file.contentType()))
                 .body(file.bytes());
     }
@@ -83,6 +85,8 @@ public class ReportController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + file.filename() + "\"")
                 .header("X-Content-Type-Options", "nosniff")
+                .header("X-Axiom-Dataset-Fingerprint", file.datasetFingerprint())
+                .header("X-Axiom-Report-Rows", String.valueOf(file.rowCount()))
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(file.bytes());
     }

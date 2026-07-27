@@ -27,20 +27,20 @@ import java.util.UUID;
  * envelope shapes, so a standards-compliant client can consume them without
  * special-casing Axiom.
  *
- * <p>Group endpoints are not implemented. Saying so plainly is more useful than a
- * stub: FR-TEN-007 names group provisioning, and until E02's profile and
- * permission-set model exists there is nothing coherent to map a directory group
- * onto. The ServiceProviderConfig below advertises that honestly rather than
- * claiming support a connector would then fail against.
+ * <p>Users and Groups are mapped to tenant-owned identity/security masters.
+ * Deprovisioning is a soft lifecycle transition so ownership attribution and
+ * audit evidence remain intact.
  */
 @RestController
 @RequestMapping(value = "/scim/v2", produces = "application/scim+json")
 public class ScimController {
 
     private final ScimUserService users;
+    private final ScimGroupService groups;
 
-    public ScimController(ScimUserService users) {
+    public ScimController(ScimUserService users, ScimGroupService groups) {
         this.users = users;
+        this.groups = groups;
     }
 
     @GetMapping("/Users")
@@ -83,6 +83,30 @@ public class ScimController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/Groups")
+    public Map<String, Object> listGroups(@RequestParam(required = false) String filter,
+                                          @RequestParam(required = false) Integer startIndex,
+                                          @RequestParam(required = false) Integer count) {
+        return groups.list(filter, startIndex, count);
+    }
+    @GetMapping("/Groups/{id}") public Map<String,Object> getGroup(@PathVariable UUID id){return groups.get(id);}
+    @PostMapping(value="/Groups",consumes={MediaType.APPLICATION_JSON_VALUE,"application/scim+json"})
+    public ResponseEntity<Map<String,Object>> createGroup(@RequestBody Map<String,Object> body){Map<String,Object> created=groups.create(body);return ResponseEntity.status(HttpStatus.CREATED).header("Location","/scim/v2/Groups/"+created.get("id")).body(created);}
+    @PutMapping(value="/Groups/{id}",consumes={MediaType.APPLICATION_JSON_VALUE,"application/scim+json"})
+    public Map<String,Object> replaceGroup(@PathVariable UUID id,@RequestBody Map<String,Object> body){return groups.replace(id,body);}
+    @PatchMapping(value="/Groups/{id}",consumes={MediaType.APPLICATION_JSON_VALUE,"application/scim+json"})
+    public Map<String,Object> patchGroup(@PathVariable UUID id,@RequestBody Map<String,Object> body){return groups.patch(id,body);}
+    @DeleteMapping("/Groups/{id}") public ResponseEntity<Void> deleteGroup(@PathVariable UUID id){groups.deactivate(id);return ResponseEntity.noContent().build();}
+
+    @GetMapping("/Schemas")
+    public Map<String,Object> schemas(){return Map.of("schemas",List.of(ScimUserService.LIST_SCHEMA),"totalResults",3,"startIndex",1,"itemsPerPage",3,"Resources",List.of(
+            schema(ScimUserService.USER_SCHEMA,"User",List.of("userName","displayName","active","emails")),
+            schema(ScimGroupService.GROUP_SCHEMA,"Group",List.of("displayName","members")),
+            schema(ScimUserService.AXIOM_EXTENSION,"Axiom User Extension",List.of("role"))));}
+    @GetMapping("/Schemas/{urn}") public Map<String,Object> schema(@PathVariable String urn){return switch(urn){case ScimUserService.USER_SCHEMA->schema(urn,"User",List.of("userName","displayName","active","emails"));case ScimGroupService.GROUP_SCHEMA->schema(urn,"Group",List.of("displayName","members"));case ScimUserService.AXIOM_EXTENSION->schema(urn,"Axiom User Extension",List.of("role"));default->throw new com.axiom.common.NotFoundException("Unknown SCIM schema");};}
+    @GetMapping("/ResourceTypes") public Map<String,Object> resourceTypes(){return Map.of("schemas",List.of(ScimUserService.LIST_SCHEMA),"totalResults",2,"startIndex",1,"itemsPerPage",2,"Resources",List.of(resourceType("User","/Users",ScimUserService.USER_SCHEMA),resourceType("Group","/Groups",ScimGroupService.GROUP_SCHEMA)));}
+    @GetMapping("/ResourceTypes/{name}") public Map<String,Object> resourceType(@PathVariable String name){return "User".equalsIgnoreCase(name)?resourceType("User","/Users",ScimUserService.USER_SCHEMA):"Group".equalsIgnoreCase(name)?resourceType("Group","/Groups",ScimGroupService.GROUP_SCHEMA):throwNotFound();}
+
     @GetMapping("/ServiceProviderConfig")
     public Map<String, Object> serviceProviderConfig() {
         Map<String, Object> config = new LinkedHashMap<>();
@@ -91,7 +115,7 @@ public class ScimController {
         config.put("patch", Map.of("supported", true));
         config.put("bulk", Map.of("supported", false, "maxOperations", 0, "maxPayloadSize", 0));
         config.put("filter", Map.of("supported", true, "maxResults", 200,
-                "note", "Supports userName eq \"value\" and active eq true|false"));
+                "note", "Users support userName eq \"value\" and active eq true|false; Groups support displayName eq \"value\""));
         config.put("changePassword", Map.of("supported", false,
                 "note", "SCIM-provisioned users authenticate through the directory, not with a local password"));
         config.put("sort", Map.of("supported", false));
@@ -100,12 +124,13 @@ public class ScimController {
                 "type", "oauthbearertoken",
                 "name", "Axiom SCIM token",
                 "description", "A workspace-scoped provisioning token issued from Sessions & Security")));
-        config.put("resourceTypesSupported", List.of("User"));
-        config.put("groupsSupported", false);
-        config.put("note", "Group provisioning is not implemented: Axiom's profile and permission-set model "
-                + "(epic E02) is not yet built, so there is nothing coherent to map a directory group onto. "
-                + "Assign the Axiom role through the "
-                + ScimUserService.AXIOM_EXTENSION + " extension on the user resource instead.");
+        config.put("resourceTypesSupported", List.of("User", "Group"));
+        config.put("groupsSupported", true);
+        config.put("note", "Directory groups are retained as governed E02 security user-group masters; delete deactivates the group and preserves audit evidence.");
         return config;
     }
+
+    private static Map<String,Object> schema(String id,String name,List<String> attributes){return Map.of("schemas",List.of("urn:ietf:params:scim:schemas:core:2.0:Schema"),"id",id,"name",name,"attributes",attributes.stream().map(a->Map.of("name",a,"type","string","multiValued",a.equals("emails")||a.equals("members"))).toList());}
+    private static Map<String,Object> resourceType(String name,String endpoint,String schema){return Map.of("schemas",List.of("urn:ietf:params:scim:schemas:core:2.0:ResourceType"),"id",name,"name",name,"endpoint",endpoint,"schema",schema);}
+    private static Map<String,Object> throwNotFound(){throw new com.axiom.common.NotFoundException("Unknown SCIM resource type");}
 }

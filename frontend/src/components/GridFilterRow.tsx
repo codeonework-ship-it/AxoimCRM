@@ -1,4 +1,5 @@
 import { type ReactNode } from "react";
+import { useI18n } from "../i18n/I18nProvider";
 
 /**
  * Per-column filters that live inside the grid header.
@@ -57,6 +58,7 @@ export function GridFilterRow({
   trailing = 0,
   leading = 0,
 }: GridFilterRowProps) {
+  const { t, tp } = useI18n();
   if (columns.length === 0) return null;
 
   function setFilter(key: string, value: string) {
@@ -80,23 +82,23 @@ export function GridFilterRow({
       <th key={column.key} className="grid-filter-cell" scope="col">
         {kind === "none" ? null : kind === "boolean" ? (
           <select
-            aria-label={`Filter ${column.label}`}
-            title={`Show rows where ${column.label} is yes, no, or any value.`}
+            aria-label={`${t("ui.common.filter", "Filter")} ${tp(column.label)}`}
+            title={`${tp("Show rows where")} ${tp(column.label)} ${tp("is yes, no, or any value.")}`}
             value={filters[column.key] ?? "any"}
             onChange={(event) => setFilter(column.key, event.target.value)}
           >
-            <option value="any">Any</option>
-            <option value="yes">Yes</option>
-            <option value="no">No</option>
+            <option value="any">{t("ui.common.any", "Any")}</option>
+            <option value="yes">{t("ui.common.yes", "Yes")}</option>
+            <option value="no">{t("ui.common.no", "No")}</option>
           </select>
         ) : kind === "enum" ? (
           <select
-            aria-label={`Filter ${column.label}`}
-            title={`Show rows where ${column.label} matches one option.`}
+            aria-label={`${t("ui.common.filter", "Filter")} ${tp(column.label)}`}
+            title={`${tp("Show rows where")} ${tp(column.label)} ${tp("matches one option.")}`}
             value={filters[column.key] ?? ""}
             onChange={(event) => setFilter(column.key, event.target.value)}
           >
-            <option value="">Any</option>
+            <option value="">{t("ui.common.any", "Any")}</option>
             {(column.options ?? []).map((option) => (
               <option key={option} value={option}>{option}</option>
             ))}
@@ -104,11 +106,11 @@ export function GridFilterRow({
         ) : (
           <input
             type="search"
-            aria-label={`Filter ${column.label}`}
-            title={`Type text to show rows where ${column.label} contains it.`}
+            aria-label={`${t("ui.common.filter", "Filter")} ${tp(column.label)}`}
+            title={`${tp("Type text to show rows where")} ${tp(column.label)} ${tp("contains it.")}`}
             /* "contains" states the match semantics. Repeating the column name
                here would duplicate the header directly above it. */
-            placeholder="contains"
+            placeholder={tp("contains")}
             value={filters[column.key] ?? ""}
             onChange={(event) => setFilter(column.key, event.target.value)}
           />
@@ -145,6 +147,7 @@ export function GridFilterHeader({
   onChange,
   label = "Filter columns",
 }: Omit<GridFilterRowProps, "trailing" | "leading"> & { label?: string }) {
+  const { t, tp } = useI18n();
   if (columns.length === 0) return null;
 
   function setFilter(key: string, value: string) {
@@ -163,25 +166,25 @@ export function GridFilterHeader({
         if (kind === "none") return null;
         return (
           <label className="grid-filter-head-cell" key={column.key}>
-            <span>{column.label}</span>
+            <span>{tp(column.label)}</span>
             {kind === "boolean" ? (
-              <select value={filters[column.key] ?? "any"} aria-label={`Filter ${column.label}`}
+              <select value={filters[column.key] ?? "any"} aria-label={`${t("ui.common.filter", "Filter")} ${tp(column.label)}`}
                 onChange={(event) => setFilter(column.key, event.target.value)}>
-                <option value="any">Any</option>
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
+                <option value="any">{t("ui.common.any", "Any")}</option>
+                <option value="yes">{t("ui.common.yes", "Yes")}</option>
+                <option value="no">{t("ui.common.no", "No")}</option>
               </select>
             ) : kind === "enum" ? (
-              <select value={filters[column.key] ?? ""} aria-label={`Filter ${column.label}`}
+              <select value={filters[column.key] ?? ""} aria-label={`${t("ui.common.filter", "Filter")} ${tp(column.label)}`}
                 onChange={(event) => setFilter(column.key, event.target.value)}>
-                <option value="">Any</option>
+                <option value="">{t("ui.common.any", "Any")}</option>
                 {(column.options ?? []).map((option) => (
                   <option key={option} value={option}>{option}</option>
                 ))}
               </select>
             ) : (
-              <input type="search" value={filters[column.key] ?? ""} placeholder="contains"
-                aria-label={`Filter ${column.label}`}
+              <input type="search" value={filters[column.key] ?? ""} placeholder={tp("contains")}
+                aria-label={`${t("ui.common.filter", "Filter")} ${tp(column.label)}`}
                 onChange={(event) => setFilter(column.key, event.target.value)} />
             )}
           </label>
@@ -189,7 +192,7 @@ export function GridFilterHeader({
       })}
       <button type="button" className="link-btn grid-filter-clear" disabled={active === 0}
         onClick={() => onChange({})}>
-        Clear{active > 0 ? ` (${active})` : ""}
+        {t("ui.common.clear", "Clear")}{active > 0 ? ` (${active})` : ""}
       </button>
     </div>
   );

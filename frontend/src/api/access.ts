@@ -12,11 +12,7 @@ export interface IdpRoute {
   id: string;
   displayName: string;
   protocol: "SAML2" | "OIDC";
-  /**
-   * False while the build has no live connection to the provider. The sign-in
-   * page must not redirect when this is false — the callback would return 501
-   * and strand the user on a JSON error page instead of a form they can use.
-   */
+  /** True when the provider uses a complete browser redirect/callback flow. */
   handshakeAvailable: boolean;
   /** Provider-specific wording to show the user. Server-authored; render verbatim. */
   message: string;
@@ -90,9 +86,17 @@ export async function discoverIdp(tenantSlug: string, email: string): Promise<Id
 
 /** Begins the redirect handshake. Returns the URL to send the browser to. */
 export async function beginSso(idpId: string, tenantSlug: string): Promise<{ redirectUrl: string }> {
-  return call(`/api/v1/sso/oidc/${idpId}/authorize`, {
+  return call(`/api/v1/sso/${idpId}/authorize`, {
     method: "POST",
+    credentials: "include",
     body: JSON.stringify({ tenantSlug, redirectUri: `${window.location.origin}/login` }),
+  });
+}
+
+export async function exchangeSsoTicket(ticket: string): Promise<import("./client").LoginResponse> {
+  return call(`/api/v1/sso/session/exchange`, {
+    method: "POST",
+    body: JSON.stringify({ ticket }),
   });
 }
 
@@ -183,6 +187,12 @@ export interface IdpConfig {
   clientSecret: string | null;
   discoveryUrl: string | null;
   attributeMap: Record<string, string>;
+  jitEnabled: boolean;
+  defaultRole: string;
+  clientAuthMethod: "CLIENT_SECRET_BASIC" | "CLIENT_SECRET_POST";
+  lastLiveTestAt: string | null;
+  lastLiveTestStatus: "PASSED" | "FAILED" | null;
+  lastLiveTestDetail: string | null;
   certificateNotAfter: string | null;
   certificateExpiringSoon: boolean;
   updatedAt: string;
@@ -200,6 +210,9 @@ export interface IdpMutation {
   clientSecret?: string | null;
   discoveryUrl?: string | null;
   attributeMap?: Record<string, string>;
+  jitEnabled?: boolean;
+  defaultRole?: string;
+  clientAuthMethod?: "CLIENT_SECRET_BASIC" | "CLIENT_SECRET_POST";
 }
 
 export interface IdpTestResult {
@@ -220,17 +233,48 @@ export interface IdpCertificateAlert {
   recipientCount: number;
 }
 
+export const IDENTITY_CERTIFICATION_EVIDENCE = [
+  "federatedLogin", "issuerAudienceNonceValidated", "scimDiscovery", "scimUserCreate",
+  "scimUserUpdate", "scimUserDeactivate", "sessionsRevoked", "ownedRecordsPreserved",
+  "scimGroupCreate", "scimGroupMembership", "scimGroupDeactivate", "filterAndPagination",
+] as const;
+
+export interface IdentityCertification {
+  id: string;
+  idpConfigId: string | null;
+  provider: string;
+  externalTenantRef: string;
+  connectorJobRef: string;
+  status: "PASSED" | "FAILED";
+  evidence: Record<string, boolean>;
+  missing: string[];
+  startedAt: string;
+  completedAt: string;
+}
+
+export interface IdentityCertificationRequest {
+  idpConfigId?: string | null;
+  provider: string;
+  externalTenantRef: string;
+  connectorJobRef: string;
+  evidence: Record<string, boolean>;
+}
+
 export const idpApi = {
   list: () => authed<IdpConfig[]>("GET", "/api/v1/identity/idp"),
   create: (body: IdpMutation) => authed<IdpConfig>("POST", "/api/v1/identity/idp", body),
   update: (id: string, body: IdpMutation) => authed<IdpConfig>("PUT", `/api/v1/identity/idp/${id}`, body),
   remove: (id: string) => authed<void>("DELETE", `/api/v1/identity/idp/${id}`),
   test: (id: string) => authed<IdpTestResult>("POST", `/api/v1/identity/idp/${id}/test`),
+  liveTest: (id: string) => authed<{ ready: boolean; protocol: string; inspected: Record<string, unknown>; message: string; testedAt: string }>("POST", `/api/v1/identity/idp/${id}/live-test`),
   route: (email: string) =>
     authed<{ method: string; idpConfigId: string | null; displayName: string | null; protocol: string | null; note: string }>(
       "GET", `/api/v1/identity/idp/route?email=${encodeURIComponent(email)}`),
   certificateAlerts: () => authed<IdpCertificateAlert[]>("GET", "/api/v1/identity/idp/certificate-alerts"),
   sweepCertificateAlerts: () => authed<{ alertsCreated: number }>("POST", "/api/v1/identity/idp/certificate-alerts/sweep"),
+  certifications: () => authed<IdentityCertification[]>("GET", "/api/v1/identity/certifications"),
+  recordCertification: (body: IdentityCertificationRequest) =>
+    authed<IdentityCertification>("POST", "/api/v1/identity/certifications", body),
 };
 
 /* ------------------------------------------------------ trial accounts ---- */

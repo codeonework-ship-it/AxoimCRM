@@ -139,7 +139,8 @@ export function MasterToolbar({ master, entityType, search, filter, grouped, gro
               <button className="btn btn-sm btn-primary" disabled={importMutation.isPending} onClick={() => fileRef.current?.click()}>
                 {importMutation.isPending ? "Validating..." : "Bulk upload"}
               </button>
-              <input ref={fileRef} className="sr-only" type="file" accept=".csv,text/csv" onChange={(event) => {
+              <input ref={fileRef} className="sr-only" type="file" accept=".csv,text/csv"
+                aria-label={`Upload ${master} CSV file`} onChange={(event) => {
                 const file = event.target.files?.[0]; if (file) importMutation.mutate(file); event.target.value = "";
               }} />
             </>}

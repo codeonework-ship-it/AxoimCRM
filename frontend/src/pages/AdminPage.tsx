@@ -6,6 +6,7 @@ import { useAuth } from "../auth/AuthContext";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataGridToolbar } from "../components/DataGridToolbar";
 import { DataViewFrame } from "../components/DataViewFrame";
+import { DocumentationMasterPanel } from "../components/DocumentationMasterPanel";
 import { GridFilterRow, type GridFilterColumn } from "../components/GridFilterRow";
 import { InfoTag } from "../components/InfoTag";
 import { useToasts } from "../components/Toasts";
@@ -157,12 +158,14 @@ export function AdminPage() {
   const queryClient = useQueryClient();
   const platform = PLATFORM_ROLES.has(user?.role ?? "");
   const readOnly = READ_ONLY_ROLES.has(user?.role ?? "");
+  const documentationReadOnly = !["SUPER_ADMIN", "TENANT_ADMIN", "DATA_STEWARD"].includes(user?.role ?? "");
   const tabs = useMemo(() => [
-    "users", "rbac", "alerts",
+    "users", "rbac", "alerts", "documentation",
     ...(platform ? ["trials", "companies", "billing"] : []),
   ], [platform]);
   const initialTab = location.pathname.includes("/rbac") ? "rbac"
     : location.pathname.includes("/alerts") ? "alerts"
+      : location.pathname.includes("/documentation") ? "documentation"
       : location.pathname.includes("/trials") ? "trials"
         : location.pathname.includes("/companies") ? "companies"
           : location.pathname.includes("/billing") ? "billing"
@@ -171,14 +174,17 @@ export function AdminPage() {
   const [groupedTabs, setGroupedTabs] = useLocalStorageState<Record<string, string[]>>("axiom.grid.admin.grouped-tabs", {}, sanitizeGroupedTabs);
   const [columnFiltersByTab, setColumnFiltersByTab] = useLocalStorageState<Record<string, Record<string, string>>>("axiom.grid.admin.column-filters", {}, sanitizeColumnFiltersByTab);
 
-  const usersQ = useQuery({ queryKey: ["admin", "users"], queryFn: api.adminUsers, retry: 1 });
-  const policiesQ = useQuery({ queryKey: ["rbac", "policies"], queryFn: () => api.rbacPolicies(), retry: 1 });
-  const rolesQ = useQuery({ queryKey: ["rbac", "roles"], queryFn: api.roles, retry: 1 });
-  const reportsQ = useQuery({ queryKey: ["reports"], queryFn: api.reports, retry: 1 });
-  const emailAlertsQ = useQuery({ queryKey: ["alerts", "email"], queryFn: api.emailAlerts, retry: 1 });
-  const reportAlertsQ = useQuery({ queryKey: ["alerts", "reports"], queryFn: api.reportAlerts, retry: 1 });
-  const companiesQ = useQuery({ queryKey: ["admin", "companies"], queryFn: api.companies, enabled: platform, retry: 1 });
-  const billingQ = useQuery({ queryKey: ["admin", "billing"], queryFn: api.billing, enabled: platform, retry: 1 });
+  // A tab selection is the explicit load signal for that tab. Hidden admin
+  // modules must not issue eager requests merely because the page is mounted.
+  const usersQ = useQuery({ queryKey: ["admin", "users"], queryFn: api.adminUsers, enabled: tab === "users", retry: 1 });
+  const policiesQ = useQuery({ queryKey: ["rbac", "policies"], queryFn: () => api.rbacPolicies(), enabled: tab === "rbac", retry: 1 });
+  const rolesQ = useQuery({ queryKey: ["rbac", "roles"], queryFn: api.roles, enabled: tab === "rbac", retry: 1 });
+  const reportsQ = useQuery({ queryKey: ["reports"], queryFn: api.reports, enabled: tab === "alerts", retry: 1 });
+  const emailAlertsQ = useQuery({ queryKey: ["alerts", "email"], queryFn: api.emailAlerts, enabled: tab === "alerts", retry: 1 });
+  const reportAlertsQ = useQuery({ queryKey: ["alerts", "reports"], queryFn: api.reportAlerts, enabled: tab === "alerts", retry: 1 });
+  const companiesQ = useQuery({ queryKey: ["admin", "companies"], queryFn: api.companies,
+    enabled: platform && (tab === "trials" || tab === "companies"), retry: 1 });
+  const billingQ = useQuery({ queryKey: ["admin", "billing"], queryFn: api.billing, enabled: platform && tab === "billing", retry: 1 });
 
   const [userDraft, setUserDraft] = useState({ displayName: "", email: "", role: "SALES", password: "axiom-demo" });
   const [emailDraft, setEmailDraft] = useState({ name: "", subject: "", bodyHtml: "<p>Hello,</p>", to: "", cc: "", bcc: "", attachmentOptional: true });
@@ -262,7 +268,9 @@ export function AdminPage() {
       {readOnly && <span className="count">Read-only audit mode</span>}
     </div>
     <div className="admin-tabs" role="tablist" aria-label="Administration modules">
-      {tabs.map((item) => <button key={item} className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item.replace(/-/g, " ")}</button>)}
+      {tabs.map((item) => <button key={item} id={`admin-${item}-tab`} type="button" role="tab"
+        aria-selected={tab === item}
+        className={tab === item ? "active" : ""} onClick={() => setTab(item)}>{item.replace(/-/g, " ")}</button>)}
     </div>
 
     {tab === "users" && <DataViewFrame
@@ -393,6 +401,8 @@ export function AdminPage() {
         <AlertTable title="Report alerts" rows={reportAlertsQ.data?.filter((row) => visibleReportAlertKeys.has(`${row.name}|${row.subject}`)).map((row) => ({ id: row.id, name: row.name, subject: row.subject, detail: `${row.reportLabel} · ${row.formats.join(", ")}`, action: () => sendReport.mutate(row.id) })) ?? []} readOnly={readOnly} filters={columnFiltersByTab.alerts ?? {}} onFiltersChange={(next) => setTabFilters("alerts", next)} />
       </div>
     </DataViewFrame>}
+
+    {tab === "documentation" && <DocumentationMasterPanel readOnly={documentationReadOnly} />}
 
     {tab === "trials" && platform && <DataViewFrame
       title="Trial accounts"

@@ -14,7 +14,13 @@ import com.axiom.migration.MigrationOnboardingService.TemplateRow;
 import com.axiom.migration.MigrationPlanService.CreatePlanRequest;
 import com.axiom.migration.MigrationPlanService.MappingEdit;
 import com.axiom.migration.MigrationPlanService.MappingReview;
+import com.axiom.migration.MigrationPlanService.MappingRevisionRow;
 import com.axiom.migration.MigrationPlanService.PlanRow;
+import com.axiom.migration.MigrationRecoveryService.DeltaCheckpointRow;
+import com.axiom.migration.MigrationRecoveryService.RecoveryActionRow;
+import com.axiom.migration.MigrationRecoveryService.RecoveryView;
+import com.axiom.api.PageResult;
+import com.axiom.migration.MigrationModel.Issue;
 import com.axiom.migration.TargetSchema.TargetEntity;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -53,16 +59,19 @@ public class MigrationController {
     private final MigrationRollbackService rollback;
     private final MigrationReconciler reconciler;
     private final MigrationOnboardingService onboarding;
+    private final MigrationRecoveryService recovery;
 
     public MigrationController(MigrationConnectionService connections, MigrationPlanService plans,
                                MigrationRunService runs, MigrationRollbackService rollback,
-                               MigrationReconciler reconciler, MigrationOnboardingService onboarding) {
+                               MigrationReconciler reconciler, MigrationOnboardingService onboarding,
+                               MigrationRecoveryService recovery) {
         this.connections = connections;
         this.plans = plans;
         this.runs = runs;
         this.rollback = rollback;
         this.reconciler = reconciler;
         this.onboarding = onboarding;
+        this.recovery = recovery;
     }
 
     // ------------------------------------------------------------------ sources
@@ -146,12 +155,27 @@ public class MigrationController {
         return plans.acknowledgeUnmapped(id);
     }
 
+    @GetMapping("/plans/{id}/mapping/revisions")
+    public List<MappingRevisionRow> mappingRevisions(@PathVariable UUID id) {
+        return plans.revisions(id);
+    }
+
+    @PostMapping("/plans/{id}/mapping/revisions/{versionNo}/restore")
+    public MappingReview restoreMapping(@PathVariable UUID id, @PathVariable int versionNo) {
+        return plans.restore(id, versionNo);
+    }
+
     // ------------------------------------------------------------------ runs
 
     @PostMapping("/plans/{id}/runs")
     @ResponseStatus(HttpStatus.ACCEPTED)
     public RunHandle queue(@PathVariable UUID id, @RequestBody Map<String, String> body) {
-        return runs.queue(id, body.get("mode"));
+        String mode = body.get("mode");
+        if ("ROLLBACK".equalsIgnoreCase(mode) || "RECONCILE".equalsIgnoreCase(mode)) {
+            throw new IllegalArgumentException("Use the dedicated " + mode.toLowerCase()
+                    + " recovery endpoint so an operator reason is captured in the audit trail");
+        }
+        return runs.queue(id, mode);
     }
 
     @GetMapping("/plans/{id}/runs")
@@ -162,6 +186,30 @@ public class MigrationController {
     @GetMapping("/runs/{runId}")
     public RunHandle run(@PathVariable UUID runId) {
         return runs.run(runId);
+    }
+
+    @GetMapping("/runs/{runId}/recovery")
+    public RecoveryView recovery(@PathVariable UUID runId) {
+        return recovery.recovery(runId);
+    }
+
+    @GetMapping("/runs/{runId}/issues")
+    public PageResult<Issue> issues(@PathVariable UUID runId,
+                                    @RequestParam(required = false) String search,
+                                    @RequestParam(required = false) String category,
+                                    @RequestParam(defaultValue = "0") int page) {
+        return recovery.issues(runId, search, category, page);
+    }
+
+    @PostMapping("/runs/{runId}/retry")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public RunHandle retry(@PathVariable UUID runId, @RequestBody Map<String, String> body) {
+        return runs.retry(runId, body.get("reason"));
+    }
+
+    @PostMapping("/runs/{runId}/cancel")
+    public RunHandle cancel(@PathVariable UUID runId, @RequestBody Map<String, String> body) {
+        return runs.cancel(runId, body.get("reason"));
     }
 
     /** The FR-MIG-003 pre-flight report for a dry run (and the issue log for any run). */
@@ -181,6 +229,30 @@ public class MigrationController {
     @GetMapping("/plans/{id}/rollback-preview")
     public RollbackPreview rollbackPreview(@PathVariable UUID id) {
         return rollback.preview(id);
+    }
+
+    @PostMapping("/plans/{id}/rollback")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public RunHandle rollback(@PathVariable UUID id, @RequestBody Map<String, String> body) {
+        return recovery.rollback(id, body.get("reason"));
+    }
+
+    @PostMapping("/plans/{id}/reconcile")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    public RunHandle reconcile(@PathVariable UUID id, @RequestBody Map<String, String> body) {
+        return recovery.reconcile(id, body.get("reason"));
+    }
+
+    @GetMapping("/plans/{id}/checkpoints")
+    public List<DeltaCheckpointRow> checkpoints(@PathVariable UUID id) {
+        plans.plan(id);
+        return recovery.checkpoints(id);
+    }
+
+    @GetMapping("/plans/{id}/recovery-actions")
+    public List<RecoveryActionRow> recoveryActions(@PathVariable UUID id) {
+        plans.plan(id);
+        return recovery.actions(id);
     }
 
     // ------------------------------------------------------------------ onboarding

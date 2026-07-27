@@ -3,6 +3,9 @@ package com.axiom.accounts;
 import com.axiom.audit.AuditService;
 import com.axiom.common.ConflictException;
 import com.axiom.common.NotFoundException;
+import com.axiom.outbox.OutboxWriter;
+import com.axiom.security.AuthorizationService;
+import com.axiom.security.SecurableObject;
 import com.axiom.tenancy.TenantContext;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -36,13 +39,18 @@ public class ContactService {
     private final AuditService audit;
     private final DuplicateService duplicates;
     private final ActorSession actor;
+    private final AuthorizationService authorization;
+    private final OutboxWriter outbox;
 
     public ContactService(JdbcTemplate jdbc, AuditService audit,
-                          DuplicateService duplicates, ActorSession actor) {
+                          DuplicateService duplicates, ActorSession actor,
+                          AuthorizationService authorization, OutboxWriter outbox) {
         this.jdbc = jdbc;
         this.audit = audit;
         this.duplicates = duplicates;
         this.actor = actor;
+        this.authorization = authorization;
+        this.outbox = outbox;
     }
 
     // --------------------------------------------------------------- contracts
@@ -95,6 +103,7 @@ public class ContactService {
 
     @Transactional(readOnly = true)
     public ContactDetail get(UUID id) {
+        authorization.requireRead(SecurableObject.CONTACT, id);
         try {
             return jdbc.queryForObject("""
                     select c.id, c.account_id, a.name as account_name, c.first_name, c.last_name,
@@ -141,6 +150,10 @@ public class ContactService {
                 .append(" where c.tenant_id = ? and c.deleted_at is null and c.merged_into_id is null");
         List<Object> args = new ArrayList<>();
         args.add(TenantContext.get().tenantId());
+        AuthorizationService.RecordPredicate visible = authorization.visibleRecordPredicate(
+                SecurableObject.CONTACT, "c");
+        sql.append(" and (").append(visible.sql()).append(")");
+        args.addAll(visible.args());
         if (accountId != null) {
             sql.append(" and c.account_id = ?");
             args.add(accountId);
@@ -172,11 +185,18 @@ public class ContactService {
     public ContactView view(UUID id) {
         ContactDetail contact = get(id);
         UUID tenant = TenantContext.get().tenantId();
+        AuthorizationService.RecordPredicate reportsVisible = authorization.visibleRecordPredicate(
+                SecurableObject.CONTACT, "c");
+        List<Object> reportArgs = new ArrayList<>();
+        reportArgs.add(tenant);
+        reportArgs.add(id);
+        reportArgs.addAll(reportsVisible.args());
 
         List<ContactDetail> reports = jdbc.query(
                 LIST_SELECT + " where c.tenant_id = ? and c.reports_to_contact_id = ?"
-                        + " and c.deleted_at is null order by c.last_name, c.first_name",
-                (rs, i) -> mapDetail(rs), tenant, id);
+                        + " and c.deleted_at is null and (" + reportsVisible.sql() + ")"
+                        + " order by c.last_name, c.first_name",
+                (rs, i) -> mapDetail(rs), reportArgs.toArray());
 
         /*
          * Two ways an activity reaches a contact, and the timeline has to honour
@@ -261,6 +281,8 @@ public class ContactService {
 
     @Transactional
     public ContactDetail create(ContactRequest request) {
+        authorization.requireCreate(SecurableObject.CONTACT);
+        if (request.accountId() != null) authorization.requireRead(SecurableObject.ACCOUNT, request.accountId());
         actor.bind();
         String first = AccountService.require(request.firstName(), "First name is required");
         String last = AccountService.require(request.lastName(), "Last name is required");
@@ -299,11 +321,14 @@ public class ContactService {
         audit.record("CONTACT_CREATE", "CONTACT", id, "Created contact " + fullName,
                 Map.of("name", fullName, "accountId", String.valueOf(request.accountId()),
                         "duplicateTopConfidence", assessment.topConfidence()));
+        outbox.write("contact", id, "contact.created", Map.of("name", fullName));
         return get(id);
     }
 
     @Transactional
     public ContactDetail update(UUID id, long expectedVersion, ContactRequest request) {
+        authorization.requireEdit(SecurableObject.CONTACT, id);
+        if (request.accountId() != null) authorization.requireRead(SecurableObject.ACCOUNT, request.accountId());
         actor.bind();
         ContactDetail before = get(id);
         String first = AccountService.require(request.firstName(), "First name is required");
@@ -349,6 +374,7 @@ public class ContactService {
         }
         audit.record("CONTACT_UPDATE", "CONTACT", id, "Updated contact " + fullName,
                 Map.of("name", fullName, "fromVersion", expectedVersion));
+        outbox.write("contact", id, "contact.updated", Map.of("version", expectedVersion + 1));
         return get(id);
     }
 
@@ -408,6 +434,7 @@ public class ContactService {
      */
     @Transactional
     public ContactDetail clone(UUID id, ContactRequest overrides) {
+        authorization.requireRead(SecurableObject.CONTACT, id);
         ContactDetail source = get(id);
         ContactRequest request = new ContactRequest(
                 pick(overrides == null ? null : overrides.firstName(), source.firstName()),
@@ -449,6 +476,7 @@ public class ContactService {
     /** Ownership transfer for one contact. The bulk path reuses this method. */
     @Transactional
     public ContactDetail reassign(UUID id, UUID ownerId, String reason) {
+        authorization.requireEdit(SecurableObject.CONTACT, id);
         actor.bind();
         ContactDetail before = get(id);
         if (ownerId == null) {
@@ -468,6 +496,7 @@ public class ContactService {
                 "Transferred " + before.firstName() + " " + before.lastName() + " to a new owner",
                 Map.of("fromOwnerId", String.valueOf(before.ownerId()), "toOwnerId", ownerId.toString(),
                         "reason", reason == null || reason.isBlank() ? "not stated" : reason.trim()));
+        outbox.write("contact", id, "contact.reassigned", Map.of("ownerId", ownerId.toString()));
         return get(id);
     }
 
@@ -481,6 +510,7 @@ public class ContactService {
      */
     @Transactional
     public void delete(UUID id, String reason) {
+        authorization.requireDelete(SecurableObject.CONTACT, id);
         actor.bind();
         ContactDetail before = get(id);
         Long reports = jdbc.queryForObject("""
@@ -502,6 +532,7 @@ public class ContactService {
         audit.record("CONTACT_DELETE", "CONTACT", id,
                 "Deleted contact " + before.firstName() + " " + before.lastName(),
                 Map.of("reason", reason == null || reason.isBlank() ? "not stated" : reason.trim()));
+        outbox.write("contact", id, "contact.deleted", Map.of("softDelete", true));
     }
 
     private static String pick(String preferred, String fallback) {
@@ -528,6 +559,7 @@ public class ContactService {
 
     @Transactional(readOnly = true)
     public List<AddressRow> addresses(String ownerEntity, UUID ownerId) {
+        authorization.requireRead(securable(ownerEntity), ownerId);
         return jdbc.query("""
                 select id, owner_entity, owner_id, address_type, is_primary, line1, line2, city,
                        state_region, postal_code, country_code, validation_status
@@ -544,6 +576,7 @@ public class ContactService {
 
     @Transactional
     public AddressRow addAddress(AddressRequest request) {
+        authorization.requireEdit(securable(request.ownerEntity()), request.ownerId());
         actor.bind();
         String ownerEntity = AccountService.upper(request.ownerEntity());
         String type = AccountService.upper(request.addressType());
@@ -562,6 +595,8 @@ public class ContactService {
         audit.record("ADDRESS_ADD", ownerEntity, request.ownerId(),
                 "Added " + type.toLowerCase() + " address", Map.of("addressId", id.toString(),
                         "addressType", type, "isPrimary", request.isPrimary()));
+        outbox.write(ownerEntity.toLowerCase(), request.ownerId(), "address.added",
+                Map.of("addressId", id.toString(), "addressType", type));
         return addresses(ownerEntity, request.ownerId()).stream()
                 .filter(a -> a.id().equals(id)).findFirst()
                 .orElseThrow(() -> new NotFoundException("Address not found after insert"));
@@ -579,6 +614,7 @@ public class ContactService {
 
     @Transactional(readOnly = true)
     public List<ChannelRow> channels(UUID contactId) {
+        authorization.requireRead(SecurableObject.CONTACT, contactId);
         return jdbc.query("""
                 select id, contact_id, channel, channel_type, value, is_primary, verified_at
                 from crm.contact_channel
@@ -593,6 +629,7 @@ public class ContactService {
 
     @Transactional
     public List<ChannelRow> addChannel(UUID contactId, ChannelRequest request) {
+        authorization.requireEdit(SecurableObject.CONTACT, contactId);
         actor.bind();
         get(contactId);
         String channel = AccountService.upper(request.channel());
@@ -614,7 +651,16 @@ public class ContactService {
         audit.record("CONTACT_CHANNEL_ADD", "CONTACT", contactId,
                 "Added " + channel.toLowerCase() + " channel",
                 Map.of("channelId", id.toString(), "channel", channel, "isPrimary", request.isPrimary()));
+        outbox.write("contact", contactId, "contact.channel.added",
+                Map.of("channelId", id.toString(), "channel", channel));
         return channels(contactId);
+    }
+
+    private static SecurableObject securable(String ownerEntity) {
+        String value = AccountService.upper(ownerEntity);
+        if ("ACCOUNT".equals(value)) return SecurableObject.ACCOUNT;
+        if ("CONTACT".equals(value)) return SecurableObject.CONTACT;
+        throw new IllegalArgumentException("Addresses can belong only to an account or contact");
     }
 
     static String blankToNull(String value) {

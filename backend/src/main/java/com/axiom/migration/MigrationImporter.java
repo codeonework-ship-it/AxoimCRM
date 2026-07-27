@@ -83,7 +83,7 @@ public class MigrationImporter {
     public Outcome execute(UUID runId, PlanContext plan, SourceAdapter adapter,
                            SourceSession session, Instant deltaSince) {
         UUID tenantId = TenantContext.get().tenantId();
-        UUID actor = TenantContext.get().userId();
+        UUID actor = tenantActor(tenantId, TenantContext.get().userId());
         TenantIndex tenant = analyzer.readTenantIndex(tenantId);
         MigratedIndex migrated = analyzer.readMigratedIndex(tenantId, plan.planId());
         Map<String, UUID> stages = stageIndex(tenantId);
@@ -431,6 +431,26 @@ public class MigrationImporter {
             stages.putIfAbsent("__first__", (UUID) row[0]);
         }
         return stages;
+    }
+
+    /** Platform administrators are attributable request principals but are not
+     * tenant-owned CRM users and therefore cannot satisfy business-record owner
+     * foreign keys. Prefer the caller when it is a tenant user; otherwise use
+     * the tenant's active administrator as the operational owner while audit
+     * evidence continues to name the real platform actor. */
+    UUID tenantActor(UUID tenantId, UUID requestedActor) {
+        List<UUID> users = jdbc.query("""
+                select id from identity.app_user
+                where tenant_id = ? and active
+                order by case when id = ? then 0 when role = 'TENANT_ADMIN' then 1 else 2 end,
+                         created_at, id
+                limit 1
+                """, (rs, i) -> rs.getObject(1, UUID.class), tenantId, requestedActor);
+        if (users.isEmpty()) {
+            throw new IllegalStateException("The tenant has no active user who can own migrated records. "
+                    + "Activate a tenant administrator before importing.");
+        }
+        return users.get(0);
     }
 
     /** An unrecognised source stage lands on the first stage rather than nowhere. */

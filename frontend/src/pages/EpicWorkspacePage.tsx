@@ -14,6 +14,8 @@ import { formatDate, formatMoney } from "../lib/format";
 import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
 import { useAppDialog, type DialogApi } from "../components/AppDialog";
+import { ReleaseControlPlane } from "../components/ReleaseControlPlane";
+import { BfsiOperationsPanel, CommodityOperationsPanel, MobileOfflinePanel } from "../components/VerticalClosurePanels";
 
 export type WorkspaceModule =
   | "forecast"
@@ -223,6 +225,10 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
     </div>
 
     {module === "automation" && <WorkflowGateConsole />}
+    {module === "sandbox" && <ReleaseControlPlane />}
+    {module === "mobile" && <MobileOfflinePanel devices={rawRows} />}
+    {module === "bfsi" && <BfsiOperationsPanel />}
+    {module === "commodity" && <CommodityOperationsPanel />}
 
     <section className="list-controls" aria-label={`${titleFromModule(module)} search and filters`}>
       <label>

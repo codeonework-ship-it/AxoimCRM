@@ -4,6 +4,9 @@ import com.axiom.audit.AuditService;
 import com.axiom.common.ConflictException;
 import com.axiom.common.NotFoundException;
 import com.axiom.tenancy.TenantContext;
+import com.axiom.outbox.OutboxWriter;
+import com.axiom.security.AuthorizationService;
+import com.axiom.security.SecurableObject;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -40,13 +43,18 @@ public class AccountService {
     private final AuditService audit;
     private final DuplicateService duplicates;
     private final ActorSession actor;
+    private final AuthorizationService authorization;
+    private final OutboxWriter outbox;
 
     public AccountService(JdbcTemplate jdbc, AuditService audit,
-                          DuplicateService duplicates, ActorSession actor) {
+                          DuplicateService duplicates, ActorSession actor,
+                          AuthorizationService authorization, OutboxWriter outbox) {
         this.jdbc = jdbc;
         this.audit = audit;
         this.duplicates = duplicates;
         this.actor = actor;
+        this.authorization = authorization;
+        this.outbox = outbox;
     }
 
     // --------------------------------------------------------------- contracts
@@ -82,6 +90,8 @@ public class AccountService {
                                 List<HierarchyNode> nodes, boolean restricted, String restrictionNote) {}
 
     public record ReparentRequest(UUID parentAccountId, String reason) {}
+    public record LifecycleRequest(boolean active, long expectedVersion,
+                                   @NotBlank(message = "A lifecycle change reason is required") String reason) {}
 
     // ------------------------------------------------------------------ reading
 
@@ -131,11 +141,7 @@ public class AccountService {
 
     @Transactional(readOnly = true)
     public AccountDetail get(UUID id) {
-        RecordAccess.Scope scope = RecordAccess.current();
-        List<Object> args = new ArrayList<>();
-        args.add(TenantContext.get().tenantId());
-        args.add(id);
-        String ownerFilter = scope.ownerPredicate("a.owner_id", args);
+        authorization.requireRead(SecurableObject.ACCOUNT, id);
         try {
             return jdbc.queryForObject("""
                     select %s
@@ -144,7 +150,7 @@ public class AccountService {
                     left join crm.account up on up.tenant_id = a.tenant_id and up.id = a.ultimate_parent_id
                     left join identity.app_user u on u.tenant_id = a.tenant_id and u.id = a.owner_id
                     where a.tenant_id = ? and a.id = ? and a.deleted_at is null
-                    """.formatted(DETAIL_COLUMNS) + ownerFilter, detailMapper(), args.toArray());
+                    """.formatted(DETAIL_COLUMNS), detailMapper(), TenantContext.get().tenantId(), id);
         } catch (EmptyResultDataAccessException ex) {
             throw new NotFoundException("Account not found, or it has been merged away or deleted");
         }
@@ -157,18 +163,19 @@ public class AccountService {
     @Transactional(readOnly = true)
     public HierarchyView hierarchy(UUID id) {
         AccountDetail self = get(id);
-        RecordAccess.Scope scope = RecordAccess.current();
         UUID root = self.ultimateParentId() == null ? self.id() : self.ultimateParentId();
+        AuthorizationService.RecordPredicate visible = authorization.visibleRecordPredicate(
+                SecurableObject.ACCOUNT, "a");
         List<Object> args = new ArrayList<>();
         args.add(TenantContext.get().tenantId());
         args.add(root);
-        String ownerFilter = scope.ownerPredicate("a.owner_id", args);
+        args.addAll(visible.args());
         List<HierarchyNode> nodes = jdbc.query("""
                 select a.id, a.name, a.parent_account_id, a.hierarchy_depth, a.status,
                        a.health_score, a.health_band
                 from crm.account a
                 where a.tenant_id = ? and a.deleted_at is null and a.ultimate_parent_id = ?
-                """ + ownerFilter + """
+                """ + " and (" + visible.sql() + ")" + """
                 order by a.hierarchy_depth, a.name
                 """, (rs, i) -> new HierarchyNode(
                         rs.getObject("id", UUID.class), rs.getString("name"),
@@ -177,13 +184,14 @@ public class AccountService {
                         rs.getString("health_band"), rs.getObject("id", UUID.class).equals(id)),
                 args.toArray());
         return new HierarchyView(id, self.ultimateParentId(), self.ultimateParentName(), nodes,
-                scope.restricted(), scope.restricted() ? scope.restrictionNote() : null);
+                !visible.allowsEverything(), !visible.allowsEverything() ? restrictionNote() : null);
     }
 
     // ----------------------------------------------------------------- writing
 
     @Transactional
     public AccountDetail create(AccountRequest request) {
+        authorization.requireCreate(SecurableObject.ACCOUNT);
         actor.bind();
         String name = require(request.name(), "Account name is required");
         DuplicateService.Assessment assessment = duplicates.assess(new DuplicateService.Probe(
@@ -221,11 +229,13 @@ public class AccountService {
                 Map.of("name", name, "recordType", nullSafe(upper(request.recordType()), "STANDARD"),
                         "parentAccountId", String.valueOf(request.parentAccountId()),
                         "duplicateTopConfidence", assessment.topConfidence()));
+        outbox.write("account", id, "account.created", Map.of("accountId", id.toString(), "name", name));
         return get(id);
     }
 
     @Transactional
     public AccountDetail update(UUID id, long expectedVersion, AccountRequest request) {
+        authorization.requireEdit(SecurableObject.ACCOUNT, id);
         actor.bind();
         AccountDetail before = get(id);
         String name = require(request.name(), "Account name is required");
@@ -267,6 +277,8 @@ public class AccountService {
         audit.record("ACCOUNT_UPDATE", "ACCOUNT", id, "Updated account " + name,
                 Map.of("previousName", nullSafe(before.name(), ""), "name", name,
                         "fromVersion", expectedVersion));
+        outbox.write("account", id, "account.updated", Map.of(
+                "accountId", id.toString(), "fromVersion", expectedVersion, "name", name));
         return get(id);
     }
 
@@ -277,6 +289,7 @@ public class AccountService {
      */
     @Transactional
     public AccountDetail reparent(UUID id, ReparentRequest request) {
+        authorization.requireEdit(SecurableObject.ACCOUNT, id);
         actor.bind();
         AccountDetail before = get(id);
         if (request.parentAccountId() != null) {
@@ -307,7 +320,34 @@ public class AccountService {
                         "hierarchyPath", after.hierarchyPath(),
                         "ultimateParentId", String.valueOf(after.ultimateParentId()),
                         "reason", nullSafe(request.reason(), "")));
+        outbox.write("account", id, "account.reparented", Map.of(
+                "accountId", id.toString(), "parentAccountId", String.valueOf(after.parentAccountId()),
+                "reason", nullSafe(request.reason(), "")));
         return after;
+    }
+
+    /** Soft lifecycle only: account rows are never physically deleted by the API. */
+    @Transactional
+    public AccountDetail changeLifecycle(UUID id, LifecycleRequest request) {
+        authorization.requireDelete(SecurableObject.ACCOUNT, id);
+        actor.bind();
+        AccountDetail before = get(id);
+        String target = request.active() ? "ACTIVE" : "INACTIVE";
+        int updated = jdbc.update("""
+                update crm.account set status = ?, updated_at = now(), updated_by = ?, version = version + 1
+                where tenant_id = ? and id = ? and deleted_at is null and version = ?
+                """, target, TenantContext.get().userId(), TenantContext.get().tenantId(), id,
+                request.expectedVersion());
+        if (updated == 0) {
+            throw new ConflictException("This account changed while you were editing it. Reload and try again.");
+        }
+        audit.recordWithReason("ACCOUNT_" + target, "ACCOUNT", id,
+                (request.active() ? "Reactivated " : "Inactivated ") + before.name(), request.reason(),
+                Map.of("before", Map.of("status", before.status()), "after", Map.of("status", target),
+                        "fromVersion", request.expectedVersion()));
+        outbox.write("account", id, request.active() ? "account.reactivated" : "account.inactivated",
+                Map.of("accountId", id.toString(), "reason", request.reason()));
+        return get(id);
     }
 
     // ------------------------------------------------------------------ helpers
@@ -375,5 +415,9 @@ public class AccountService {
 
     static String nullSafe(String value, String fallback) {
         return value == null ? fallback : value;
+    }
+
+    private static String restrictionNote() {
+        return "Totals cover only the records your access permits. Records outside your access are excluded.";
     }
 }

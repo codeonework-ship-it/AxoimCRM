@@ -100,7 +100,7 @@ export function TopBar({ onOpenCommand, onOpenHelp, onToggleNav, navExpanded }: 
         <span className="search-kbd">{isMac ? "⌘K" : "Ctrl K"}</span>
       </button>
 
-      <div ref={bellWrapRef} style={{ position: "relative" }}>
+      <div ref={bellWrapRef} className="notification-control">
         <button
           ref={bellButtonRef}
           className="icon-btn"
@@ -179,7 +179,7 @@ export function TopBar({ onOpenCommand, onOpenHelp, onToggleNav, navExpanded }: 
         title={`${t("shell.manual", "User Manual")} (Ctrl+/)`}
         onClick={onOpenHelp}
       >
-        {t("shell.manual", "User Manual")}
+        <span className="manual-button-label">{t("shell.manual", "User Manual")}</span>
       </button>
 
       <LocaleSwitcher />

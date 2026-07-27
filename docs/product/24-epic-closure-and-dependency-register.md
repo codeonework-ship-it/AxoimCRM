@@ -62,12 +62,12 @@ queues and recovery surfaces may be completed without claiming live delivery.
 
 | Epic | Pending adapter or external authority | First-party boundary that must remain complete |
 |---|---|---|
-| E01 | SAML/OIDC IdP federation and production SCIM provider testing | Provider/config masters, certificate alerts, local identity, sessions and access audit |
+| E01 | Named Entra ID/Okta tenant credentials and production connector-job evidence | Live SAML/OIDC engine, browser replay protection, SCIM User/Group lifecycle and discovery, scoped tokens, soft deprovision, certificate alerts, certification evidence register and access audit |
 | E07 | Microsoft 365, Google Workspace and telephony capture | Activities, templates, manual logging, timeline and outbox events |
 | E08 | E-signature and external document storage | Quote revisions, approval, Jasper document generation and dispatch queue |
 | E13 | Externally hosted partner portal | Partner identities, deal registration, overlap rules and protection evidence |
 | E14/E17 | External webhook destinations and vendor connectors | Outbox, subscriptions, signing contract, retry, DLQ and replay |
-| E15 | SMTP/email delivery and production-volume certification environment | Artifact generation, schedule/threshold policy and delivery evidence queue |
+| E15 | SMTP/email delivery vendor adapter | Artifact generation, schedule/threshold policy, delivery evidence queue, projection/KPI reconciliation and production-volume certification gate |
 | E16 | Commercial AI/model providers | Provider-neutral requests, guardrails, citations, audit and deterministic fallback |
 | E18 | Salesforce/Zoho/other source connectors | Discovery contract, mapping, validation, dry-run, reconciliation and rollback |
 | E21 | Apple/Microsoft store signing and distribution accounts | Responsive/PWA/Electron runtime, device sessions and offline-sync contract |
@@ -82,10 +82,42 @@ not a blanket “complete” flag.
 | Priority | Epics | Required closure evidence |
 |---|---|---|
 | P0 | E01-E06, E20 | Complete end-to-end CRUD/lifecycle flows, record-level authorization, tenant isolation tests, audit/outbox assertions and accessibility/runtime suites |
-| P0 | E15 | Report-grid/PDF parity, KPI reconciliation, projection rebuild/reconciliation tests, export audit, scale gate and viewer regression coverage |
+| P0 | E15 | ✅ Closed: report-grid/PDF SHA-256 parity, independent KPI reconciliation, projection rebuild/reconciliation, immutable certification evidence and million-row/latency scale gate |
 | P1 | E07-E14 | Finish first-party authoring and lifecycle commands, workflow/approval coverage, bulk/master validation and cross-module transaction tests |
-| P1 | E17-E19 | Complete vendor-neutral connector management, migration rollback/re-sync, sandbox promotion and recovery tests |
-| P2 | E16, E21-E23 | Provider-independent guardrails, offline conflict UX and complete vertical-pack workflows before any adapter certification |
+| P1 | E17 | Complete vendor-neutral connector management |
+| Closed first-party | E19 | Sandbox provisioning, immutable promotion packages, full-diff validation, production maker-checker, atomic deployment, conflict-safe rollback and restored-environment DR certification are implemented and verified |
+| Closed first-party | E18 | Migration rollback/re-sync, mapping revision management, reconciliation reruns and operator recovery are implemented and tested; only the adapters listed in the vendor register remain pending |
+| Closed first-party | E01 | Live SAML/OIDC federation and SCIM User/Group lifecycle are implemented and locally verified; only a named external provider tenant's certification evidence remains pending |
+| P2 | E16 | Provider-independent AI guardrails before any model-provider certification |
+| Closed first-party | E21 | Permission-filtered offline packages, cache evidence, optimistic synchronization, explicit conflict resolution, authorization recheck and responsive operator UX are implemented; store distribution remains external |
+| Closed requested workflow | E22 | Onboarding, KYC ownership/expiry, screening disposition, risk, activation, holdings/whitespace, suitability overrides and exception maker-checker flows are implemented; external screening feeds remain pending |
+| Closed origination | E23 | Source-mastered agreement/credit gates, enquiry/tender/cargo workflow, non-binding pricing, term approvals, execution queue/retries and acknowledgement are implemented; named CTRM adapters remain pending |
+
+### P0 E01-E06 and E20 closure evidence (2026-07-27)
+
+The first-party P0 closure contract is now implemented and verified. Account,
+contact, lead and opportunity lifecycle commands enforce record-level access and
+write audit/outbox evidence atomically; hierarchy and rollup reads apply the same
+visibility predicates; Docker-free PostgreSQL tests prove tenant and outbox RLS
+plus audit immutability; and the production web build, WCAG 2.2 automated checks,
+authenticated runtime suite and 100-row list contract pass. The repeatable proof
+and exact scope are recorded in
+[`../architecture/p0-core-closure.md`](../architecture/p0-core-closure.md).
+
+Named external IdP certification (E01) and an approved Alertmanager receiver
+(E20) remain `PENDING_VENDOR`; neither is counted as unfinished first-party code.
+
+### E19 sandbox, release and recovery closure evidence (2026-07-27)
+
+The first-party release control plane is closed through migration `V348`, the
+`ReleaseManagementService` command boundary and the `/sandbox` operator UI.
+Validation writes no target state and reports the complete diff and all blockers;
+production promotion requires an independent maker-checker approval; deployment,
+audit and outbox evidence commit atomically; rollback refuses to overwrite later
+configuration; and restored databases are certified against RTO/RPO, row parity,
+schema, checksum and outbox continuity. The Docker-free runtime proof, security
+invariants and operating procedure are recorded in
+[`../architecture/e19-sandbox-release-dr-closure.md`](../architecture/e19-sandbox-release-dr-closure.md).
 
 ## 6. Release decision
 

@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
-import { api, isUnreachable, type ReferenceEntry, type ReferenceValueSet, type ResolvedReferenceEntry } from "../api/client";
+import { api, isUnreachable, type ReferenceEntry, type ReferenceEntryMutation, type ReferenceValueSet, type ResolvedReferenceEntry } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataGridToolbar } from "../components/DataGridToolbar";
@@ -10,6 +10,7 @@ import { GridFilterRow } from "../components/GridFilterRow";
 import { InfoTag } from "../components/InfoTag";
 import { canManageMasters } from "../components/MasterToolbar";
 import { useToasts } from "../components/Toasts";
+import { useAppDialog } from "../components/AppDialog";
 import { GridLoader, LoaderStatus } from "../components/Loaders";
 import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
@@ -28,7 +29,18 @@ import { usePersistedGridState } from "../lib/usePersistedGridState";
  * same master. `/reference-data` with no code resolves to the first tab.
  */
 
-const EMPTY_DRAFT = { code: "", label: "", sortOrder: 100 };
+type ReferenceEditorMode = "create" | "edit" | "clone";
+interface ReferenceDraft {
+  code: string;
+  label: string;
+  sortOrder: number;
+  active: boolean;
+  effectiveFrom: string;
+  effectiveTo: string;
+}
+const EMPTY_DRAFT: ReferenceDraft = {
+  code: "", label: "", sortOrder: 100, active: true, effectiveFrom: "", effectiveTo: "",
+};
 const REFERENCE_GROUP_COLUMNS: GroupColumn<ReferenceEntry>[] = [
   { key: "code", label: "Code", value: (row) => row.code },
   { key: "label", label: "Label", value: (row) => row.label },
@@ -61,11 +73,14 @@ function panelDomId(apiName: string): string {
 export function ReferenceDataPage() {
   const { user } = useAuth();
   const toasts = useToasts();
+  const dialog = useAppDialog();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const params = useParams<{ setCode?: string }>();
   const [searchParams] = useSearchParams();
   const [draft, setDraft] = useState(EMPTY_DRAFT);
+  const [editorMode, setEditorMode] = useState<ReferenceEditorMode>("create");
+  const [editingCode, setEditingCode] = useState<string | null>(null);
   const [asOf, setAsOf] = useState(() => new Date().toISOString().slice(0, 10));
   const [resolveCode, setResolveCode] = useState("");
   const [resolved, setResolved] = useState<ResolvedReferenceEntry | null>(null);
@@ -102,6 +117,8 @@ export function ReferenceDataPage() {
   // A half-typed value from one master must not leak into the next.
   useEffect(() => {
     setDraft(EMPTY_DRAFT);
+    setEditorMode("create");
+    setEditingCode(null);
     setResolveCode("");
     setResolved(null);
   }, [selectedApiName]);
@@ -129,10 +146,14 @@ export function ReferenceDataPage() {
       code: draft.code,
       label: draft.label,
       sortOrder: draft.sortOrder,
-      active: true,
+      active: draft.active,
+      effectiveFrom: draft.effectiveFrom || null,
+      effectiveTo: draft.effectiveTo || null,
     }),
     onSuccess: () => {
       setDraft(EMPTY_DRAFT);
+      setEditorMode("create");
+      setEditingCode(null);
       toasts.push("info", "Reference entry added", "The value is active for this tenant.");
       void queryClient.invalidateQueries({ queryKey: ["reference", "entries", selectedApiName] });
     },
@@ -140,19 +161,25 @@ export function ReferenceDataPage() {
   });
 
   const updateMutation = useMutation({
-    mutationFn: (entry: ReferenceEntry) => api.updateReferenceEntry(selectedApiName, entry.code, {
-      code: entry.code,
-      label: entry.label,
-      sortOrder: entry.sortOrder,
-      active: !entry.active,
-      effectiveFrom: entry.effectiveFrom,
-      effectiveTo: entry.effectiveTo,
-    }),
+    mutationFn: ({ code, entry }: { code: string; entry: ReferenceEntryMutation }) =>
+      api.updateReferenceEntry(selectedApiName, code, entry),
     onSuccess: () => {
+      setDraft(EMPTY_DRAFT);
+      setEditorMode("create");
+      setEditingCode(null);
       toasts.push("info", "Reference entry updated", "The value set was updated without deleting history.");
       void queryClient.invalidateQueries({ queryKey: ["reference", "entries", selectedApiName] });
     },
     onError: (error) => toasts.push("error", "Reference update failed", error instanceof Error ? error.message : "Update failed."),
+  });
+  const retireMutation = useMutation({
+    mutationFn: ({ entry, reason }: { entry: ReferenceEntry; reason: string }) =>
+      api.deleteReferenceEntry(selectedApiName, entry.code, reason),
+    onSuccess: () => {
+      toasts.push("info", "Reference entry deleted", "The value was retired, not hard-deleted, and remains available to historical records and reports.");
+      void queryClient.invalidateQueries({ queryKey: ["reference", "entries", selectedApiName] });
+    },
+    onError: (error) => toasts.push("error", "Reference entry cannot be deleted", error instanceof Error ? error.message : "Delete failed."),
   });
   const resolveMutation = useMutation({
     mutationFn: () => api.resolveReferenceEntry(selectedApiName, resolveCode, asOf),
@@ -196,12 +223,81 @@ export function ReferenceDataPage() {
     selectTab(sets[target].apiName, true);
   }
 
-  function createEntry() {
+  function saveEntry() {
     if (!draft.code.trim() || !draft.label.trim()) {
       toasts.push("error", "Missing reference details", "Code and label are required.");
       return;
     }
-    createMutation.mutate();
+    if (draft.effectiveFrom && draft.effectiveTo && draft.effectiveTo < draft.effectiveFrom) {
+      toasts.push("error", "Invalid effective dates", "Effective To must be on or after Effective From.");
+      return;
+    }
+    if (editorMode === "edit" && editingCode) {
+      updateMutation.mutate({ code: editingCode, entry: {
+        code: editingCode,
+        label: draft.label,
+        sortOrder: draft.sortOrder,
+        active: draft.active,
+        effectiveFrom: draft.effectiveFrom || null,
+        effectiveTo: draft.effectiveTo || null,
+      } });
+    } else createMutation.mutate();
+  }
+
+  function beginCreate() {
+    setDraft(EMPTY_DRAFT);
+    setEditorMode("create");
+    setEditingCode(null);
+  }
+
+  function beginEdit(entry: ReferenceEntry) {
+    setDraft({
+      code: entry.code,
+      label: entry.label,
+      sortOrder: entry.sortOrder,
+      active: entry.active,
+      effectiveFrom: entry.effectiveFrom ?? "",
+      effectiveTo: entry.effectiveTo ?? "",
+    });
+    setEditorMode("edit");
+    setEditingCode(entry.code);
+  }
+
+  function beginClone(entry: ReferenceEntry) {
+    setDraft({
+      code: "",
+      label: `${entry.label} Copy`,
+      sortOrder: entry.sortOrder + 5,
+      active: true,
+      effectiveFrom: entry.effectiveFrom ?? "",
+      effectiveTo: entry.effectiveTo ?? "",
+    });
+    setEditorMode("clone");
+    setEditingCode(null);
+  }
+
+  async function retireEntry(entry: ReferenceEntry) {
+    const reason = await dialog.prompt({
+      title: "Delete Reference Value",
+      message: `Delete ${entry.code} - ${entry.label}? Axiom will retire the value without removing its history. Values used by system workflows or dependent lists are protected.`,
+      label: "Retirement reason",
+      placeholder: "Why should this value no longer be available?",
+      required: true,
+      confirmLabel: "Delete Value",
+      tone: "danger",
+    });
+    if (reason?.trim()) retireMutation.mutate({ entry, reason: reason.trim() });
+  }
+
+  function restoreEntry(entry: ReferenceEntry) {
+    updateMutation.mutate({ code: entry.code, entry: {
+      code: entry.code,
+      label: entry.label,
+      sortOrder: entry.sortOrder,
+      active: true,
+      effectiveFrom: entry.effectiveFrom,
+      effectiveTo: null,
+    } });
   }
 
   return <>
@@ -269,8 +365,9 @@ export function ReferenceDataPage() {
         role="tabpanel"
         aria-labelledby={tabDomId(activeSet.apiName)}
       >
-        <header>
+        <header className="reference-panel-head">
           <div><span className="eyebrow">{activeSet.module}</span><h2>{activeSet.label}</h2><p>{activeSet.description ?? "Tenant-scoped governed values."}</p></div>
+          {canManage && <button type="button" className="btn btn-primary btn-sm" onClick={beginCreate}>New Value</button>}
         </header>
         <section className="list-controls" aria-label="Resolve a historical reference value">
           <label><span>Value code <InfoTag text="Choose the stored code from a historical record." label="Historical value code help" /></span>
@@ -289,12 +386,21 @@ export function ReferenceDataPage() {
             <span>{resolved.note}</span>
           </div>}
         </section>
-        {canManage && <div className="reference-entry-form">
-          <span className="reference-form-help"><InfoTag text="Add a new dropdown value. Codes are system-friendly names; labels are what users read." label="Reference value form help" /></span>
-          <input title="Short system code for this value, usually uppercase." value={draft.code} onChange={(event) => setDraft((value) => ({ ...value, code: event.target.value.toUpperCase() }))} placeholder="CODE" aria-label="Reference code" />
-          <input title="Friendly label users will see in dropdowns and reports." value={draft.label} onChange={(event) => setDraft((value) => ({ ...value, label: event.target.value }))} placeholder="Display label" aria-label="Reference label" />
-          <input title="Lower numbers appear earlier in lists." type="number" value={draft.sortOrder} onChange={(event) => setDraft((value) => ({ ...value, sortOrder: Number(event.target.value) }))} aria-label="Sort order" />
-          <button className="btn btn-primary btn-sm" disabled={createMutation.isPending || !selectedApiName} onClick={createEntry}>{createMutation.isPending ? "Saving..." : "Add value"}</button>
+        {canManage && <div className="reference-entry-form" aria-label={`${editorMode} reference value`}>
+          <div className="reference-editor-heading">
+            <span className="eyebrow">{editorMode === "edit" ? "Edit Value" : editorMode === "clone" ? "Clone Value" : "Create Value"}</span>
+            <InfoTag text="Create, edit, clone, restore or retire a governed dropdown value. Codes stay stable so reports and historical records never lose their meaning." label="Reference value form help" />
+          </div>
+          <label><span>Code</span><input title="Short system code for this value, usually uppercase." disabled={editorMode === "edit"} value={draft.code} onChange={(event) => setDraft((value) => ({ ...value, code: event.target.value.toUpperCase() }))} placeholder="CODE" aria-label="Reference code" /></label>
+          <label><span>Display Label</span><input title="Friendly label users will see in dropdowns and reports." value={draft.label} onChange={(event) => setDraft((value) => ({ ...value, label: event.target.value }))} placeholder="Display label" aria-label="Reference label" /></label>
+          <label><span>Sort Order</span><input title="Lower numbers appear earlier in lists." type="number" min="0" value={draft.sortOrder} onChange={(event) => setDraft((value) => ({ ...value, sortOrder: Number(event.target.value) }))} aria-label="Sort order" /></label>
+          <label><span>Effective From</span><input type="date" value={draft.effectiveFrom} onChange={(event) => setDraft((value) => ({ ...value, effectiveFrom: event.target.value }))} aria-label="Effective from" /></label>
+          <label><span>Effective To</span><input type="date" value={draft.effectiveTo} onChange={(event) => setDraft((value) => ({ ...value, effectiveTo: event.target.value }))} aria-label="Effective to" /></label>
+          <label className="reference-active-check"><input type="checkbox" checked={draft.active} onChange={(event) => setDraft((value) => ({ ...value, active: event.target.checked }))} /><span>Active</span></label>
+          <div className="reference-editor-actions">
+            <button className="btn btn-primary btn-sm" disabled={createMutation.isPending || updateMutation.isPending || !selectedApiName} onClick={saveEntry}>{createMutation.isPending || updateMutation.isPending ? "Saving..." : editorMode === "edit" ? "Save Changes" : "Create Value"}</button>
+            {(editorMode !== "create" || draft.code || draft.label) && <button className="btn btn-sm" disabled={createMutation.isPending || updateMutation.isPending} onClick={beginCreate}>Cancel</button>}
+          </div>
         </div>}
         {entriesQ.isLoading && <GridLoader label="Reading value set" rows={5} columns={5} />}
         {entriesQ.isError && <p className="empty-note">Entries failed to load{entriesQ.error instanceof Error ? `: ${entriesQ.error.message}` : "."}</p>}
@@ -315,7 +421,13 @@ export function ReferenceDataPage() {
               {showGroup && <tr className="group-row"><th colSpan={canManage ? 5 : 4}>{groupText}</th></tr>}
               <tr>
                 <td>{entry.code}</td><td>{entry.label}</td><td>{entry.sortOrder}</td><td>{group}</td>
-                {canManage && <td className="table-action"><button className="link-btn" disabled={updateMutation.isPending || entry.systemManaged} onClick={() => updateMutation.mutate(entry)}>{entry.active ? "Deactivate" : "Activate"}</button></td>}
+                {canManage && <td className="table-action">
+                  <button className="link-btn" disabled={updateMutation.isPending || retireMutation.isPending} onClick={() => beginEdit(entry)}>Edit</button>
+                  <button className="link-btn" disabled={updateMutation.isPending || retireMutation.isPending} onClick={() => beginClone(entry)}>Clone</button>
+                  {entry.active
+                    ? <button className="link-btn danger-link" title={entry.systemManaged ? "System-managed values are protected because workflows depend on them." : "Soft-delete this value while keeping its history."} disabled={retireMutation.isPending || entry.systemManaged} onClick={() => void retireEntry(entry)}>Delete</button>
+                    : <button className="link-btn" disabled={updateMutation.isPending} onClick={() => restoreEntry(entry)}>Restore</button>}
+                </td>}
               </tr>
             </Fragment>;
           })}

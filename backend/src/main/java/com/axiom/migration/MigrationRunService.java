@@ -56,7 +56,7 @@ public class MigrationRunService {
         this.audit = audit;
     }
 
-    private static final Set<String> MODES = Set.of("DRY_RUN", "IMPORT", "DELTA", "ROLLBACK");
+    private static final Set<String> MODES = Set.of("DRY_RUN", "IMPORT", "DELTA", "ROLLBACK", "RECONCILE");
 
     // ------------------------------------------------------------------ queue
 
@@ -87,6 +87,12 @@ public class MigrationRunService {
                 MigrationRollbackService.requireRollbackRole();
                 rollback.requireWithinRetention(rollback.plan(principal.tenantId(), planId));
             }
+            case "RECONCILE" -> {
+                if (plan.importedAt() == null) {
+                    throw new ConflictException("Plan \"" + plan.name() + "\" has not completed an import. "
+                            + "Reconciliation compares an imported target with its source.");
+                }
+            }
             default -> { /* DRY_RUN is deliberately ungated: iterate freely */ }
         }
 
@@ -110,6 +116,81 @@ public class MigrationRunService {
                 Map.of("runId", runId.toString(), "mode", normalised));
 
         return run(runId);
+    }
+
+    /** Retry is a new immutable attempt; the failed run is never rewritten. */
+    @Transactional
+    public RunHandle retry(UUID failedRunId, String reason) {
+        TenantContext.Principal principal = TenantContext.get();
+        CrmRole.requireImport(principal.role());
+        RunHandle failed = run(failedRunId);
+        if (!Set.of("FAILED", "CANCELLED").contains(failed.status())) {
+            throw new ConflictException("Only a failed or cancelled migration run can be retried");
+        }
+        if ("ROLLBACK".equals(failed.mode())) MigrationRollbackService.requireRollbackRole();
+        requireNoRunInFlight(failed.planId(), plans.plan(failed.planId()).name());
+        String recoveryReason = reason == null ? "Operator requested retry" : reason.trim();
+        if (recoveryReason.isBlank()) throw new IllegalArgumentException("A retry reason is required");
+        UUID runId = jdbc.queryForObject("""
+                insert into migration.run
+                  (tenant_id, plan_id, mode, status, delta_since, requested_by, retry_of_run, attempt_no)
+                select tenant_id, plan_id, mode, 'QUEUED', delta_since, ?, id, attempt_no + 1
+                from migration.run where tenant_id = ? and id = ? returning id
+                """, UUID.class, principal.userId(), principal.tenantId(), failedRunId);
+        recordRecovery(failed.planId(), failedRunId, "RETRY", recoveryReason, runId,
+                "A new immutable attempt was queued");
+        audit.record("MIGRATION_RUN_RETRIED", "MIGRATION_RUN", failedRunId,
+                "Migration run retried as " + runId,
+                Map.of("resultRunId", runId.toString(), "reason", recoveryReason));
+        return run(runId);
+    }
+
+    /** A queued run is safe to cancel. Running imports are atomic and therefore
+     * finish or fail as one transaction instead of stopping half-written. */
+    @Transactional
+    public RunHandle cancel(UUID runId, String reason) {
+        TenantContext.Principal principal = TenantContext.get();
+        CrmRole.requireImport(principal.role());
+        String recoveryReason = reason == null ? "" : reason.trim();
+        if (recoveryReason.isBlank()) throw new IllegalArgumentException("A cancellation reason is required");
+        RunHandle current = run(runId);
+        int changed = jdbc.update("""
+                update migration.run set status = 'CANCELLED', cancelled_at = now(), finished_at = now(),
+                    cancellation_reason = ?, message = ?
+                where tenant_id = ? and id = ? and status = 'QUEUED'
+                """, recoveryReason, "Cancelled before execution: " + recoveryReason,
+                principal.tenantId(), runId);
+        if (changed == 0) {
+            throw new ConflictException("Only a queued run can be cancelled. A running migration is atomic "
+                    + "and must finish or fail before an operator recovery action is chosen.");
+        }
+        recordRecovery(current.planId(), runId, "CANCEL", recoveryReason, null,
+                "Queued run cancelled before any source or target work began");
+        audit.record("MIGRATION_RUN_CANCELLED", "MIGRATION_RUN", runId,
+                "Queued migration run cancelled", Map.of("reason", recoveryReason));
+        return run(runId);
+    }
+
+    private void requireNoRunInFlight(UUID planId, String planName) {
+        Long count = jdbc.queryForObject("""
+                select count(*) from migration.run
+                where tenant_id = ? and plan_id = ? and status in ('QUEUED','RUNNING')
+                """, Long.class, TenantContext.get().tenantId(), planId);
+        if (count != null && count > 0) {
+            throw new ConflictException("Plan \"" + planName + "\" already has a run in flight");
+        }
+    }
+
+    void recordRecovery(UUID planId, UUID runId, String action, String reason,
+                        UUID resultRunId, String detail) {
+        TenantContext.Principal principal = TenantContext.get();
+        jdbc.update("""
+                insert into migration.recovery_action
+                  (tenant_id, plan_id, run_id, action, status, reason, requested_by,
+                   result_run_id, detail, completed_at)
+                values (?, ?, ?, ?, 'COMPLETED', ?, ?, ?, ?, now())
+                """, principal.tenantId(), planId, runId, action, reason, principal.userId(),
+                resultRunId, detail);
     }
 
     private void requireAcknowledgedUnmappedFields(UUID planId) {
@@ -186,7 +267,7 @@ public class MigrationRunService {
     private static final String RUN_SELECT = """
             select id, plan_id, mode, status, phase, total_units, processed_units, records_created,
                    records_updated, records_skipped, records_removed, issue_count,
-                   queued_at, started_at, finished_at, message
+                   retry_of_run, attempt_no, queued_at, started_at, finished_at, message
             from migration.run
             """;
 
@@ -199,6 +280,7 @@ public class MigrationRunService {
                 rs.getString("mode"), rs.getString("status"), rs.getString("phase"), total, processed, percent,
                 rs.getLong("records_created"), rs.getLong("records_updated"), rs.getLong("records_skipped"),
                 rs.getLong("records_removed"), rs.getLong("issue_count"),
+                rs.getObject("retry_of_run", UUID.class), rs.getInt("attempt_no"),
                 rs.getTimestamp("queued_at").toInstant(),
                 rs.getTimestamp("started_at") == null ? null : rs.getTimestamp("started_at").toInstant(),
                 rs.getTimestamp("finished_at") == null ? null : rs.getTimestamp("finished_at").toInstant(),

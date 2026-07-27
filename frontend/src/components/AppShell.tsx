@@ -7,6 +7,7 @@ import { NotificationsProvider } from "./notifications";
 import { CommandPalette } from "./CommandPalette";
 import { HelpDrawer } from "./HelpDrawer";
 import { useScreenViewTracking } from "../activity/uiActivity";
+import { PageDataGate } from "./PageDataGate";
 
 export function AppShell() {
   const navigate = useNavigate();
@@ -96,7 +97,7 @@ export function AppShell() {
             navExpanded={navOpen || !railCollapsed}
           />
           <main className="shell-content app-ground">
-            <Outlet />
+            <PageDataGate><Outlet /></PageDataGate>
           </main>
         </div>
       </div>

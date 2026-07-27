@@ -5,6 +5,11 @@ import com.axiom.migration.MigrationModel.Issue;
 import com.axiom.migration.MigrationModel.ObjectOutcome;
 import com.axiom.migration.MigrationModel.ReconciliationLine;
 import com.axiom.migration.MigrationModel.ReconciliationReport;
+import com.axiom.migration.MigrationModel.PlanContext;
+import com.axiom.migration.MigrationModel.ObjectPlan;
+import com.axiom.migration.SourceContract.SourceAdapter;
+import com.axiom.migration.SourceContract.SourceRecord;
+import com.axiom.migration.SourceContract.SourceSession;
 import com.axiom.tenancy.TenantContext;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -15,6 +20,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.Set;
+import java.util.HashSet;
 
 /**
  * The reconciliation report (FR-MIG-006, F-290).
@@ -108,6 +115,54 @@ public class MigrationReconciler {
                 where m.tenant_id = ? and m.plan_id = ? and m.source_object = ?
                   and m.target_entity = 'OPPORTUNITY' and m.state = 'LIVE'
                 """, BigDecimal.class, tenantId, planId, sourceObject);
+    }
+
+    /** Re-read the authoritative source and target without mutating business
+     * records. This is the operator's on-demand drift check after an import or
+     * any number of delta runs. */
+    @Transactional
+    public List<Issue> reconcileNow(UUID runId, PlanContext plan, SourceAdapter adapter, SourceSession session) {
+        UUID tenantId = TenantContext.get().tenantId();
+        List<Issue> issues = new ArrayList<>();
+        for (ObjectPlan object : plan.objects()) {
+            if (object.targetEntity() == null) continue;
+            List<SourceRecord> records = adapter.records(session, object.sourceObject(), null);
+            Set<String> live = new HashSet<>(jdbc.query("""
+                    select source_record_id from migration.record_map
+                    where tenant_id = ? and plan_id = ? and source_object = ? and state = 'LIVE'
+                      and target_entity <> 'OPPORTUNITY_CONTACT_ROLE'
+                    """, (rs, i) -> rs.getString(1), tenantId, plan.planId(), object.sourceObject()));
+            for (SourceRecord source : records) {
+                if (!live.contains(source.sourceId())) {
+                    issues.add(Issue.skipped(object.sourceObject(), source.sourceId(), source.label(),
+                            "No live Axiom target is recorded for this source record. Review the original run "
+                            + "issues, correct validation or mapping, then run a delta re-sync."));
+                }
+            }
+            BigDecimal sourceSum = BigDecimal.ZERO;
+            for (SourceRecord source : records) {
+                for (String field : object.moneyFields()) {
+                    sourceSum = sourceSum.add(MigrationAssembly.money(source.values().get(field)));
+                }
+            }
+            long targetCount = targetCount(tenantId, plan.planId(), object.sourceObject());
+            BigDecimal targetSum = targetSum(tenantId, plan.planId(), object.sourceObject(), object.targetEntity());
+            boolean sumsBalance = targetSum == null || sourceSum.compareTo(targetSum) == 0;
+            boolean balanced = records.size() == targetCount && sumsBalance;
+            jdbc.update("""
+                    insert into migration.reconciliation_line
+                      (tenant_id, run_id, source_object, target_entity, source_count, target_count,
+                       not_migrated_count, source_amount_sum, target_amount_sum, currency_code, balanced)
+                    values (?, ?, ?, ?, ?, ?, ?, ?, ?, 'SOURCE', ?)
+                    on conflict (tenant_id, run_id, source_object) do update
+                      set source_count = excluded.source_count, target_count = excluded.target_count,
+                          not_migrated_count = excluded.not_migrated_count,
+                          source_amount_sum = excluded.source_amount_sum,
+                          target_amount_sum = excluded.target_amount_sum, balanced = excluded.balanced
+                    """, tenantId, runId, object.sourceObject(), object.targetEntity(), records.size(),
+                    targetCount, Math.max(0, records.size() - live.size()), sourceSum, targetSum, balanced);
+        }
+        return List.copyOf(issues);
     }
 
     // ------------------------------------------------------------------ read

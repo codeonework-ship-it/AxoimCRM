@@ -14,6 +14,7 @@ import { GroupColumnPicker } from "./GroupColumnPicker";
 import { InfoTag } from "./InfoTag";
 import { useToasts } from "./Toasts";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
+import { useI18n } from "../i18n/I18nProvider";
 
 /**
  * One table component for every RBAC screen: per-column filtering, grouping and
@@ -133,6 +134,7 @@ export function DataTable<T>({
   initialGroupBy,
   note,
 }: DataTableProps<T>) {
+  const { t, tp, formatNumber } = useI18n();
   const toasts = useToasts();
   const [groupBy, setGroupBy, filters, setFilters] = usePersistedGridState(`table-${name}`, { groupColumns: initialGroupBy ? [initialGroupBy] : [] });
   const [sort, setSort] = useState<{ key: string; direction: 1 | -1 } | null>(null);
@@ -260,8 +262,8 @@ export function DataTable<T>({
       if (raw === undefined || raw === "" || raw === "any") return null;
       return {
         key: column.key,
-        label: column.header,
-        value: column.filter === "boolean" ? (raw === "yes" ? "Yes" : "No") : raw,
+        label: tp(column.header),
+        value: column.filter === "boolean" ? (raw === "yes" ? t("ui.common.yes", "Yes") : t("ui.common.no", "No")) : raw,
       };
     })
     .filter((filter): filter is { key: string; label: string; value: string } => !!filter);
@@ -271,12 +273,12 @@ export function DataTable<T>({
     try {
       const result = await copyGridSnapshot(tableExportRows(), tableExportContext(), `${slug(name)}-table-view-snapshot`);
       if (result === "clipboard") {
-        toasts.push("info", "Grid snapshot copied", "The image includes the current columns, rows, filters, grouping, sort and timestamp.");
+        toasts.push("info", tp("Grid snapshot copied"), tp("The image includes the current columns, rows, filters, grouping, sort and timestamp."));
       } else {
-        toasts.push("info", "Grid snapshot downloaded", "This browser blocked image clipboard access, so the complete PNG snapshot was downloaded instead.");
+        toasts.push("info", tp("Grid snapshot downloaded"), tp("This browser blocked image clipboard access, so the complete PNG snapshot was downloaded instead."));
       }
     } catch (error) {
-      toasts.push("error", "Grid snapshot not created", error instanceof Error ? error.message : "The snapshot could not be created.");
+      toasts.push("error", tp("Grid snapshot not created"), error instanceof Error ? error.message : tp("The snapshot could not be created."));
     }
   }
 
@@ -291,40 +293,40 @@ export function DataTable<T>({
       );
       await recordCurrentViewExportAudit(format, context);
       saveDownloadedFile(file);
-      toasts.push("info", `Table ${format === "XLSX" ? "Excel" : format === "DOCX" ? "Word" : "PDF"} ready`, "The download reflects the current table filters, grouping and sort.");
+      toasts.push("info", `${tp("Table")} ${format === "XLSX" ? "Excel" : format === "DOCX" ? "Word" : "PDF"} ${tp("ready")}`, tp("The download reflects the current table filters, grouping and sort."));
     } catch (error) {
-      toasts.push("error", "Table export failed", error instanceof Error ? error.message : "Download failed.");
+      toasts.push("error", tp("Table export failed"), error instanceof Error ? error.message : tp("Download failed."));
     }
   }
 
   function tableExportRows(): GridExportRow[] {
     return sorted.map((row) => Object.fromEntries(columns.map((column) => {
       const value = text(column.value(row));
-      return [column.header, value === "" ? (column.blank ?? "—") : value];
+      return [tp(column.header), value === "" ? (column.blank ?? "—") : value];
     })));
   }
 
   function tableExportContext(): GridExportContext {
     return {
-      title: `${name} table view`,
+      title: `${tp(name)} ${tp("table view")}`,
       objectType: auditEntityType,
       generatedAt: new Date(),
       rowCount: sorted.length,
       groups: [
-        ...groupColumns.map((column) => column.header),
-        ...(sortColumn ? [`Sort: ${sortColumn.header} ${sort?.direction === 1 ? "ascending" : "descending"}`] : []),
-        ...(collapsed.size ? [`Collapsed groups: ${collapsed.size}`] : []),
+        ...groupColumns.map((column) => tp(column.header)),
+        ...(sortColumn ? [`${tp("Sort")}: ${tp(sortColumn.header)} ${sort?.direction === 1 ? tp("ascending") : tp("descending")}`] : []),
+        ...(collapsed.size ? [`${tp("Collapsed groups")}: ${formatNumber(collapsed.size)}`] : []),
       ],
       filters: activeFilters.map((filter) => ({ label: filter.label, value: filter.value })),
     };
   }
 
   function tableViewScope(): string {
-    const parts = [`${sorted.length}${sorted.length !== rows.length ? ` of ${rows.length}` : ""} rows`];
-    if (activeFilters.length) parts.push(`${activeFilters.length} filters`);
-    if (groupColumns.length) parts.push(`${groupColumns.length} groups`);
-    if (sortColumn) parts.push(`sorted by ${sortColumn.header}`);
-    if (collapsed.size) parts.push(`${collapsed.size} collapsed`);
+    const parts = [`${formatNumber(sorted.length)}${sorted.length !== rows.length ? ` ${tp("of")} ${formatNumber(rows.length)}` : ""} ${tp("rows")}`];
+    if (activeFilters.length) parts.push(`${formatNumber(activeFilters.length)} ${tp("filters")}`);
+    if (groupColumns.length) parts.push(`${formatNumber(groupColumns.length)} ${tp("groups")}`);
+    if (sortColumn) parts.push(`${tp("sorted by")} ${tp(sortColumn.header)}`);
+    if (collapsed.size) parts.push(`${formatNumber(collapsed.size)} ${tp("collapsed")}`);
     return parts.join(" · ");
   }
 
@@ -353,11 +355,11 @@ export function DataTable<T>({
     <section className={`data-table-frame${full ? " data-table-frame-full" : ""}`} aria-label={`${name} table workspace`}>
       <header className="data-table-frame-head">
         <div>
-          <span className="eyebrow">Table workspace</span>
+          <span className="eyebrow">{t("ui.grid.tableWorkspace", "Table workspace")}</span>
           <h2 className="data-view-title">
-            <span>{name}</span>
+            <span>{tp(name)}</span>
             <InfoTag
-              text="Use this table to filter each column, group related rows, sort headers, open audit history, export the current view, or expand it for a larger review."
+              text={tp("Use this table to filter each column, group related rows, sort headers, open audit history, export the current view, or expand it for a larger review.")}
               label={`${name} table help`}
             />
           </h2>
@@ -372,7 +374,7 @@ export function DataTable<T>({
       */}
       <div className="data-grid-tools-stack">
         <div className="grid-tool-row" role="toolbar" aria-label={`${name} table tools`}>
-          <div className="grid-tool-label"><span>Actions</span></div>
+          <div className="grid-tool-label"><span>{t("ui.common.actions", "Actions")}</span></div>
           <div className="grid-tool-controls">
             <button
               type="button"
@@ -380,27 +382,27 @@ export function DataTable<T>({
               aria-expanded={filtersOpen}
               onClick={() => setFiltersOpen((open) => !open)}
             >
-              {filtersOpen ? "Hide column filters" : "Column filters"}
+              {filtersOpen ? t("ui.grid.hideColumnFilters", "Hide column filters") : t("ui.grid.columnFilters", "Column filters")}
               {activeFilterCount > 0 && <span className="chip">{activeFilterCount}</span>}
             </button>
             <span className="toolbar-divider" aria-hidden />
             <button type="button" className="btn btn-sm" onClick={() => void exportTableView("XLSX")}>
-              Export Excel
+              {t("ui.grid.exportExcel", "Export Excel")}
             </button>
             <button type="button" className="btn btn-sm" onClick={() => void exportTableView("DOCX")}>
-              Export Word
+              {t("ui.grid.exportWord", "Export Word")}
             </button>
             <button type="button" className="btn btn-sm" onClick={() => void exportTableView("PDF")}>
-              Export PDF
+              {t("ui.grid.exportPdf", "Export PDF")}
             </button>
             <button type="button" className="btn btn-sm" onClick={() => void copyTableView()}>
-              Copy view
+              {t("ui.grid.copyView", "Copy view")}
             </button>
             <button type="button" className="btn btn-sm" onClick={() => setAuditOpen(true)}>
-              Audit
+              {t("ui.grid.audit", "Audit")}
             </button>
             <button type="button" className="btn btn-sm" onClick={() => setFull((value) => !value)}>
-              {full ? "Restore view" : "Full size"}
+              {full ? t("ui.grid.restoreView", "Restore view") : t("ui.grid.fullSize", "Full size")}
             </button>
           </div>
           <div className="grid-tool-trailing">
@@ -416,12 +418,12 @@ export function DataTable<T>({
                   setPage(0);
                 }}
               >
-                Reset view
+                {t("ui.grid.resetView", "Reset view")}
               </button>
             )}
             <span className="count">
-              {sorted.length}
-              {sorted.length !== rows.length ? ` of ${rows.length}` : ""} rows
+              {formatNumber(sorted.length)}
+              {sorted.length !== rows.length ? ` ${tp("of")} ${formatNumber(rows.length)}` : ""} {tp("rows")}
             </span>
           </div>
         </div>
@@ -434,7 +436,7 @@ export function DataTable<T>({
             setGroupBy(next);
             setCollapsed(new Set());
           }}
-          helpText="Tick the columns you want to group by. Rows will be grouped using the selected columns in the order you picked them."
+          helpText={tp("Tick the columns you want to group by. Rows will be grouped using the selected columns in the order you picked them.")}
         />
       </div>
 
@@ -445,8 +447,8 @@ export function DataTable<T>({
               type="button"
               className="filter-chip"
               key={filter.key}
-              title={`Remove ${filter.label} filter`}
-              aria-label={`Remove ${filter.label} filter`}
+              title={`${tp("Remove")} ${filter.label} ${tp("filter")}`}
+              aria-label={`${tp("Remove")} ${filter.label} ${tp("filter")}`}
               onClick={() => setFilter(filter.key, "")}
             >
               <span>{filter.label}</span>
@@ -467,22 +469,22 @@ export function DataTable<T>({
                 return (
                   <th key={column.key} aria-sort={ariaSort} scope="col">
                     {column.sortable === false ? (
-                      column.header
+                      tp(column.header)
                     ) : (
                       <button
                         type="button"
                         className="link-btn"
                         onClick={() => toggleSort(column.key)}
-                        aria-label={`Sort by ${column.header}`}
+                        aria-label={`${tp("Sort by")} ${tp(column.header)}`}
                       >
-                        {column.header}
+                        {tp(column.header)}
                         {sorting && <span aria-hidden="true">{sort.direction === 1 ? " ^" : " v"}</span>}
                       </button>
                     )}
                   </th>
                 );
               })}
-              {actions && <th className="table-action">{actionsHeader}</th>}
+              {actions && <th className="table-action">{tp(actionsHeader)}</th>}
             </tr>
             {/*
               The same in-header filter row every other grid now uses. This
@@ -493,7 +495,7 @@ export function DataTable<T>({
               <GridFilterRow
                 columns={columns.map((column) => ({
                   key: column.key,
-                  label: column.header,
+                  label: tp(column.header),
                   kind: column.filter ?? "text",
                   options: enumOptions[column.key] ?? [],
                 }))}
@@ -510,7 +512,7 @@ export function DataTable<T>({
             {sorted.length === 0 && (
               <tr>
                 <td colSpan={columnCount} className="empty-note">
-                  {activeFilterCount > 0 ? "No rows match these column filters." : empty}
+                  {activeFilterCount > 0 ? t("ui.grid.noMatchingRows", "No rows match these column filters.") : tp(empty)}
                 </td>
               </tr>
             )}
@@ -543,13 +545,13 @@ export function DataTable<T>({
         </table>
       </div>
       <footer className="page-controls" aria-label={`${name} pagination`}>
-        <span>Showing {pageRows.length} of {sorted.length} records - {DEFAULT_PAGE_SIZE} rows per page</span>
+        <span>{tp("Showing")} {formatNumber(pageRows.length)} {tp("of")} {formatNumber(sorted.length)} {tp("records")} - {formatNumber(DEFAULT_PAGE_SIZE)} {t("ui.grid.rowsPerPage", "rows per page")}</span>
         <div>
           <button type="button" className="btn btn-sm" disabled={page === 0}
-            onClick={() => setPage((value) => Math.max(0, value - 1))}>Previous</button>
-          <strong>Page {totalPages === 0 ? 0 : page + 1} of {totalPages}</strong>
+            onClick={() => setPage((value) => Math.max(0, value - 1))}>{t("ui.common.previous", "Previous")}</button>
+          <strong>{t("ui.grid.page", "Page")} {formatNumber(totalPages === 0 ? 0 : page + 1)} {tp("of")} {formatNumber(totalPages)}</strong>
           <button type="button" className="btn btn-sm" disabled={page + 1 >= totalPages}
-            onClick={() => setPage((value) => value + 1)}>Next</button>
+            onClick={() => setPage((value) => value + 1)}>{t("ui.common.next", "Next")}</button>
         </div>
       </footer>
       {note && <p className="loading-note">{note}</p>}
@@ -558,7 +560,7 @@ export function DataTable<T>({
       open={auditOpen}
       entityType={auditEntityType}
       title={`${name} audit`}
-      emptyLabel="No audited actions for this table yet."
+      emptyLabel={tp("No audited actions for this table yet.")}
       onClose={() => setAuditOpen(false)}
     />
     </>

@@ -4,6 +4,9 @@ import com.axiom.audit.AuditService;
 import com.axiom.common.ConflictException;
 import com.axiom.common.NotFoundException;
 import com.axiom.tenancy.TenantContext;
+import com.axiom.security.AuthorizationService;
+import com.axiom.security.SecurableObject;
+import com.axiom.outbox.OutboxWriter;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -45,13 +48,18 @@ public class OpportunityCommandService {
     private final PipelineQueries queries;
     private final OpportunityLifecycleService lifecycle;
     private final AuditService audit;
+    private final AuthorizationService authorization;
+    private final OutboxWriter outbox;
 
     public OpportunityCommandService(JdbcTemplate jdbc, PipelineQueries queries,
-                                     OpportunityLifecycleService lifecycle, AuditService audit) {
+                                     OpportunityLifecycleService lifecycle, AuditService audit,
+                                     AuthorizationService authorization, OutboxWriter outbox) {
         this.jdbc = jdbc;
         this.queries = queries;
         this.lifecycle = lifecycle;
         this.audit = audit;
+        this.authorization = authorization;
+        this.outbox = outbox;
     }
 
     private static UUID tenantId() {
@@ -59,6 +67,7 @@ public class OpportunityCommandService {
     }
 
     private OpportunityLifecycleService.OpportunityState open(UUID opportunityId, Long expectedVersion) {
+        authorization.requireEdit(SecurableObject.OPPORTUNITY, opportunityId);
         PipelinePermissions.requireWrite(TenantContext.get().role());
         OpportunityLifecycleService.OpportunityState opp = lifecycle.load(opportunityId);
         lifecycle.requireOpen(opp);
@@ -110,6 +119,7 @@ public class OpportunityCommandService {
                 map("productCode", entry.productCode(), "quantity", request.quantity(),
                         "computedTotal", totals.computedTotal(), "total", totals.total(),
                         "totalIsOverridden", totals.overridden(), "opportunityAmount", amount));
+        event(opportunityId, "opportunity.line-added", Map.of("lineId", id.toString(), "amount", amount));
         return line(opportunityId, id);
     }
 
@@ -143,6 +153,7 @@ public class OpportunityCommandService {
                 map("lineId", lineId.toString(), "computedTotal", totals.computedTotal(),
                         "total", totals.total(), "totalIsOverridden", totals.overridden(),
                         "previousTotal", existing.total(), "opportunityAmount", amount));
+        event(opportunityId, "opportunity.line-updated", Map.of("lineId", lineId.toString(), "amount", amount));
         return line(opportunityId, lineId);
     }
 
@@ -156,6 +167,7 @@ public class OpportunityCommandService {
         audit.record("OPPORTUNITY_LINE_DELETE", "OPPORTUNITY", opportunityId,
                 "Removed line " + existing.productName() + " from " + opp.name(),
                 map("lineId", lineId.toString(), "total", existing.total(), "opportunityAmount", amount));
+        event(opportunityId, "opportunity.line-removed", Map.of("lineId", lineId.toString(), "amount", amount));
     }
 
     private PipelineQueries.PriceBookEntryRow priceBookEntry(UUID id) {
@@ -307,6 +319,8 @@ public class OpportunityCommandService {
         audit.record("OPPORTUNITY_SPLIT_REPLACE", "OPPORTUNITY", opportunityId,
                 type + " splits updated on " + opp.name(),
                 map("splitType", type, "entryCount", entries.size(), "totalPercentage", total));
+        event(opportunityId, "opportunity.splits-replaced",
+                Map.of("splitType", type, "entryCount", entries.size()));
         return splits(opportunityId, type);
     }
 
@@ -325,6 +339,7 @@ public class OpportunityCommandService {
     }
 
     public List<SplitRow> splits(UUID opportunityId, String splitType) {
+        authorization.requireRead(SecurableObject.OPPORTUNITY, opportunityId);
         String type = splitType == null || splitType.isBlank() ? null
                 : splitType.trim().toUpperCase(Locale.ROOT);
         return jdbc.query("""
@@ -379,6 +394,8 @@ public class OpportunityCommandService {
                 competitor.name() + " recorded on " + opp.name() + " as " + position,
                 map("competitor", competitor.name(), "position", position,
                         "incumbent", Boolean.TRUE.equals(request.incumbent())));
+        event(opportunityId, "opportunity.competitor-upserted",
+                Map.of("competitorId", request.competitorId().toString(), "position", position));
         return new OpportunityCompetitorRow(id, request.competitorId(), competitor.name(), position,
                 Boolean.TRUE.equals(request.incumbent()), OpportunityLifecycleService.trimToNull(request.notes()));
     }
@@ -395,6 +412,8 @@ public class OpportunityCommandService {
         }
         audit.record("OPPORTUNITY_COMPETITOR_REMOVE", "OPPORTUNITY", opportunityId,
                 "Competitor removed from " + opp.name(), map("competitorId", competitorId.toString()));
+        event(opportunityId, "opportunity.competitor-removed",
+                Map.of("competitorId", competitorId.toString()));
     }
 
     // -------------------------------------------------- FR-OPP-008 qualification
@@ -451,6 +470,8 @@ public class OpportunityCommandService {
         audit.record("OPPORTUNITY_QUALIFICATION_SAVE", "OPPORTUNITY", opportunityId,
                 "Qualification updated on " + opp.name(),
                 map("framework", framework.get("code"), "score", score));
+        event(opportunityId, "opportunity.qualification-updated",
+                Map.of("framework", String.valueOf(framework.get("code")), "score", score));
         return new QualificationResult(opportunityId, (String) framework.get("code"),
                 (String) framework.get("name"), score,
                 ((Number) counts.get("answered")).intValue(), ((Number) counts.get("total")).intValue());
@@ -494,6 +515,7 @@ public class OpportunityCommandService {
     @Transactional
     public UUID addContactRole(UUID opportunityId, UUID contactId, String role) {
         OpportunityLifecycleService.OpportunityState opp = open(opportunityId, null);
+        authorization.requireRead(SecurableObject.CONTACT, contactId);
         String normalized = role == null ? "" : role.trim().toUpperCase(Locale.ROOT);
         if (!CONTACT_ROLES.contains(normalized)) {
             throw new ConflictException("Unknown contact role: " + role + " (expected one of " + CONTACT_ROLES + ")");
@@ -517,6 +539,8 @@ public class OpportunityCommandService {
         audit.record("OPPORTUNITY_CONTACT_ROLE_ADD", "OPPORTUNITY", opportunityId,
                 normalized + " role recorded on " + opp.name(),
                 map("contactId", contactId.toString(), "role", normalized));
+        event(opportunityId, "opportunity.contact-role-added",
+                Map.of("contactId", contactId.toString(), "role", normalized));
         return id;
     }
 
@@ -530,6 +554,7 @@ public class OpportunityCommandService {
         if (removed == 0) throw new NotFoundException("Contact role not found on this opportunity: " + roleId);
         audit.record("OPPORTUNITY_CONTACT_ROLE_REMOVE", "OPPORTUNITY", opportunityId,
                 "Contact role removed from " + opp.name(), map("roleId", roleId.toString()));
+        event(opportunityId, "opportunity.contact-role-removed", Map.of("roleId", roleId.toString()));
     }
 
     // ---------------------------------------------------------------- approvals
@@ -558,6 +583,8 @@ public class OpportunityCommandService {
         audit.record("OPPORTUNITY_APPROVAL", "OPPORTUNITY", opportunityId,
                 type + " approval " + state.toLowerCase(Locale.ROOT) + " on " + opp.name(),
                 map("approvalType", type, "state", state));
+        event(opportunityId, "opportunity.approval-recorded",
+                Map.of("approvalType", type, "state", state));
     }
 
     private static Map<String, Object> map(Object... keyValues) {
@@ -566,5 +593,9 @@ public class OpportunityCommandService {
             out.put((String) keyValues[i], keyValues[i + 1]);
         }
         return out;
+    }
+
+    private void event(UUID opportunityId, String type, Map<String, Object> payload) {
+        outbox.write("opportunity", opportunityId, type, payload);
     }
 }

@@ -4,17 +4,17 @@ Minimal Electron wrapper around the Axiom CRM web app. It adds a native
 window, a standard app menu (reload / devtools / zoom), and native OS
 notifications exposed to the web app as `window.axiomDesktop.notify(title, body)`.
 
-The local publish flow creates a portable Windows desktop folder and zip from
-the current frontend production build. It is unsigned by design; code signing
-and store publishing require external certificates/accounts and remain a
-release-management step outside this repository.
+The local publish flow first creates a dedicated Electron renderer build, then
+creates a portable Windows desktop folder and zip. The desktop renderer uses
+relative `file://` assets and an explicit local API origin; it is intentionally
+different from the hosted web build. The package is unsigned by design because
+code signing and store publishing require external certificates/accounts.
 
 ## Prerequisites
 
 - Node 18+ and npm
-- The frontend, either:
-  - running as a dev server: `cd ../frontend && npm run dev` (port 5173), or
-  - built to static files: `cd ../frontend && npm run build` (creates `frontend/dist`)
+- The frontend dev server when using development mode:
+  `cd ../frontend && npm run dev` (port 5173)
 
 ## Run
 
@@ -27,16 +27,16 @@ $env:ELECTRON_DEV = "1"; npm start
 # bash / cmd:
 ELECTRON_DEV=1 npm start
 
-# Production-ish (loads ../frontend/dist/index.html — run `npm run build` in frontend first)
+# Production-ish (loads the current ../frontend/dist/index.html)
 npm start
 
 # Docker-backed desktop preview (recommended for the complete local stack)
 # PowerShell:
 $env:AXIOM_WEB_URL = "http://localhost:4280"; npm start
 
-# Local desktop package / publish artifact
-cd ../frontend && npm run build
-cd ../electron-client && npm run package
+# Local desktop package / publish artifact. This builds the correct desktop
+# renderer automatically before packaging it.
+npm run publish:local
 
 # Responsive wrapping and raster-quality acceptance audit (requires the local
 # web app on :4280 and API on :8080)

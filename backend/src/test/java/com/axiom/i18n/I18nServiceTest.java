@@ -96,6 +96,23 @@ class I18nServiceTest {
                 any(RowMapper.class));
     }
 
+    @Test void phraseBundleMapsEnglishSourceToTenantAwareTranslation() {
+        stubKnownLocale();
+        when(jdbc.query(anyString(), any(RowMapper.class), any(), any(), any(), any()))
+                .thenReturn((List) List.of(
+                        Map.entry("Accounts", "Kunden"),
+                        Map.entry("Accounts", "Konten"),
+                        Map.entry("Export PDF", "PDF exportieren")));
+
+        Map<String, String> phrases = service.phraseBundle("DE");
+
+        assertEquals("Kunden", phrases.get("Accounts"));
+        assertEquals("PDF exportieren", phrases.get("Export PDF"));
+        assertEquals(2, phrases.size());
+        verify(jdbc).query(anyString(), any(RowMapper.class),
+                eq("en"), eq("de"), isNull(), eq("de"));
+    }
+
     private void stubKnownLocale() {
         when(jdbc.queryForObject(anyString(), eq(Boolean.class), any(Object[].class)))
                 .thenReturn(Boolean.TRUE);

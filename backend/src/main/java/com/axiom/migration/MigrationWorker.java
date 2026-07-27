@@ -160,6 +160,7 @@ public class MigrationWorker {
             case "DRY_RUN" -> dryRun(runId, run);
             case "IMPORT", "DELTA" -> importRun(runId, run);
             case "ROLLBACK" -> rollbackRun(runId, run);
+            case "RECONCILE" -> reconcileRun(runId, run);
             default -> throw new IllegalStateException("Unknown migration run mode " + run.mode());
         }
     }
@@ -206,6 +207,26 @@ public class MigrationWorker {
                  where tenant_id = ? and id = ?
                 """, MigrationImporter.timestamp(outcome.sourceWatermark()), tenantId, run.planId());
 
+        // A checkpoint advances only in this successful import transaction. If
+        // any later statement fails, both target writes and checkpoints roll
+        // back together and the same source window is safe to retry.
+        for (ObjectOutcome object : outcome.outcomes()) {
+            jdbc.update("""
+                    insert into migration.delta_checkpoint
+                      (tenant_id, plan_id, source_object, watermark, last_success_run_id,
+                       records_created, records_updated)
+                    values (?, ?, ?, ?, ?, ?, ?)
+                    on conflict (tenant_id, plan_id, source_object) do update
+                      set watermark = excluded.watermark,
+                          last_success_run_id = excluded.last_success_run_id,
+                          records_created = excluded.records_created,
+                          records_updated = excluded.records_updated,
+                          updated_at = now()
+                    """, tenantId, run.planId(), object.sourceObject(),
+                    MigrationImporter.timestamp(outcome.sourceWatermark()), runId,
+                    object.toCreate(), object.toUpdate());
+        }
+
         finish(runId, "RECONCILE", outcome.created(), outcome.updated(), outcome.skipped(), 0,
                 outcome.issues().size(),
                 outcome.outcomes().stream().mapToLong(ObjectOutcome::sourceCount).sum(),
@@ -236,6 +257,22 @@ public class MigrationWorker {
                 + (result.blocked().isEmpty() ? "" : "; " + result.blocked().size()
                     + " could not be removed and are listed with the reason")
                 + ". Records that existed before the migration were not touched.");
+    }
+
+    private void reconcileRun(UUID runId, RunRow run) {
+        PlanContext plan = plans.context(run.planId());
+        Adapter adapter = adapter(run.planId());
+        List<Issue> issues = reconciler.reconcileNow(runId, plan, adapter.adapter(), adapter.session());
+        writeIssues(runId, issues);
+        long total = plan.objects().size();
+        finish(runId, "RECONCILE", 0, 0, issues.size(), 0, issues.size(), total, null,
+                issues.isEmpty()
+                        ? "Reconciliation complete. Source and target are balanced."
+                        : "Reconciliation complete with " + issues.size()
+                          + " source record(s) requiring operator recovery.");
+        audit.record("MIGRATION_RECONCILED", "MIGRATION_PLAN", run.planId(),
+                "Migration reconciliation completed",
+                Map.of("runId", runId.toString(), "issues", String.valueOf(issues.size())));
     }
 
     // ------------------------------------------------------------------ run row plumbing

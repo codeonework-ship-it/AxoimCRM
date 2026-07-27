@@ -6,6 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "build:desktop": "tsc --noEmit && vite build --mode desktop",
+    "test:a11y": "playwright test tests/accessibility.spec.ts",
+    "test:runtime": "playwright test tests/runtime.spec.ts",
+    "test:release": "npm run build && playwright test",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview"
   },
@@ -18,6 +22,8 @@
     "react-router-dom": "7.18.1"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.12.1",
+    "@playwright/test": "^1.62.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^6.0.4",

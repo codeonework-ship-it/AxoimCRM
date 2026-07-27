@@ -63,4 +63,36 @@ class MasterDataServiceTest {
         verify(jdbc).update(anyString(), any(), any(), any(), any());
         verify(audit).record(eq("BULK_IMPORT"), eq("ACCOUNT"), eq(null), anyString(), any());
     }
+
+    @Test void importRejectsMoreThanFiveThousandRowsBeforeWriting() {
+        StringBuilder csv = new StringBuilder("name,industry\n");
+        for (int row = 1; row <= 5_001; row++) csv.append("Account ").append(row).append(",Technology\n");
+
+        BulkValidationException error = assertThrows(BulkValidationException.class,
+                () -> service.importCsv("accounts", csv.toString().getBytes(StandardCharsets.UTF_8)));
+
+        assertTrue(error.getMessage().contains("5,000 rows"));
+    }
+
+    @Test void importRejectsFilesLargerThanFiveMebibytesBeforeParsing() {
+        byte[] oversized = new byte[(5 * 1024 * 1024) + 1];
+        BulkValidationException error = assertThrows(BulkValidationException.class,
+                () -> service.importCsv("accounts", oversized));
+        assertTrue(error.getMessage().contains("5 MB"));
+    }
+
+    @Test void quotedCommaIsParsedAsOneField() {
+        when(jdbc.queryForObject(anyString(), eq(Integer.class), any(Object[].class))).thenReturn(0);
+        MasterDataService.ImportResult result = service.importCsv("accounts",
+                "name,industry\n\"North, West\",Technology\n".getBytes(StandardCharsets.UTF_8));
+        assertEquals(1, result.imported());
+        verify(jdbc).update(anyString(), any(), eq("North, West"), eq("Technology"), any());
+    }
+
+    @Test void unterminatedQuotedValueIsRejected() {
+        BulkValidationException error = assertThrows(BulkValidationException.class,
+                () -> service.importCsv("accounts",
+                        "name,industry\n\"Broken,Technology\n".getBytes(StandardCharsets.UTF_8)));
+        assertTrue(error.getMessage().contains("unterminated quoted value"));
+    }
 }

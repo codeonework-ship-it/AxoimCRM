@@ -64,6 +64,17 @@ export function ReferenceIcon({ size }: IconProps) {
   );
 }
 
+/** Tenant data store used by the explicit page-loading boundary. */
+export function DatabaseIcon({ size }: IconProps) {
+  return (
+    <svg {...base(size)}>
+      <ellipse cx="12" cy="5.5" rx="8" ry="3" />
+      <path d="M4 5.5v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
+      <path d="M4 11.5v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6" />
+    </svg>
+  );
+}
+
 export function BellIcon({ size }: IconProps) {
   return (
     <svg {...base(size)}>

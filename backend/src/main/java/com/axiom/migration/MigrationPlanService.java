@@ -9,6 +9,9 @@ import com.axiom.migration.MigrationModel.ObjectPlan;
 import com.axiom.migration.MigrationModel.PlanContext;
 import com.axiom.migration.SourceContract.SourceField;
 import com.axiom.tenancy.TenantContext;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -54,13 +57,15 @@ public class MigrationPlanService {
     private final MigrationConnectionService connections;
     private final SourceAdapterRegistry adapters;
     private final AuditService audit;
+    private final ObjectMapper json;
 
     public MigrationPlanService(JdbcTemplate jdbc, MigrationConnectionService connections,
-                                SourceAdapterRegistry adapters, AuditService audit) {
+                                SourceAdapterRegistry adapters, AuditService audit, ObjectMapper json) {
         this.jdbc = jdbc;
         this.connections = connections;
         this.adapters = adapters;
         this.audit = audit;
+        this.json = json;
     }
 
     // ------------------------------------------------------------------ requests and rows
@@ -81,7 +86,7 @@ public class MigrationPlanService {
                           String status, int retentionDays, boolean sampleData,
                           Instant unmappedAcknowledgedAt, int unmappedAcknowledgedCount,
                           Instant deltaWatermark, Instant importedAt, Instant createdAt,
-                          long mappedFields, long unmappedFields) {}
+                          long mappedFields, long unmappedFields, int mappingVersion) {}
 
     public record MappingRow(UUID id, String sourceObject, String sourceField, String sourceDataType,
                              boolean custom, String targetEntity, String targetField, String status,
@@ -97,6 +102,12 @@ public class MigrationPlanService {
                                 int mappedCount, int unmappedCount,
                                 boolean acknowledgementCurrent, Instant acknowledgedAt,
                                 String acknowledgementStatement) {}
+
+    public record MappingRevisionRow(UUID id, int versionNo, String reason, UUID createdBy,
+                                     Instant createdAt, int fieldCount) {}
+
+    private record MappingSnapshotRow(String sourceObject, String sourceField, String targetEntity,
+                                      String targetField, String status, String origin, String note) {}
 
     // ------------------------------------------------------------------ create
 
@@ -122,6 +133,7 @@ public class MigrationPlanService {
         }
 
         proposeMapping(planId, connection);
+        snapshotMapping(planId, "Initial proposed mapping");
         audit.record("MIGRATION_PLAN_CREATED", "MIGRATION_PLAN", planId,
                 "Created migration plan \"" + request.name().trim() + "\" over " + connection.vendor()
                 + " source \"" + connection.name() + "\"",
@@ -139,6 +151,7 @@ public class MigrationPlanService {
         CrmRole.requireImport(TenantContext.get().role());
         PlanRow plan = plan(planId);
         proposeMapping(planId, connections.connection(plan.connectionId()));
+        snapshotMapping(planId, "Mapping proposal refreshed after schema discovery");
         return review(planId);
     }
 
@@ -273,16 +286,101 @@ public class MigrationPlanService {
 
         // Any edit invalidates a prior acknowledgement: the operator signed off a
         // specific list of losses, and the list has changed.
-        jdbc.update("""
-                update migration.plan set unmapped_acknowledged_at = null, unmapped_acknowledged_by = null,
-                                          unmapped_acknowledged_count = 0, updated_at = now()
-                where tenant_id = ? and id = ?
-                """, principal.tenantId(), planId);
+        invalidateAcknowledgement(planId, principal.tenantId());
 
         audit.record("MIGRATION_MAPPING_EDITED", "MIGRATION_PLAN", planId,
                 edits.size() + " field mapping(s) corrected by the operator",
                 Map.of("edits", String.valueOf(edits.size())));
+        snapshotMapping(planId, "Operator mapping changes");
         return review(planId);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MappingRevisionRow> revisions(UUID planId) {
+        plan(planId);
+        return jdbc.query("""
+                select id, version_no, reason, created_by, created_at, jsonb_array_length(mappings) field_count
+                from migration.mapping_revision
+                where tenant_id = ? and plan_id = ? order by version_no desc
+                """, (rs, i) -> new MappingRevisionRow(rs.getObject("id", UUID.class),
+                        rs.getInt("version_no"), rs.getString("reason"),
+                        rs.getObject("created_by", UUID.class), rs.getTimestamp("created_at").toInstant(),
+                        rs.getInt("field_count")), TenantContext.get().tenantId(), planId);
+    }
+
+    /** Restore is append-only: the restored state becomes a new revision. */
+    @Transactional
+    public MappingReview restore(UUID planId, int versionNo) {
+        TenantContext.Principal principal = TenantContext.get();
+        CrmRole.requireImport(principal.role());
+        plan(planId);
+        List<String> payloads = jdbc.query("""
+                select mappings::text from migration.mapping_revision
+                where tenant_id = ? and plan_id = ? and version_no = ?
+                """, (rs, i) -> rs.getString(1), principal.tenantId(), planId, versionNo);
+        if (payloads.isEmpty()) throw new NotFoundException("No mapping revision " + versionNo);
+
+        List<MappingSnapshotRow> snapshot;
+        try {
+            snapshot = json.readValue(payloads.get(0), new TypeReference<>() {});
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Stored mapping revision " + versionNo + " is unreadable", ex);
+        }
+
+        jdbc.update("""
+                update migration.field_mapping set target_entity = null, target_field = null,
+                    status = 'UNMAPPED', origin = 'USER', note = 'Not present in restored revision', updated_at = now()
+                where tenant_id = ? and plan_id = ?
+                """, principal.tenantId(), planId);
+        for (MappingSnapshotRow row : snapshot) {
+            jdbc.update("""
+                    update migration.field_mapping set target_entity = ?, target_field = ?, status = ?,
+                        origin = ?, note = ?, updated_at = now()
+                    where tenant_id = ? and plan_id = ? and source_object = ? and source_field = ?
+                    """, row.targetEntity(), row.targetField(), row.status(), row.origin(), row.note(),
+                    principal.tenantId(), planId, row.sourceObject(), row.sourceField());
+        }
+        invalidateAcknowledgement(planId, principal.tenantId());
+        snapshotMapping(planId, "Restored mapping revision " + versionNo);
+        audit.record("MIGRATION_MAPPING_RESTORED", "MIGRATION_PLAN", planId,
+                "Restored mapping revision " + versionNo,
+                Map.of("restoredVersion", String.valueOf(versionNo), "fieldCount", String.valueOf(snapshot.size())));
+        return review(planId);
+    }
+
+    private void snapshotMapping(UUID planId, String reason) {
+        TenantContext.Principal principal = TenantContext.get();
+        List<MappingSnapshotRow> rows = jdbc.query("""
+                select source_object, source_field, target_entity, target_field, status, origin, note
+                from migration.field_mapping where tenant_id = ? and plan_id = ?
+                order by source_object, source_field
+                """, (rs, i) -> new MappingSnapshotRow(rs.getString("source_object"),
+                        rs.getString("source_field"), rs.getString("target_entity"),
+                        rs.getString("target_field"), rs.getString("status"),
+                        rs.getString("origin"), rs.getString("note")), principal.tenantId(), planId);
+        final String payload;
+        try {
+            payload = json.writeValueAsString(rows);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("Could not record the mapping revision", ex);
+        }
+        Integer version = jdbc.queryForObject("""
+                update migration.plan set mapping_version = mapping_version + 1, updated_at = now()
+                where tenant_id = ? and id = ? returning mapping_version
+                """, Integer.class, principal.tenantId(), planId);
+        jdbc.update("""
+                insert into migration.mapping_revision
+                  (tenant_id, plan_id, version_no, reason, mappings, created_by)
+                values (?, ?, ?, ?, cast(? as jsonb), ?)
+                """, principal.tenantId(), planId, version, reason, payload, principal.userId());
+    }
+
+    private void invalidateAcknowledgement(UUID planId, UUID tenantId) {
+        jdbc.update("""
+                update migration.plan set unmapped_acknowledged_at = null, unmapped_acknowledged_by = null,
+                                          unmapped_acknowledged_count = 0, updated_at = now()
+                where tenant_id = ? and id = ?
+                """, tenantId, planId);
     }
 
     @Transactional
@@ -382,6 +480,7 @@ public class MigrationPlanService {
             select p.id, p.name, p.connection_id, c.name as connection_name, c.vendor, p.status,
                    p.retention_days, p.is_sample_data, p.unmapped_acknowledged_at,
                    p.unmapped_acknowledged_count, p.delta_watermark, p.imported_at, p.created_at,
+                   p.mapping_version,
                    (select count(*) from migration.field_mapping m
                      where m.tenant_id = p.tenant_id and m.plan_id = p.id and m.status = 'MAPPED') as mapped_fields,
                    (select count(*) from migration.field_mapping m
@@ -400,7 +499,7 @@ public class MigrationPlanService {
             rs.getTimestamp("delta_watermark") == null ? null : rs.getTimestamp("delta_watermark").toInstant(),
             rs.getTimestamp("imported_at") == null ? null : rs.getTimestamp("imported_at").toInstant(),
             rs.getTimestamp("created_at").toInstant(),
-            rs.getLong("mapped_fields"), rs.getLong("unmapped_fields"));
+            rs.getLong("mapped_fields"), rs.getLong("unmapped_fields"), rs.getInt("mapping_version"));
 
     private static final RowMapper<MappingRow> MAPPING_MAPPER = (rs, i) -> new MappingRow(
             rs.getObject("id", UUID.class), rs.getString("source_object"), rs.getString("source_field"),

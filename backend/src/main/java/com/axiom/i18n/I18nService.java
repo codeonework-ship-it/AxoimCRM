@@ -103,6 +103,46 @@ public class I18nService {
         return bundle;
     }
 
+    /**
+     * Exact {@code English source text -> resolved localized text} catalogue.
+     *
+     * <p>This is the compatibility boundary for older and high-density screens
+     * whose visible labels pre-date explicit {@code t(key, fallback)} calls.
+     * The browser only replaces an exact registered phrase; it never sends
+     * record data to a translation vendor and never guesses at user content.
+     * New screens should still use the keyed bundle directly.</p>
+     *
+     * <p>The same tenant-aware fallback chain as {@link #bundle(String)} is
+     * deliberately retained. {@code putIfAbsent} makes duplicate English
+     * wording deterministic: the first key in key-path order owns that phrase.</p>
+     */
+    public Map<String, String> phraseBundle(String localeCode) {
+        String locale = requireKnownLocale(localeCode);
+        String tenantId = TenantContext.isBound() ? TenantContext.get().tenantId().toString() : null;
+
+        List<Map.Entry<String, String>> rows = jdbc.query("""
+                select te.value as source_value,
+                       coalesce(o.value, tl.value, te.value) as localized_value
+                from i18n.translation_key k
+                join i18n.translation te
+                  on te.key_id = k.id and te.locale_code = ?
+                left join i18n.tenant_translation_override o
+                       on o.key_id = k.id
+                      and o.locale_code = ?
+                      and o.tenant_id = cast(? as uuid)
+                left join i18n.translation tl
+                       on tl.key_id = k.id and tl.locale_code = ?
+                where coalesce(o.value, tl.value, te.value) is not null
+                order by k.key_path
+                """,
+                (rs, i) -> Map.entry(rs.getString("source_value"), rs.getString("localized_value")),
+                DEFAULT_LOCALE, locale, tenantId, locale);
+
+        Map<String, String> phrases = new LinkedHashMap<>();
+        rows.forEach(entry -> phrases.putIfAbsent(entry.getKey(), entry.getValue()));
+        return phrases;
+    }
+
     private String requireKnownLocale(String localeCode) {
         String normalized = localeCode == null ? "" : localeCode.trim().toLowerCase(Locale.ROOT);
         Boolean known = jdbc.queryForObject(
