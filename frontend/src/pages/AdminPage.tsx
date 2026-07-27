@@ -13,6 +13,7 @@ import { useToasts } from "../components/Toasts";
 import { formatDate, formatMoney } from "../lib/format";
 import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
 import { useLocalStorageState } from "../lib/usePersistedGridState";
+import { useGridDataLoad } from "../components/PageDataGate";
 
 const PLATFORM_ROLES = new Set(["SUPER_ADMIN", "SUPER_AUDIT"]);
 const READ_ONLY_ROLES = new Set(["SUPER_AUDIT", "AUDITOR"]);
@@ -173,18 +174,24 @@ export function AdminPage() {
   const [tab, setTab] = useState(tabs.includes(initialTab) ? initialTab : tabs[0]);
   const [groupedTabs, setGroupedTabs] = useLocalStorageState<Record<string, string[]>>("axiom.grid.admin.grouped-tabs", {}, sanitizeGroupedTabs);
   const [columnFiltersByTab, setColumnFiltersByTab] = useLocalStorageState<Record<string, Record<string, string>>>("axiom.grid.admin.column-filters", {}, sanitizeColumnFiltersByTab);
+  const usersGrid = useGridDataLoad("User management");
+  const policiesGrid = useGridDataLoad("RBAC policies");
+  const alertsGrid = useGridDataLoad("Email and report alerts");
+  const trialsGrid = useGridDataLoad("Trial accounts");
+  const companiesGrid = useGridDataLoad("Company setup accounts");
+  const billingGrid = useGridDataLoad("Billing");
 
   // A tab selection is the explicit load signal for that tab. Hidden admin
   // modules must not issue eager requests merely because the page is mounted.
-  const usersQ = useQuery({ queryKey: ["admin", "users"], queryFn: api.adminUsers, enabled: tab === "users", retry: 1 });
-  const policiesQ = useQuery({ queryKey: ["rbac", "policies"], queryFn: () => api.rbacPolicies(), enabled: tab === "rbac", retry: 1 });
-  const rolesQ = useQuery({ queryKey: ["rbac", "roles"], queryFn: api.roles, enabled: tab === "rbac", retry: 1 });
-  const reportsQ = useQuery({ queryKey: ["reports"], queryFn: api.reports, enabled: tab === "alerts", retry: 1 });
-  const emailAlertsQ = useQuery({ queryKey: ["alerts", "email"], queryFn: api.emailAlerts, enabled: tab === "alerts", retry: 1 });
-  const reportAlertsQ = useQuery({ queryKey: ["alerts", "reports"], queryFn: api.reportAlerts, enabled: tab === "alerts", retry: 1 });
+  const usersQ = useQuery({ queryKey: ["admin", "users"], queryFn: api.adminUsers, enabled: tab === "users" && usersGrid.loaded, retry: 1 });
+  const policiesQ = useQuery({ queryKey: ["rbac", "policies"], queryFn: () => api.rbacPolicies(), enabled: tab === "rbac" && policiesGrid.loaded, retry: 1 });
+  const rolesQ = useQuery({ queryKey: ["rbac", "roles"], queryFn: api.roles, enabled: tab === "rbac" && policiesGrid.loaded, retry: 1 });
+  const reportsQ = useQuery({ queryKey: ["reports"], queryFn: api.reports, enabled: tab === "alerts" && alertsGrid.loaded, retry: 1 });
+  const emailAlertsQ = useQuery({ queryKey: ["alerts", "email"], queryFn: api.emailAlerts, enabled: tab === "alerts" && alertsGrid.loaded, retry: 1 });
+  const reportAlertsQ = useQuery({ queryKey: ["alerts", "reports"], queryFn: api.reportAlerts, enabled: tab === "alerts" && alertsGrid.loaded, retry: 1 });
   const companiesQ = useQuery({ queryKey: ["admin", "companies"], queryFn: api.companies,
-    enabled: platform && (tab === "trials" || tab === "companies"), retry: 1 });
-  const billingQ = useQuery({ queryKey: ["admin", "billing"], queryFn: api.billing, enabled: platform && tab === "billing", retry: 1 });
+    enabled: platform && ((tab === "trials" && trialsGrid.loaded) || (tab === "companies" && companiesGrid.loaded)), retry: 1 });
+  const billingQ = useQuery({ queryKey: ["admin", "billing"], queryFn: api.billing, enabled: platform && tab === "billing" && billingGrid.loaded, retry: 1 });
 
   const [userDraft, setUserDraft] = useState({ displayName: "", email: "", role: "SALES", password: "axiom-demo" });
   const [emailDraft, setEmailDraft] = useState({ name: "", subject: "", bodyHtml: "<p>Hello,</p>", to: "", cc: "", bcc: "", attachmentOptional: true });

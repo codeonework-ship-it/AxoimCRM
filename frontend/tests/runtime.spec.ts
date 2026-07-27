@@ -13,8 +13,13 @@ async function signIn(page: Page) {
 }
 
 async function loadScreen(page: Page) {
-  const load = page.getByRole('button', { name: 'Load Screen Data' })
-  if (await load.isVisible()) await load.click()
+  const load = page.getByRole('button', { name: 'Load Grid Data' }).first()
+  try {
+    await load.waitFor({ state: 'visible', timeout: 2500 })
+    await load.click()
+  } catch {
+    // Screens without a data grid intentionally have no load interaction.
+  }
 }
 
 test('authenticated P0 routes render without uncaught runtime failures', async ({ page }) => {
@@ -30,6 +35,24 @@ test('authenticated P0 routes render without uncaught runtime failures', async (
     await expect(page.getByRole('main')).toBeVisible()
   }
   expect(errors, 'No route may raise an uncaught error or error-level console message').toEqual([])
+})
+
+test('BFSI and Commodity operations are separated into accessible route tabs', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/packs/bfsi')
+  await loadScreen(page)
+
+  const industryTabs = page.getByRole('tablist', { name: 'Industry workflow', exact: true })
+  await expect(industryTabs).toBeVisible()
+  await expect(industryTabs.getByRole('tab', { name: 'BFSI Onboarding, screening and exceptions', exact: true })).toHaveAttribute('aria-selected', 'true')
+  const commodityTab = industryTabs.getByRole('tab', { name: 'Commodity Pricing, approval and execution', exact: true })
+  await commodityTab.click()
+
+  await expect(page).toHaveURL(/\/packs\/commodity$/)
+  await loadScreen(page)
+  await expect(page.getByRole('tablist', { name: 'Industry workflow', exact: true })
+    .getByRole('tab', { name: 'Commodity Pricing, approval and execution', exact: true })).toHaveAttribute('aria-selected', 'true')
+  await expect(page.locator('.release-control-head h2')).toContainText('Commodity Pricing, Approval And Execution')
 })
 
 test('core list APIs enforce the 100-row server page contract', async ({ page }) => {
@@ -52,7 +75,7 @@ test('core list APIs enforce the 100-row server page contract', async ({ page })
   }
 })
 
-test('route data is not requested until Load Screen Data is selected', async ({ page }) => {
+test('the page renders immediately and grid data waits for its grid Load action', async ({ page }) => {
   await signIn(page)
   const accountRequests: string[] = []
   page.on('request', request => {
@@ -60,12 +83,14 @@ test('route data is not requested until Load Screen Data is selected', async ({ 
   })
 
   await page.goto('/accounts')
-  await expect(page.getByRole('button', { name: 'Load Screen Data' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Accounts', exact: true })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Load Grid Data' })).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Load Screen Data' })).toHaveCount(0)
   await page.waitForTimeout(400)
   expect(accountRequests, 'No account data call is allowed before the explicit load action').toEqual([])
 
-  await page.getByRole('button', { name: 'Load Screen Data' }).click()
-  await expect.poll(() => accountRequests.length, { message: 'Loading the screen must start its tenant-scoped query' }).toBeGreaterThan(0)
+  await page.getByRole('button', { name: 'Load Grid Data' }).click()
+  await expect.poll(() => accountRequests.length, { message: 'Loading the grid must start its tenant-scoped query' }).toBeGreaterThan(0)
   expect(accountRequests.some(url => /(?:\?|&)page=0(?:&|$)/.test(url))).toBeTruthy()
 })
 
@@ -83,7 +108,38 @@ test('hidden administration tabs do not load until selected', async ({ page }) =
   expect(alertRequests, 'A hidden tab must not consume API or database capacity').toEqual([])
 
   await page.getByRole('tab', { name: 'alerts', exact: true }).click()
+  await page.getByRole('button', { name: 'Load Grid Data' }).click()
   await expect.poll(() => alertRequests.length).toBeGreaterThanOrEqual(2)
+})
+
+test('grid audit opens as an unclipped viewport drawer', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/campaigns')
+  await loadScreen(page)
+  await page.getByRole('button', { name: 'Audit', exact: true }).click()
+
+  const drawer = page.locator('body > .audit-drawer-scrim > .audit-drawer')
+  await expect(drawer).toBeVisible()
+  const geometry = await drawer.evaluate(element => {
+    const drawerRect = element.getBoundingClientRect()
+    const headerRect = element.querySelector('.drawer-head')!.getBoundingClientRect()
+    const listRect = element.querySelector('.audit-list')!.getBoundingClientRect()
+    return {
+      top: drawerRect.top,
+      bottom: drawerRect.bottom,
+      viewportHeight: window.innerHeight,
+      listTop: listRect.top,
+      headerBottom: headerRect.bottom,
+      bodyOverflow: document.body.style.overflow,
+    }
+  })
+  expect(geometry.top).toBeLessThanOrEqual(1)
+  expect(Math.abs(geometry.bottom - geometry.viewportHeight)).toBeLessThanOrEqual(1)
+  expect(geometry.listTop).toBeGreaterThanOrEqual(geometry.headerBottom - 1)
+  expect(geometry.bodyOverflow).toBe('hidden')
+
+  await page.keyboard.press('Escape')
+  await expect(drawer).toBeHidden()
 })
 
 test('Account 360 is a usable dock and grid actions render as controls', async ({ page }) => {

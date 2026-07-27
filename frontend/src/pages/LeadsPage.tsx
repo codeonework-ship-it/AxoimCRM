@@ -12,6 +12,7 @@ import { GridFilterHeader } from "../components/GridFilterRow";
 import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
 import { useAppDialog } from "../components/AppDialog";
+import { useGridDataLoad } from "../components/PageDataGate";
 
 const CONVERTIBLE = new Set(["NEW", "QUALIFIED"]);
 const STATUSES = ["NEW", "WORKING", "NURTURING", "QUALIFIED", "CONVERTED", "DISQUALIFIED"];
@@ -23,6 +24,7 @@ const LEAD_GROUP_COLUMNS: GroupColumn<Lead>[] = [
 ];
 
 export function LeadsPage() {
+  const leadsGrid = useGridDataLoad("Lead queue");
   const [groupColumns, setGroupColumns, columnFilters, setColumnFilters] = usePersistedGridState("leads");
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
@@ -39,6 +41,7 @@ export function LeadsPage() {
   const leadsQ = useQuery({
     queryKey: ["leads", page, search, statusFilter],
     queryFn: () => api.leads({ page, search, filter: statusFilter }),
+    enabled: leadsGrid.loaded,
     retry: 1,
   });
   const convertMutation = useMutation({ mutationFn: (leadId: string) => api.convertLead(leadId) });

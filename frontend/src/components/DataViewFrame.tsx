@@ -1,5 +1,8 @@
 import { useState, type ReactNode } from "react";
 import { InfoTag, screenInfo } from "./InfoTag";
+import { DatabaseIcon } from "./icons";
+import { GridDataLoadedScope, useGridDataLoad } from "./PageDataGate";
+import { useT } from "../i18n/I18nProvider";
 
 interface DataViewFrameProps {
   title: string;
@@ -30,6 +33,8 @@ interface DataViewFrameProps {
  */
 export function DataViewFrame({ title, children, actions }: DataViewFrameProps) {
   const [full, setFull] = useState(false);
+  const t = useT();
+  const grid = useGridDataLoad(title);
   return (
     <section className={`data-view-frame${full ? " data-view-full" : ""}`} aria-label={title}>
       <header className="data-view-head">
@@ -37,7 +42,7 @@ export function DataViewFrame({ title, children, actions }: DataViewFrameProps) 
           <div className="data-view-heading">
             <span className="eyebrow">Data workspace</span>
             <h2 className="data-view-title">
-              <span>{title}</span>
+              <span className="data-view-title-text">{title}</span>
               <InfoTag text={screenInfo(title)} label={`${title} help`} />
             </h2>
           </div>
@@ -47,9 +52,24 @@ export function DataViewFrame({ title, children, actions }: DataViewFrameProps) 
             </button>
           </div>
         </div>
-        {actions && <div className="data-view-actions">{actions}</div>}
+        {grid.loaded && actions && <div className="data-view-actions">{actions}</div>}
       </header>
-      <div className="data-view-body">{children}</div>
+      <div className="data-view-body">
+        {grid.loaded ? (
+          <GridDataLoadedScope>{children}</GridDataLoadedScope>
+        ) : (
+          <div className="grid-data-gate" role="status" aria-live="polite">
+            <span className="grid-data-gate-icon" aria-hidden="true"><DatabaseIcon /></span>
+            <div>
+              <strong>{t("ui.load.gridTitle", "Grid Data Is Ready On Demand")}</strong>
+              <p>{t("ui.load.gridDescription", "Load the first 100 tenant-scoped rows. Search, filters and pagination continue to run on the server.")}</p>
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={grid.load}>
+              {t("ui.load.gridButton", "Load Grid Data")}
+            </button>
+          </div>
+        )}
+      </div>
     </section>
   );
 }

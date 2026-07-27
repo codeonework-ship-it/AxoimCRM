@@ -21,6 +21,7 @@ import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups,
 import { usePersistedGridState } from "../lib/usePersistedGridState";
 import { useAppDialog } from "../components/AppDialog";
 import { useRecordLock } from "../locking/useRecordLock";
+import { useGridDataLoad } from "../components/PageDataGate";
 
 /**
  * Contacts, at the depth accounts and leads already had.
@@ -78,6 +79,7 @@ const FIELDS: RecordField<ContactRequest>[] = [
 ];
 
 export function ContactsPage() {
+  const contactsGrid = useGridDataLoad("Contact directory");
   const { user } = useAuth();
   const toasts = useToasts();
   const appDialog = useAppDialog();
@@ -105,6 +107,7 @@ export function ContactsPage() {
   const contactsQ = useQuery({
     queryKey: ["contacts", search, statusFilter],
     queryFn: () => api.contactsFull({ search: search || undefined, status: statusFilter || undefined }),
+    enabled: contactsGrid.loaded,
     retry: 1,
   });
 

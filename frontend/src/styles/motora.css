@@ -978,7 +978,7 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   border-color: var(--line-m);
   border-bottom-color: var(--line-bright);
 }
-:root[data-theme="meridian"] .data-view-title > span { color: var(--text); }
+:root[data-theme="meridian"] .data-view-title > .data-view-title-text { color: var(--text); }
 :root[data-theme="meridian"] .data-view-head .eyebrow,
 :root[data-theme="meridian"] .page-head .eyebrow,
 :root[data-theme="meridian"] .kpi .eyebrow { color: var(--cyan-deep); }
@@ -1661,7 +1661,6 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   gap: 8px;
   max-width: 620px;
   padding-top: 20px;
-  border-top: 1px solid var(--line);
 }
 .downloads-title { font-size: 0.9rem; font-weight: 700; }
 .downloads-sub { margin: 0; max-width: 52ch; color: var(--muted); font-size: 0.82rem; }
@@ -1940,7 +1939,7 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
 }
 
 /* The workspace title is the instrument label. */
-:root[data-theme="ironman"] .data-view-title > span { color: #fff8f6; }
+:root[data-theme="ironman"] .data-view-title > .data-view-title-text { color: #fff8f6; }
 :root[data-theme="ironman"] .data-view-head .eyebrow { color: var(--cyan); }
 
 /* Group header rows: the seam repeated inside the grid, so a grouped table reads
@@ -2029,20 +2028,11 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   opacity: 0.5;
 }
 
-/* The horizon: one thin lit band where the floor meets the void. */
-:root[data-theme="tron"] .app-ground::after {
-  content: "";
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 41vh;
-  height: 1px;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(90deg,
-    transparent, rgba(111, 249, 255, 0.55) 20%, rgba(111, 249, 255, 0.55) 80%, transparent);
-  box-shadow: 0 0 26px 6px rgba(111, 249, 255, 0.18);
-}
+/* Do not draw a fixed horizon across the viewport. A fixed pseudo-element on
+   .app-ground cut through every screen at 41vh, including login and data-grid
+   content. The perspective floor remains, but it now dissolves without a
+   page-wide horizontal seam. */
+:root[data-theme="tron"] .app-ground::after { content: none; }
 
 /* ---------------------------------------------------------------------------
    2. HUD FRAMING — the workspace sits inside a bracketed frame.
@@ -2083,11 +2073,11 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   border-bottom: 1px solid var(--cyan);
   box-shadow: 0 1px 18px -6px rgba(111, 249, 255, 0.6);
 }
-:root[data-theme="tron"] .data-view-title > span {
+:root[data-theme="tron"] .data-view-title > .data-view-title-text {
   position: relative;
   padding-left: 14px;
 }
-:root[data-theme="tron"] .data-view-title > span::before {
+:root[data-theme="tron"] .data-view-title > .data-view-title-text::before {
   content: "";
   position: absolute;
   left: 0;
@@ -2374,11 +2364,11 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
 }
 
 /* Section headers: a lit rule beneath, and a bar leading the title. */
-:root[data-theme="dark"] .data-view-title > span {
+:root[data-theme="dark"] .data-view-title > .data-view-title-text {
   position: relative;
   padding-left: 13px;
 }
-:root[data-theme="dark"] .data-view-title > span::before {
+:root[data-theme="dark"] .data-view-title > .data-view-title-text::before {
   content: "";
   position: absolute;
   left: 0;
@@ -2481,11 +2471,11 @@ tbody tr:hover td:first-child { box-shadow: inset 2px 0 0 var(--cyan); }
   border-right: 2px solid var(--cyan);
 }
 
-:root[data-theme="ironman"] .data-view-title > span {
+:root[data-theme="ironman"] .data-view-title > .data-view-title-text {
   position: relative;
   padding-left: 13px;
 }
-:root[data-theme="ironman"] .data-view-title > span::before {
+:root[data-theme="ironman"] .data-view-title > .data-view-title-text::before {
   content: "";
   position: absolute;
   left: 0;

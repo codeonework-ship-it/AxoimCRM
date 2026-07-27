@@ -13,6 +13,7 @@ import { formatDate, formatMoney } from "../lib/format";
 import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
 import { useAppDialog } from "../components/AppDialog";
+import { useGridDataLoad } from "../components/PageDataGate";
 
 type CpqSection = "products" | "price-books" | "quotes";
 
@@ -84,6 +85,8 @@ const QUOTE_FILTER_COLUMNS: GridFilterColumn[] = [
 ];
 
 export function CpqPage({ section }: CpqPageProps) {
+  const gridTitle = section === "products" ? "Product catalogue" : section === "price-books" ? "Price book register" : "Quote register";
+  const cpqGrid = useGridDataLoad(gridTitle);
   const toasts = useToasts();
   const dialog = useAppDialog();
   const queryClient = useQueryClient();
@@ -95,19 +98,19 @@ export function CpqPage({ section }: CpqPageProps) {
   const productsQ = useQuery({
     queryKey: ["cpq", "products", page, search, filter],
     queryFn: () => api.cpqProducts({ page, search, category: filter }),
-    enabled: section === "products",
+    enabled: section === "products" && cpqGrid.loaded,
     retry: 1,
   });
   const priceBooksQ = useQuery({
     queryKey: ["cpq", "price-books", page, search, filter],
     queryFn: () => api.cpqPriceBooks({ page, search, status: filter }),
-    enabled: section === "price-books",
+    enabled: section === "price-books" && cpqGrid.loaded,
     retry: 1,
   });
   const quotesQ = useQuery({
     queryKey: ["cpq", "quotes", page, search, filter],
     queryFn: () => api.cpqQuotes({ page, search, status: filter }),
-    enabled: section === "quotes",
+    enabled: section === "quotes" && cpqGrid.loaded,
     retry: 1,
   });
   const summaryQ = useQuery({ queryKey: ["cpq", "quotes", "summary"], queryFn: api.cpqQuoteSummary, retry: 1 });
@@ -183,7 +186,7 @@ export function CpqPage({ section }: CpqPageProps) {
     </section>
 
     <DataViewFrame
-      title={section === "products" ? "Product catalogue" : section === "price-books" ? "Price book register" : "Quote register"}
+      title={gridTitle}
       actions={<DataGridToolbar
         gridName={section === "products" ? "Product catalogue" : section === "price-books" ? "Price book register" : "Quote register"}
         grouped={toolbarGroupKeys.length > 0}

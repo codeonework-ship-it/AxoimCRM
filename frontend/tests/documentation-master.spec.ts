@@ -11,8 +11,8 @@ test('documentation drawer content is governed by the administration master', as
   await expect(page).not.toHaveURL(/\/login(?:\?|$)/)
 
   await page.goto('/admin/documentation')
-  await page.getByRole('button', { name: 'Load Screen Data' }).click()
   await expect(page.getByRole('heading', { name: 'Documentation Drawer Master' })).toBeVisible()
+  await page.getByRole('button', { name: 'Load Grid Data' }).click()
   await expect(page.getByRole('cell', { name: 'SCAN_HOME', exact: true })).toBeVisible()
   await expect(page.getByText(/Version 3 .* 10 sections .* 62 entries/)).toBeVisible()
 

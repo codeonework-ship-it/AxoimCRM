@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   api, type BfsiDetail, type CommodityDetail, type OfflineConflict,
@@ -19,6 +19,66 @@ function age(seconds: number) {
   if (seconds < 60) return `${seconds}s old`;
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m old`;
   return `${Math.floor(seconds / 3600)}h old`;
+}
+
+interface ClosureTab {
+  id: string;
+  label: string;
+  hint: string;
+}
+
+function ClosureTabs({ idPrefix, label, tabs, active, onChange }: {
+  idPrefix: string;
+  label: string;
+  tabs: ClosureTab[];
+  active: string;
+  onChange: (id: string) => void;
+}) {
+  function moveFocus(event: KeyboardEvent<HTMLButtonElement>, currentId: string) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const currentIndex = tabs.findIndex((tab) => tab.id === currentId);
+    const nextIndex = event.key === "Home" ? 0
+      : event.key === "End" ? tabs.length - 1
+        : event.key === "ArrowRight" ? (currentIndex + 1) % tabs.length
+          : (currentIndex - 1 + tabs.length) % tabs.length;
+    const next = tabs[nextIndex];
+    onChange(next.id);
+    requestAnimationFrame(() => document.getElementById(`${idPrefix}-${next.id}-tab`)?.focus());
+  }
+
+  return <div className="closure-workflow-tabs" role="tablist" aria-label={label}>
+    {tabs.map((tab) => <button
+      id={`${idPrefix}-${tab.id}-tab`}
+      key={tab.id}
+      type="button"
+      role="tab"
+      aria-selected={active === tab.id}
+      aria-controls={`${idPrefix}-${tab.id}-panel`}
+      tabIndex={active === tab.id ? 0 : -1}
+      className={`closure-workflow-tab${active === tab.id ? " active" : ""}`}
+      onClick={() => onChange(tab.id)}
+      onKeyDown={(event) => moveFocus(event, tab.id)}
+    ><strong>{tab.label}</strong><span>{tab.hint}</span></button>)}
+  </div>;
+}
+
+export type VerticalIndustryTab = "bfsi" | "commodity";
+
+export function VerticalIndustryTabs({ active, onChange }: {
+  active: VerticalIndustryTab;
+  onChange: (tab: VerticalIndustryTab) => void;
+}) {
+  return <ClosureTabs
+    idPrefix="vertical-industry"
+    label="Industry workflow"
+    active={active}
+    onChange={(id) => onChange(id as VerticalIndustryTab)}
+    tabs={[
+      { id: "bfsi", label: "BFSI", hint: "Onboarding, screening and exceptions" },
+      { id: "commodity", label: "Commodity", hint: "Pricing, approval and execution" },
+    ]}
+  />;
 }
 
 export function MobileOfflinePanel({ devices }: { devices: WorkspaceRow[] }) {

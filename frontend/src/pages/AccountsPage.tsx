@@ -14,6 +14,7 @@ import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups,
 import { usePersistedGridState } from "../lib/usePersistedGridState";
 import { useAppDialog } from "../components/AppDialog";
 import { CloseIcon } from "../components/icons";
+import { useGridDataLoad } from "../components/PageDataGate";
 
 const ACCOUNT_GROUP_COLUMNS: GroupColumn<Account>[] = [
   { key: "name", label: "Name", value: (row) => row.name },
@@ -22,6 +23,7 @@ const ACCOUNT_GROUP_COLUMNS: GroupColumn<Account>[] = [
 ];
 
 export function AccountsPage() {
+  const accountsGrid = useGridDataLoad("Accounts results");
   const [groupColumns, setGroupColumns, columnFilters, setColumnFilters] = usePersistedGridState("accounts");
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
@@ -35,6 +37,7 @@ export function AccountsPage() {
   const accountsQ = useQuery({
     queryKey: ["accounts", page, search, industryFilter],
     queryFn: () => api.accounts({ page, search, filter: industryFilter }),
+    enabled: accountsGrid.loaded,
     retry: 1,
   });
   const detailQ = useQuery({

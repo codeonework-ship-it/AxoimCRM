@@ -14,6 +14,7 @@ import { useAppDialog } from "../components/AppDialog";
 import { GridLoader, LoaderStatus } from "../components/Loaders";
 import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups, type GroupColumn } from "../lib/gridGrouping";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
+import { useGridDataLoad } from "../components/PageDataGate";
 
 /**
  * Master / reference data workspace.
@@ -71,6 +72,7 @@ function panelDomId(apiName: string): string {
 }
 
 export function ReferenceDataPage() {
+  const entriesGrid = useGridDataLoad("Reference value-set console");
   const { user } = useAuth();
   const toasts = useToasts();
   const dialog = useAppDialog();
@@ -103,7 +105,7 @@ export function ReferenceDataPage() {
   const entriesQ = useQuery({
     queryKey: ["reference", "entries", selectedApiName],
     queryFn: () => api.referenceEntries(selectedApiName, true),
-    enabled: !!selectedApiName,
+    enabled: !!selectedApiName && entriesGrid.loaded,
     retry: 1,
   });
 

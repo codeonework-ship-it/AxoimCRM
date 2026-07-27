@@ -1,5 +1,6 @@
 import { Fragment, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { api, isUnreachable, type ForecastScenario, type WorkflowGateStatus, type WorkspaceRow } from "../api/client";
 import { ApiUnreachable } from "../components/ApiUnreachable";
 import { DataGridToolbar } from "../components/DataGridToolbar";
@@ -15,7 +16,7 @@ import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, sortByGroups,
 import { usePersistedGridState } from "../lib/usePersistedGridState";
 import { useAppDialog, type DialogApi } from "../components/AppDialog";
 import { ReleaseControlPlane } from "../components/ReleaseControlPlane";
-import { BfsiOperationsPanel, CommodityOperationsPanel, MobileOfflinePanel } from "../components/VerticalClosurePanels";
+import { BfsiOperationsPanel, CommodityOperationsPanel, MobileOfflinePanel, VerticalIndustryTabs } from "../components/VerticalClosurePanels";
 
 export type WorkspaceModule =
   | "forecast"
@@ -117,6 +118,7 @@ const WORKFLOW_GATE_COLUMNS: Column<WorkflowGateStatus>[] = [
 ];
 
 export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
+  const navigate = useNavigate();
   const [page, setPage] = useState(0);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -227,8 +229,12 @@ export function EpicWorkspacePage({ module }: EpicWorkspacePageProps) {
     {module === "automation" && <WorkflowGateConsole />}
     {module === "sandbox" && <ReleaseControlPlane />}
     {module === "mobile" && <MobileOfflinePanel devices={rawRows} />}
-    {module === "bfsi" && <BfsiOperationsPanel />}
-    {module === "commodity" && <CommodityOperationsPanel />}
+    {(module === "bfsi" || module === "commodity") && <section className="vertical-industry-workspace" aria-label="Industry operations">
+      <VerticalIndustryTabs active={module} onChange={(tab) => navigate(`/packs/${tab}`)} />
+      <div role="tabpanel" id={`vertical-industry-${module}-panel`} aria-labelledby={`vertical-industry-${module}-tab`}>
+        {module === "bfsi" ? <BfsiOperationsPanel /> : <CommodityOperationsPanel />}
+      </div>
+    </section>}
 
     <section className="list-controls" aria-label={`${titleFromModule(module)} search and filters`}>
       <label>

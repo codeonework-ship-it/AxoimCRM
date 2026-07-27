@@ -12,6 +12,7 @@ import { GridLoader } from "../components/Loaders";
 import { filterRowsByColumns, groupLabelFor, selectedGroupColumns, type GroupColumn } from "../lib/gridGrouping";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
 import { useAppDialog } from "../components/AppDialog";
+import { useGridDataLoad } from "../components/PageDataGate";
 
 const TYPES = ["TASK", "EVENT", "CALL", "EMAIL_LOG", "NOTE"];
 const STATUSES = ["OPEN", "COMPLETED", "CANCELLED"];
@@ -30,6 +31,7 @@ function localDateTime(value: string): string | null {
 }
 
 export function ActivitiesPage() {
+  const activitiesGrid = useGridDataLoad("Activity timeline");
   const toasts = useToasts();
   const dialog = useAppDialog();
   const queryClient = useQueryClient();
@@ -60,6 +62,7 @@ export function ActivitiesPage() {
   const activitiesQ = useQuery({
     queryKey: ["activities", page, search, type, status],
     queryFn: () => api.activities({ page, search, type, status }),
+    enabled: activitiesGrid.loaded,
     retry: 1,
   });
   const summaryQ = useQuery({ queryKey: ["activities", "summary"], queryFn: api.activitySummary, retry: 1 });

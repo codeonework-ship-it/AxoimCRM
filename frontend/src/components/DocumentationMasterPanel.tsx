@@ -9,6 +9,7 @@ import {
 } from "../api/client";
 import { DataGridToolbar } from "./DataGridToolbar";
 import { DataViewFrame } from "./DataViewFrame";
+import { useGridDataLoad } from "./PageDataGate";
 import { useToasts } from "./Toasts";
 
 const LOCALES = ["en", "de", "ru"] as const;
@@ -28,9 +29,10 @@ const emptyEntry: DocumentationEntryMutation = {
 
 /** Administrator-facing master for all content rendered in HelpDrawer. */
 export function DocumentationMasterPanel({ readOnly }: { readOnly: boolean }) {
+  const documentationGrid = useGridDataLoad("Documentation Drawer Master");
   const queryClient = useQueryClient();
   const toasts = useToasts();
-  const masterQ = useQuery({ queryKey: ["documentation", "master"], queryFn: () => api.documentationMaster(true), retry: 1 });
+  const masterQ = useQuery({ queryKey: ["documentation", "master"], queryFn: () => api.documentationMaster(true), enabled: documentationGrid.loaded, retry: 1 });
   const [selectedSection, setSelectedSection] = useState<string | null>(null);
   const [sectionDraft, setSectionDraft] = useState<DocumentationSectionMutation>(emptySection);
   const [selectedEntry, setSelectedEntry] = useState<string | null>(null);

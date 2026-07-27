@@ -1,3 +1,5 @@
+import { useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useQuery } from "@tanstack/react-query";
 import { api, type AuditEvent } from "../api/client";
 import { useI18n } from "../i18n/I18nProvider";
@@ -13,12 +15,30 @@ interface AuditDrawerProps {
 
 export function AuditDrawer({ open, entityType, title, emptyLabel = "No audited actions yet.", onClose }: AuditDrawerProps) {
   const { t, tp, formatDate } = useI18n();
+  const closeRef = useRef<HTMLButtonElement>(null);
   const auditQ = useQuery({ queryKey: ["audit", entityType], queryFn: () => api.auditEvents(entityType), enabled: open });
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    document.body.style.overflow = "hidden";
+    closeRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+      opener?.focus();
+    };
+  }, [onClose, open]);
+
   if (!open) return null;
-  return <div className="drawer-scrim" role="presentation" onMouseDown={onClose}>
+  return createPortal(<div className="drawer-scrim audit-drawer-scrim" role="presentation" onMouseDown={onClose}>
     <aside className="audit-drawer" role="dialog" aria-modal="true" aria-label={`${entityType} ${tp("audit history")}`} onMouseDown={(event) => event.stopPropagation()}>
       <header className="drawer-head"><div><span className="eyebrow">{tp("Immutable evidence")}</span><h2>{tp(title ?? `${entityType} audit`)}</h2></div>
-        <button className="icon-btn" onClick={onClose} aria-label={`${t("ui.common.close", "Close")} ${t("ui.grid.audit", "Audit")}`}><CloseIcon /></button></header>
+        <button ref={closeRef} className="icon-btn" onClick={onClose} aria-label={`${t("ui.common.close", "Close")} ${t("ui.grid.audit", "Audit")}`}><CloseIcon /></button></header>
       <div className="audit-list">
         {auditQ.isLoading && <p className="loading-note">{tp("Loading audit trail...")}</p>}
         {auditQ.isError && <p className="empty-note">{tp("Audit trail unavailable.")}</p>}
@@ -29,5 +49,5 @@ export function AuditDrawer({ open, entityType, title, emptyLabel = "No audited 
         {auditQ.data?.length === 0 && <p className="empty-note">{tp(emptyLabel)}</p>}
       </div>
     </aside>
-  </div>;
+  </div>, document.body);
 }

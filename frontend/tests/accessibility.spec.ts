@@ -29,8 +29,13 @@ async function signIn(page: Page) {
 }
 
 async function loadScreen(page: Page) {
-  const load = page.getByRole('button', { name: 'Load Screen Data' })
-  if (await load.isVisible()) await load.click()
+  const load = page.getByRole('button', { name: 'Load Grid Data' }).first()
+  try {
+    await load.waitFor({ state: 'visible', timeout: 2500 })
+    await load.click()
+  } catch {
+    // Screens without a data grid intentionally have no load interaction.
+  }
 }
 
 test('login is keyboard-usable and meets WCAG 2.2 AA automated rules', async ({ page }) => {
@@ -39,6 +44,15 @@ test('login is keyboard-usable and meets WCAG 2.2 AA automated rules', async ({ 
   await assertWcag(page, 'Login')
   await page.keyboard.press('Tab')
   await expect(page.locator(':focus')).toBeVisible()
+})
+
+test('The Grid theme never draws a fixed horizontal horizon across a screen', async ({ page }) => {
+  await page.goto('/login')
+  await page.getByRole('button', { name: 'Use The Grid theme', exact: true }).click()
+  const ground = page.locator('.app-ground')
+  await expect(ground).toBeVisible()
+  const horizonContent = await ground.evaluate(element => getComputedStyle(element, '::after').content)
+  expect(horizonContent).toBe('none')
 })
 
 test('P0 operational pages meet WCAG 2.2 AA automated rules', async ({ page }) => {

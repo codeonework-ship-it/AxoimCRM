@@ -14,6 +14,7 @@ import {
 import { useToasts } from "./Toasts";
 import { useAuth } from "../auth/AuthContext";
 import { useI18n } from "../i18n/I18nProvider";
+import { InfoTag } from "./InfoTag";
 
 type StudioTab = "BUILDER" | "DASHBOARDS" | "DELIVERY" | "OPERATIONS";
 type DropZone = "columns" | "groups" | "measures" | "pivot";
@@ -286,7 +287,7 @@ function DropZone({ title: zoneTitle, help, values, fields, onDrop, onRemove }: 
   return <section className="drop-zone" onDragOver={event => event.preventDefault()} onDrop={onDrop}><strong>{zoneTitle}</strong><small>{help}</small><div>{values.map(value => <button key={value} onClick={() => onRemove(value)} title="Remove">{labelOf(fields, value)} <span>×</span></button>)}{values.length === 0 && <em>Drop a compatible field here</em>}</div></section>;
 }
 function TagList({ values, onRemove }: { values: string[]; onRemove: (index: number) => void }) { return <div className="tag-list">{values.map((value, index) => <button key={`${value}-${index}`} onClick={() => onRemove(index)}>{value} ×</button>)}</div>; }
-function Info({ text }: { text: string }) { return <span className="info-tag" tabIndex={0} title={text} aria-label={text}>i</span>; }
+function Info({ text }: { text: string }) { return <InfoTag text={text} label="Report field help" />; }
 function Metric({ label, value }: { label: string; value: string | number }) { return <div><strong>{value}</strong><span>{label}</span></div>; }
 function GovernanceList({ title: listTitle, rows, empty }: { title: string; rows: Array<{ title: string; detail: string }>; empty: string }) { return <section><h3>{listTitle}</h3>{rows.length ? rows.map((row, index) => <article key={`${row.title}-${index}`}><strong>{row.title}</strong><small>{row.detail}</small></article>) : <p>{empty}</p>}</section>; }
 

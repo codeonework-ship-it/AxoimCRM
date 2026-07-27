@@ -15,6 +15,8 @@ import { InfoTag } from "./InfoTag";
 import { useToasts } from "./Toasts";
 import { usePersistedGridState } from "../lib/usePersistedGridState";
 import { useI18n } from "../i18n/I18nProvider";
+import { DatabaseIcon } from "./icons";
+import { GridDataLoadedScope, useEnclosingGridLoaded, useGridDataLoad } from "./PageDataGate";
 
 /**
  * One table component for every RBAC screen: per-column filtering, grouping and
@@ -143,6 +145,9 @@ export function DataTable<T>({
   const [auditOpen, setAuditOpen] = useState(false);
   const [full, setFull] = useState(false);
   const [page, setPage] = useState(0);
+  const enclosingGridLoaded = useEnclosingGridLoaded();
+  const ownGrid = useGridDataLoad(name);
+  const gridLoaded = enclosingGridLoaded || ownGrid.loaded;
 
   const columnCount = columns.length + (actions ? 1 : 0);
   const auditEntityType = tableAuditEntityType(name);
@@ -357,15 +362,29 @@ export function DataTable<T>({
         <div>
           <span className="eyebrow">{t("ui.grid.tableWorkspace", "Table workspace")}</span>
           <h2 className="data-view-title">
-            <span>{tp(name)}</span>
+            <span className="data-view-title-text">{tp(name)}</span>
             <InfoTag
               text={tp("Use this table to filter each column, group related rows, sort headers, open audit history, export the current view, or expand it for a larger review.")}
               label={`${name} table help`}
             />
           </h2>
         </div>
-        <span className="grid-view-summary" aria-live="polite">{tableViewScope()}</span>
+        <div className="data-table-head-trailing">
+          {gridLoaded && <span className="grid-view-summary" aria-live="polite">{tableViewScope()}</span>}
+        </div>
       </header>
+      {!gridLoaded ? (
+        <div className="grid-data-gate" role="status" aria-live="polite">
+          <span className="grid-data-gate-icon" aria-hidden="true"><DatabaseIcon /></span>
+          <div>
+            <strong>{t("ui.load.gridTitle", "Grid Data Is Ready On Demand")}</strong>
+            <p>{t("ui.load.gridDescription", "Load the first 100 tenant-scoped rows. Search, filters and pagination continue to run on the server.")}</p>
+          </div>
+          <button type="button" className="btn btn-primary btn-sm" onClick={ownGrid.load}>
+            {t("ui.load.gridButton", "Load Grid Data")}
+          </button>
+        </div>
+      ) : <GridDataLoadedScope>
       {/*
         The same Actions / Group rows every other data workspace uses. This
         table previously laid its controls out as one flex line with the group
@@ -555,6 +574,7 @@ export function DataTable<T>({
         </div>
       </footer>
       {note && <p className="loading-note">{note}</p>}
+      </GridDataLoadedScope>}
     </section>
     <AuditDrawer
       open={auditOpen}

@@ -68,7 +68,10 @@ export function InfoTag({ text, label = "Information" }: { text: string; label?:
       aria-label={`${label}: ${text}`}
       data-info={text}
     >
-      i
+      <svg className="info-tag-icon" viewBox="0 0 12 12" aria-hidden="true" focusable="false">
+        <circle cx="6" cy="2.75" r="1" fill="currentColor" />
+        <path d="M6 5.1v4.15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      </svg>
     </span>
   );
 }
