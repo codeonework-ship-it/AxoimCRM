@@ -5658,10 +5658,13 @@ button.btn-sm:not(.btn-block) {
 }
 
 .record-dialog {
-  inline-size: min(760px, 100%);
-  max-block-size: calc(100vh - 2 * var(--space-4));
-  overflow-y: auto;
-  padding: var(--space-4) var(--space-5) var(--space-5);
+  inline-size: min(1040px, 100%);
+  min-block-size: min(640px, calc(100dvh - 2 * var(--space-4)));
+  max-block-size: calc(100dvh - 2 * var(--space-4));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: clamp(24px, 3vw, 34px);
 }
 
 .record-dialog-head,
@@ -5677,25 +5680,81 @@ button.btn-sm:not(.btn-block) {
 .record-drawer-head h2 { margin: 2px 0 0; font-size: 17px; }
 .record-drawer-head p { margin: 3px 0 0; color: var(--slate); font-size: 12px; }
 
-/* Two columns on desktop, one on narrow. Half-width by default because most
-   record fields are short; `field-wide` opts a field back to full width. */
+.record-form {
+  min-block-size: 0;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+/* Three aligned columns use the larger desktop dialog without letting controls
+   choose their own width. `field-wide` opts a field back to the full row. */
 .record-form-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: 20px 24px;
   margin-bottom: var(--space-4);
 }
 
+.record-form-grid .field {
+  min-inline-size: 0;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  margin: 0;
+}
+.record-form-grid .field > .label {
+  display: block;
+  min-block-size: 13px;
+  line-height: 13px;
+}
+.record-form-grid .field > input,
+.record-form-grid .field > select,
+.record-form-grid .field > textarea {
+  box-sizing: border-box;
+  inline-size: 100%;
+  min-inline-size: 0;
+  min-block-size: 44px;
+  margin: 0;
+  padding-inline: 12px;
+}
+.record-form-grid .field > textarea {
+  min-block-size: 96px;
+  padding-block: 10px;
+  resize: vertical;
+}
 .record-form-grid .field-wide { grid-column: 1 / -1; }
-.record-form-grid .field-help { color: var(--slate); font-size: 10.5px; }
+.record-form-grid .field-help { color: var(--slate); font-size: 10.5px; line-height: 1.45; }
 .record-form-grid .req { color: var(--red, #ff5d5d); font-style: normal; }
 
 .record-form-actions {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
+  margin-top: auto;
   padding-top: var(--space-3);
   border-top: 1px solid var(--line);
+  background: var(--paper-raised);
+}
+:root body .record-form-actions .btn {
+  inline-size: 156px;
+  min-inline-size: 156px;
+}
+
+@media (max-width: 760px) {
+  .record-dialog { min-block-size: calc(100dvh - 2 * var(--space-3)); padding: 22px; }
+  .record-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 540px) {
+  .record-scrim { padding: var(--space-2); }
+  .record-dialog { min-block-size: calc(100dvh - 2 * var(--space-2)); padding: 18px; }
+  .record-form-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .record-form-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root body .record-form-actions .btn { min-inline-size: 0; inline-size: 100%; }
 }
 
 .record-lock-banner { display:grid; gap:7px; margin:0 20px 14px; padding:12px 14px; border:1px solid var(--line-strong); background:var(--paper-sunk); color:var(--ink-soft); }

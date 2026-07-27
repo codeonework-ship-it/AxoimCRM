@@ -37,6 +37,54 @@ test('authenticated P0 routes render without uncaught runtime failures', async (
   expect(errors, 'No route may raise an uncaught error or error-level console message').toEqual([])
 })
 
+test('record authoring modal has a spacious aligned control grid', async ({ page }) => {
+  await signIn(page)
+  await page.goto('/contacts')
+  await page.getByRole('button', { name: 'New contact', exact: true }).click()
+
+  const dialog = page.getByRole('dialog', { name: 'New contact', exact: true })
+  await expect(dialog).toBeVisible()
+  const geometry = await dialog.evaluate(element => {
+    const dialogRect = element.getBoundingClientRect()
+    const fields = [...element.querySelectorAll('.record-form-grid .field')]
+    const controls = fields.map(field => {
+      const fieldRect = field.getBoundingClientRect()
+      const controlRect = field.querySelector('input, select, textarea')!.getBoundingClientRect()
+      return {
+        fieldWidth: fieldRect.width,
+        controlWidth: controlRect.width,
+        controlHeight: controlRect.height,
+        controlY: controlRect.y,
+      }
+    })
+    const actions = [...element.querySelectorAll('.record-form-actions .btn')]
+      .map(action => action.getBoundingClientRect().width)
+    const scrim = element.closest('.record-scrim')
+    return {
+      width: dialogRect.width,
+      height: dialogRect.height,
+      controls,
+      actions,
+      scrimIsBodyChild: scrim?.parentElement === document.body,
+      scrimPosition: scrim ? getComputedStyle(scrim).position : null,
+    }
+  })
+
+  expect(geometry.scrimIsBodyChild).toBe(true)
+  expect(geometry.scrimPosition).toBe('fixed')
+  expect(geometry.width).toBeGreaterThanOrEqual(900)
+  expect(geometry.height).toBeGreaterThanOrEqual(600)
+  expect(geometry.controls).toHaveLength(9)
+  for (const control of geometry.controls) {
+    expect(Math.abs(control.fieldWidth - control.controlWidth)).toBeLessThanOrEqual(1)
+    expect(control.controlHeight).toBeGreaterThanOrEqual(44)
+  }
+  expect(new Set(geometry.controls.slice(0, 3).map(control => control.controlY)).size).toBe(1)
+  expect(new Set(geometry.controls.slice(3, 6).map(control => control.controlY)).size).toBe(1)
+  expect(new Set(geometry.controls.slice(6, 9).map(control => control.controlY)).size).toBe(1)
+  expect(Math.abs(geometry.actions[0] - geometry.actions[1])).toBeLessThanOrEqual(1)
+})
+
 test('BFSI and Commodity operations are separated into accessible route tabs', async ({ page }) => {
   await signIn(page)
   await page.goto('/packs/bfsi')

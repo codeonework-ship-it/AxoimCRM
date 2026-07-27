@@ -1,7 +1,7 @@
 {
   "name": "axiom-crm-desktop",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Axiom CRM desktop shell",
   "main": "main.js",
   "scripts": {

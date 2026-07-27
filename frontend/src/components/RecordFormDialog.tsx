@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { ApiError } from "../api/client";
 import { InlineLoader } from "./Loaders";
 import { CloseIcon } from "./icons";
@@ -188,7 +189,7 @@ export function RecordFormDialog<T extends object>({
       : `Edit ${objectLabel}`;
   const authoringBlocked = mode === "edit" && !!editLock?.blocked;
 
-  return (
+  return createPortal(
     <div className="record-scrim" role="presentation"
       onMouseDown={(event) => { if (event.target === event.currentTarget) void attemptClose(); }}>
       <div className="panel record-dialog" role="dialog" aria-modal="true" aria-labelledby="record-dialog-title">
@@ -315,6 +316,7 @@ export function RecordFormDialog<T extends object>({
           </footer>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
